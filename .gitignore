@@ -13,3 +13,6 @@ Bcan008b/
 *.swp
 .vscode/
 .idea/
+
+# 本機 SDL2 dev 檔（無 sudo 時由系統 .deb 解出，見 README 建置節）
+third_party/sdl2-local/

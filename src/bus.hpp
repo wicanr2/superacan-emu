@@ -8,10 +8,10 @@
 //   $E90B3C-$E90B3D  lockout 檢查雜訊區（NOP 性質，此處給一個真實 word 儲存）
 //   $EB0D00-$EB0D03  UMC6650（8-bit）
 //   $EC0000-$ECFFFF  卡帶 SRAM（8-bit 寬，僅奇位址有效）
-//   $F00000-$F001FF  UM6618 視訊暫存器（stub：讀 0、寫忽略）
-//   $F00200-$F003FF  調色盤 RAM 256 色 xBGR-555
+//   $F00000-$F001FF  UM6618 視訊暫存器（video/um6618.cpp）
+//   $F00200-$F003FF  調色盤 RAM 256 色 xBGR-555（UM6618）
 //   $F00400-$F3FFFF  no-op 區段
-//   $F40000-$F5FFFF  VRAM 128KB
+//   $F40000-$F5FFFF  VRAM 128KB（UM6618）
 //   $F60000-$F7FFFF  no-op 區段
 //   $F80000-$FBFFFF  卡帶 ROM 高區視圖（$F80000-$F80FFF 開機時 overlay IPL）
 //   $FC0000-$FFFFFF  Work RAM 64KB，addr & 0xFFFF 映射（$FC-$FF 四頁同體）
@@ -23,6 +23,7 @@
 #pragma once
 
 #include "umc6650.hpp"
+#include "video/um6618.hpp"
 
 #include <array>
 #include <cstdint>
@@ -38,6 +39,16 @@ public:
     void loadSram(const uint8_t *data, size_t len);      // 卡帶 SRAM（可選）
 
     UMC6650 &lockout() { return lockout_; }
+    UM6618 &video() { return video_; }
+    const UM6618 &video() const { return video_; }
+
+    // 手把狀態（16-bit active low，知識庫 memory-map.md §7 (b)）；
+    // 65C02 未執行時經 MAME「direct mode」路徑由 $E80200/$E80202 讀出
+    void setPad(int player, uint16_t bits) { pad_[player & 1] = bits; }
+    uint16_t pad(int player) const { return pad_[player & 1]; }
+
+    // 68k 寫 $E9000A/B → 觸發 65C02 IRQ bit5（sound-driver.md §4.1 (a)）
+    std::function<void()> onSoundIrqRequest;
 
     // 供 65C02 wrapper 直接映射共享音效 RAM（$E80000 區與 65C02 空間同體，
     // docs/memory-map.md §5）
@@ -59,8 +70,8 @@ public:
         write16(addr + 2, uint16_t(val));
     }
 
-    bool loOverlayOn() const { return !(ctrl_ & 0x0002); }
-    bool hiOverlayOn() const { return !(ctrl_ & 0x0008); }
+    bool loOverlayOn() const { return !loOverlayOff_; }
+    bool hiOverlayOn() const { return !hiOverlayOff_; }
 
     // 卡帶向量表（overlay 關閉後的 $0/$4，即 ROM 的 SSP/PC）
     uint32_t cartVector(int n) const {
@@ -77,10 +88,23 @@ private:
     std::array<uint8_t, 4096>   ipl_{};
     std::array<uint8_t, 65536>  soundRam_{};
     std::array<uint8_t, 65536>  wram_{};
-    std::array<uint8_t, 131072> vram_{};
-    std::array<uint16_t, 256>   palette_{};
     std::array<uint8_t, 32768>  sram_{};     // 固定 32768 byte（memory-map.md §2 (a)）
     uint16_t e90b3c_ = 0;                     // 雜訊區（給真實儲存，行為無害）
     uint16_t ctrl_ = 0;                       // $E9001C
+    // IPL overlay 關閉為單向 latch：遊戲上傳音效驅動時會把整個 $E9001C 清 0
+    // （sound-driver.md §1.1），若 overlay 隨 bit 清除而恢復，卡帶自己的中斷
+    // 向量會被 IPL 蓋回（全部指向 IPL 的 rte），遊戲無法運作。
+    bool loOverlayOff_ = false, hiOverlayOff_ = false;
+    uint16_t pad_[2] = { 0xFFFF, 0xFFFF };    // active low，無輸入 = 全 1
+    uint16_t frcControl_ = 0, frcFreq_ = 0;   // $E90014/$16（FRC stub，TODO：IRQ3 計時器）
     UMC6650 lockout_{};
+    UM6618 video_{};
+
+    // 主機 DMA 通道 0/1（$E90020-$3F，memory-map.md §4 (b)）
+    struct DmaChannel { uint32_t src = 0, dst = 0; uint16_t count = 0, control = 0; };
+    std::array<DmaChannel, 2> dma_{};
+    uint16_t dmaReg(int ch, int idx) const;
+    void dmaSetReg(int ch, int idx, uint16_t v);
+    void dmaWriteByte(int ch, int idx, uint32_t addr, uint8_t val);
+    void dmaTrigger(int ch, uint16_t control);
 };

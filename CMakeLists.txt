@@ -42,6 +42,7 @@ add_executable(superacan-emu
     src/umc6650.cpp
     src/cpu68k.cpp
     src/cpu65c02.cpp
+    src/video/um6618.cpp
 )
 
 target_include_directories(superacan-emu PRIVATE
@@ -52,6 +53,30 @@ target_include_directories(superacan-emu PRIVATE
 
 target_link_libraries(superacan-emu PRIVATE moira)
 
-# 預留：未來視窗/影像里程碑加 SDL2
-# find_package(SDL2)
-# target_link_libraries(superacan-emu PRIVATE SDL2::SDL2)
+# SDL2（視窗輸出）：優先系統套件；否則用 third_party/sdl2-local（由系統
+# libsdl2-dev .deb 解出的 headers + 系統 runtime lib，本機無 sudo 時的做法，
+# 見 README「建置」）；再不行才 FetchContent 自建（需 X11 dev headers）
+find_package(SDL2 QUIET)
+if(SDL2_FOUND)
+    target_link_libraries(superacan-emu PRIVATE SDL2::SDL2)
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/third_party/sdl2-local/include/SDL2/SDL.h")
+    message(STATUS "使用 third_party/sdl2-local 的 SDL2 headers + 系統 runtime")
+    target_include_directories(superacan-emu PRIVATE
+        third_party/sdl2-local/include        # SDL_config.h 以 <SDL2/...> 引用
+        third_party/sdl2-local/include/SDL2)  # <SDL.h>
+    target_link_directories(superacan-emu PRIVATE third_party/sdl2-local)
+    target_link_libraries(superacan-emu PRIVATE SDL2)
+else()
+    message(STATUS "系統無 SDL2，以 FetchContent 建置 SDL 2.30.0")
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        sdl2
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL
+        GIT_TAG        release-2.30.0
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(sdl2)
+    target_link_libraries(superacan-emu PRIVATE SDL2::SDL2)
+endif()
