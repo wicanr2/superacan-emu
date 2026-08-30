@@ -1,0 +1,15 @@
+# 建置輸出
+build/
+out/
+
+# 版權檔：ROM / BIOS 一律不入庫
+*.bin
+*.zip
+ROMS/
+bios/
+Bcan008b/
+
+# 編輯器/雜項
+*.swp
+.vscode/
+.idea/
