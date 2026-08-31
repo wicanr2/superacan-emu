@@ -502,6 +502,26 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.jsrAddressIndexed(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k JSR (d8,A%d,Xn): %w", decoded.Register, err)
 		}
+	case InstructionCMPIByteAbsoluteLong:
+		if err := c.cmpiByteAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k CMPI.B #imm,(xxx).L: %w", err)
+		}
+	case InstructionCLRLongPostincrement:
+		if err := c.clearLongPostincrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CLR.L (A%d)+: %w", decoded.Register, err)
+		}
+	case InstructionCLRBytePostincrement:
+		if err := c.clearBytePostincrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CLR.B (A%d)+: %w", decoded.Register, err)
+		}
+	case InstructionMOVELongImmediateToPostincrement:
+		if err := c.moveLongImmediateToPostincrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L #imm,(A%d)+: %w", decoded.Register, err)
+		}
+	case InstructionCLRWordPostincrement:
+		if err := c.clearWordPostincrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CLR.W (A%d)+: %w", decoded.Register, err)
+		}
 	case InstructionBSR:
 		if err := c.bsr(decoded.Immediate8); err != nil {
 			return result, fmt.Errorf("m68k BSR: %w", err)

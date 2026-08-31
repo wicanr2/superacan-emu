@@ -1,14 +1,23 @@
 package machine
 
-import "github.com/wicanr2/superacan-emu/cpu/m68k"
+import (
+	"github.com/wicanr2/superacan-emu/cpu/m65c02"
+	"github.com/wicanr2/superacan-emu/cpu/m68k"
+)
 
 // System wires the first production CPU, bus and shared timeline together.
 // Additional chips attach to Bus and Timeline without changing the CPU API.
 type System struct {
-	Bus          *Bus
-	Timeline     *Timeline
-	M68K         *m68k.CPU
-	Instructions uint64
+	Bus               *Bus
+	Timeline          *Timeline
+	M68K              *m68k.CPU
+	M65C02            *m65c02.CPU
+	SoundBus          *SoundBus
+	SoundTimeline     *SoundTimeline
+	Instructions      uint64
+	SoundInstructions uint64
+	soundReset        bool
+	soundCredit       int64
 }
 
 func NewSystem(ipl, rom, key []byte) (*System, error) {
@@ -17,13 +26,23 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 		return nil, err
 	}
 	timeline := &Timeline{}
-	return &System{
+	soundBus := newSoundBus(&bus.soundRAM)
+	soundTimeline := &SoundTimeline{}
+	system := &System{
 		Bus: bus, Timeline: timeline,
-		M68K: m68k.New(bus, timeline),
-	}, nil
+		M68K:     m68k.New(bus, timeline),
+		M65C02:   m65c02.New(soundBus, soundTimeline),
+		SoundBus: soundBus, SoundTimeline: soundTimeline,
+		soundReset: true,
+	}
+	timeline.OnAdvance = system.advanceSound
+	bus.setControlObserver(system.controlChanged)
+	return system, nil
 }
 
 func (s *System) Reset() error { return s.M68K.Reset() }
+
+func (s *System) SoundResetAsserted() bool { return s.soundReset }
 
 func (s *System) RunInstructions(count uint64) (m68k.StepResult, error) {
 	var result m68k.StepResult
@@ -36,4 +55,36 @@ func (s *System) RunInstructions(count uint64) (m68k.StepResult, error) {
 		s.Instructions++
 	}
 	return result, nil
+}
+
+func (s *System) controlChanged(oldValue, newValue uint16) error {
+	wasReset := oldValue&1 == 0
+	isReset := newValue&1 == 0
+	if !wasReset && isReset {
+		s.soundReset = true
+		s.soundCredit = 0
+		return nil
+	}
+	if wasReset && !isReset {
+		s.soundReset = false
+		s.soundCredit = 0
+		return s.M65C02.Reset()
+	}
+	return nil
+}
+
+func (s *System) advanceSound(m68kCycles uint8) error {
+	if s.soundReset {
+		return nil
+	}
+	s.soundCredit += int64(m68kCycles)
+	for s.soundCredit >= 6 {
+		result, err := s.M65C02.Step()
+		if err != nil {
+			return err
+		}
+		s.SoundInstructions++
+		s.soundCredit -= int64(result.Cycles) * 3
+	}
+	return nil
 }

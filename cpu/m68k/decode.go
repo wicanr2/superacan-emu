@@ -107,6 +107,11 @@ const (
 	InstructionROLByteImmediate
 	InstructionMOVEWordPCIndexedToData
 	InstructionJSRAddressIndexed
+	InstructionCMPIByteAbsoluteLong
+	InstructionCLRLongPostincrement
+	InstructionCLRBytePostincrement
+	InstructionMOVELongImmediateToPostincrement
+	InstructionCLRWordPostincrement
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -401,6 +406,16 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEWordPCIndexedToData, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xfff8 == 0x4eb0:
 		return Decoded{Instruction: InstructionJSRAddressIndexed, Register: uint8(opcode & 7)}
+	case opcode == 0x0c39:
+		return Decoded{Instruction: InstructionCMPIByteAbsoluteLong}
+	case opcode&0xfff8 == 0x4298:
+		return Decoded{Instruction: InstructionCLRLongPostincrement, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4218:
+		return Decoded{Instruction: InstructionCLRBytePostincrement, Register: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x20fc:
+		return Decoded{Instruction: InstructionMOVELongImmediateToPostincrement, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xfff8 == 0x4258:
+		return Decoded{Instruction: InstructionCLRWordPostincrement, Register: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x0040:
 		return Decoded{Instruction: InstructionORIWordData, Register: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3010:

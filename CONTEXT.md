@@ -28,10 +28,13 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | 68000 phase API | scheduler-before-bus、24-bit address、FC、byte／word transaction | API 已測；尚未有整機 scheduler consumer |
 | 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
 | 68000 opcode | 真實 IPL＋Boom Zoo 已無錯執行 200,000 條指令，進入卡帶與高位址 IPL 服務區 | 官方 ISA／timing 表；未覆蓋完整 ISA、exception／IRQ |
+| W65C02 | 純 Go reset／堆疊／分支與 Boom Zoo boot 所需子集；已產生 `$0300=$FF` ack | 3:1 shared scheduler；尚未完整 ISA／IRQ |
 | media | word-swap、大小驗證、原始 SHA-256 manifest | BIOS／ROM 不入版控 |
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
+| UMC6619 | 65C02 間接位址／資料埠與暫存器檔 | PCM／timer／DMA 尚未執行 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行 68000 | 200,000 條成功指令，PC `$FF80A0`；雙 overlay 均已關閉 |
+| bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |
 | archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |
 
 MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件，可執行性用來驗證文件
@@ -85,8 +88,8 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 
 ## 下一個交付閘門
 
-下一個 vertical slice 由目前 200,000 指令後的卡帶／IPL 服務迴圈繼續，建立可觀察的
-UM6618／UM6619／sound RAM 交易檢查點，並補齊實際路徑需要的 68000 exception／IRQ。
-CPU 足以穩定進入遊戲初始化後，將 archived
-C++ 已驗證的 UM6618／UM6619／65C02／DMA／IRQ 行為分晶片移植為獨立 Go 實作。
+下一個 vertical slice 已越過 sound CPU boot ack 並觀察到 `$F44400` 起的 VRAM 初始化；
+現在把 UM6618 register／palette／VRAM 以單次 word transaction 接入，接著實作主機 DMA、
+掃描線與 IRQ。UM6619 仍須由 register file 擴充為 PCM／timer／DMA，W65C02 仍須完成
+完整 ISA 與 IRQ。各晶片都以 archived C++ 與 MAME 作分級 oracle，而非直接翻譯。
 Ebitengine 前端不能先於 headless machine core 決定 scheduler。

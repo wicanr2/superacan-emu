@@ -1,6 +1,10 @@
 package machine
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/wicanr2/superacan-emu/cpu/m68k"
+)
 
 func TestSystemResetUsesSharedTimeline(t *testing.T) {
 	ipl := make([]byte, IPLSize)
@@ -64,5 +68,44 @@ func TestHighOverlayWriteKeepsPrefetchedJump(t *testing.T) {
 	state := system.M68K.State()
 	if state.PC != 0x400 || state.IRD != 0x4e71 || system.Bus.LowOverlayEnabled() || system.Bus.HighOverlayEnabled() {
 		t.Fatalf("transfer: PC=$%06X IRD=$%04X low=%v high=%v", state.PC, state.IRD, system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled())
+	}
+}
+
+func TestSoundCPUResetReleaseAndThreeToOneScheduling(t *testing.T) {
+	ipl := make([]byte, IPLSize)
+	rom := make([]byte, 2)
+	key := make([]byte, 16)
+	system, err := NewSystem(ipl, rom, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for address, value := range map[uint32]uint8{
+		0xe8fffc: 0x00, 0xe8fffd: 0xf0,
+		0xe8f000: 0x78, 0xe8f001: 0xea,
+	} {
+		if err := system.Bus.Write8(address, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !system.SoundResetAsserted() {
+		t.Fatal("sound reset was not initially asserted")
+	}
+	if err := system.Bus.Write16(0xe9001c, 1); err != nil {
+		t.Fatal(err)
+	}
+	if state := system.M65C02.State(); state.PC != 0xf000 || state.Cycles != 7 || system.SoundResetAsserted() {
+		t.Fatalf("released sound state=%+v reset=%v", state, system.SoundResetAsserted())
+	}
+	if err := system.Timeline.Advance(m68k.Phase{Kind: m68k.PhaseInternal, Cycles: 4}); err != nil {
+		t.Fatal(err)
+	}
+	if system.SoundInstructions != 0 {
+		t.Fatalf("sound ran before two sound cycles: %d instructions", system.SoundInstructions)
+	}
+	if err := system.Timeline.Advance(m68k.Phase{Kind: m68k.PhaseInternal, Cycles: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if state := system.M65C02.State(); system.SoundInstructions != 1 || state.PC != 0xf001 || state.Cycles != 9 {
+		t.Fatalf("scheduled sound state=%+v instructions=%d", state, system.SoundInstructions)
 	}
 }

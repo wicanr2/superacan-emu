@@ -70,3 +70,28 @@ func TestLockoutWorkRAMMirrorsAndSRAMLanes(t *testing.T) {
 		t.Fatalf("SRAM odd lane=$%02X", odd)
 	}
 }
+
+func TestObserverReportsOneCompleteTransactionPerAccess(t *testing.T) {
+	b := testMachineBus(t)
+	var transactions []Transaction
+	b.SetObserver(func(transaction Transaction) { transactions = append(transactions, transaction) })
+
+	if err := b.Write16(0xfc0010, 0x1234); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := b.Read16(0xfc0010); err != nil || got != 0x1234 {
+		t.Fatalf("Read16=$%04X err=%v", got, err)
+	}
+	want := []Transaction{
+		{Address: 0xfc0010, Width: 2, Write: true, Value: 0x1234},
+		{Address: 0xfc0010, Width: 2, Value: 0x1234},
+	}
+	if len(transactions) != len(want) {
+		t.Fatalf("transactions=%+v", transactions)
+	}
+	for i := range want {
+		if transactions[i] != want[i] {
+			t.Fatalf("transaction[%d]=%+v, want %+v", i, transactions[i], want[i])
+		}
+	}
+}

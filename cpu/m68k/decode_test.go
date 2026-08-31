@@ -86,6 +86,11 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0xe319, Decoded{Instruction: InstructionROLByteImmediate, Register: 1, Quick: 1}},
 		{0x3e3b, Decoded{Instruction: InstructionMOVEWordPCIndexedToData, Register: 7}},
 		{0x4eb3, Decoded{Instruction: InstructionJSRAddressIndexed, Register: 3}},
+		{0x0c39, Decoded{Instruction: InstructionCMPIByteAbsoluteLong}},
+		{0x4299, Decoded{Instruction: InstructionCLRLongPostincrement, Register: 1}},
+		{0x4219, Decoded{Instruction: InstructionCLRBytePostincrement, Register: 1}},
+		{0x22fc, Decoded{Instruction: InstructionMOVELongImmediateToPostincrement, Register: 1}},
+		{0x425a, Decoded{Instruction: InstructionCLRWordPostincrement, Register: 2}},
 		{0xffff, Decoded{Instruction: InstructionIllegal}},
 	}
 	for _, test := range tests {

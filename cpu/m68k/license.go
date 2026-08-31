@@ -810,3 +810,74 @@ func (c *CPU) moveWordPCIndexedToData(destination uint8) error {
 	}
 	return stream.finish()
 }
+
+func (c *CPU) cmpiByteAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setCompare8(value, uint8(immediate))
+	return stream.finish()
+}
+
+func (c *CPU) clearLongPostincrement(register uint8) error {
+	address := c.state.A[register]
+	if _, err := c.readLong(address, FCSupervisorData); err != nil {
+		return err
+	}
+	if err := c.writeLong(address, 0, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[register] = (address + 4) & addressMask
+	c.setNZ32(0)
+	return c.prefetch()
+}
+
+func (c *CPU) clearBytePostincrement(register uint8) error {
+	address := c.state.A[register]
+	if _, err := c.readByte(address, FCSupervisorData); err != nil {
+		return err
+	}
+	if err := c.writeByte(address, 0, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[register] = (address + addressStep(register, WidthByte)) & addressMask
+	c.setNZ8(0)
+	return c.prefetch()
+}
+
+func (c *CPU) moveLongImmediateToPostincrement(destination uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + 4) & addressMask
+	c.setNZ32(value)
+	return stream.finish()
+}
+
+func (c *CPU) clearWordPostincrement(register uint8) error {
+	address := c.state.A[register]
+	if _, err := c.readWord(address, FCSupervisorData, PhaseDataRead); err != nil {
+		return err
+	}
+	if err := c.writeWord(address, 0, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[register] = (address + 2) & addressMask
+	c.setNZ16(0)
+	return c.prefetch()
+}

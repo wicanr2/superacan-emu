@@ -34,10 +34,14 @@
   Work/sound RAM、SRAM lane、`$E90B3C`、UMC6650、shared timeline 與 headless runner。
 - [x] 以固定真實 IPL `2e4d88…c695d7c` 及 Boom Zoo 驗證 `$400 → $620 → cart`；
   UMC6650 checksum、64-word 授權比較、第二階段 MULS hash 與雙 overlay 關閉均通過。
-- [ ] 從 Boom Zoo `$2B22 MOVEM.L` 擴充卡帶啟動 ISA、exception 與 IRQ，直到第一個
-  UM6618／UM6619／sound RAM 初始化交易；目前已通過 MOVEM、函式呼叫與 PC-indexed
-  服務路徑，無錯執行 200,000 條指令至 `$FF80A0`。不得以遊戲專屬 opcode stub
-  代替一般語意。
+- [x] 從 Boom Zoo `$2B22 MOVEM.L` 擴充卡帶啟動 ISA，直到第一個 UM6618／UM6619／
+  sound RAM 初始化交易。已完成 sound driver 上傳、65C02 `$0300=$FF` boot ack，並觀察
+  `$F44400` 起 VRAM 寫入；核心沒有遊戲專屬 opcode stub。
+- [ ] 將 UM6618 register／palette／VRAM 接入 Go bus，保證 word write 單次生效；再依
+  真實路徑實作 sprite DMA、掃描線與 IRQ4／5／7。
+- [ ] 完成 W65C02 ISA、IRQ／NMI／WAI 與 I/O ack，將目前 instruction-total 3:1 排程
+  收斂成可驗證的 cycle 邊界。
+- [ ] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ6／IRQ7 來源。
 
 ## Deprecated C++ 收尾紀錄
 

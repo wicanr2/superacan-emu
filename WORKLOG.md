@@ -157,3 +157,18 @@
   return／prefetch、ROL flags／timing，以及本批真實 opcode 的 decoder cases。
 - 證據限制：這證明固定軟體路徑已前進，不代表完整 MC68000、exception／IRQ 或遊戲
   可玩；下一步須以裝置交易 checkpoint 判定 UM6618／UM6619／sound RAM 初始化進度。
+
+## 2026-08-31：雙 CPU sound boot 與第一筆 VRAM 初始化
+
+- 新增 bus transaction observer 與 headless `--watch`／`--watch-limit`；byte／word access
+  都以完整 CPU transaction 記錄，並附 68000 step、PC、opcode。範圍解析、保留上限與
+  word 不重複計數皆有測試。
+- 第一輪證據：第 178,789 條起將 driver 寫入 `$E8F000`，第 182,885 條寫
+  `$E9001C=$0001`，第 395,493 條開始輪詢 `$E80300`；沒有 sound CPU 時永遠讀 `$00`。
+- 新增獨立純 Go W65C02 core、sound bus、3:1 shared scheduling 與 reset/HALT gate；實作
+  真實 boot 所需 ISA 子集。新增 UMC6619 indirect register port，未假造 PCM／timer。
+- 真實結果：65C02 從 `$F000` reset vector 起跑並把 `$0300` 寫成 `$FF`；68000 第一次
+  輪詢即取得 ack，離開原本等待迴圈。其後在第 397,684 條起觀察到 `$F44400` VRAM
+  word writes，證明已進入視訊資料初始化。
+- 目前前進至 462,153 條 68000 指令附近；W65C02 已執行約 311,000 條。這只證明 boot
+  路徑，尚不代表完整 65C02、IRQ、UM6618 renderer 或 UMC6619 音訊完成。
