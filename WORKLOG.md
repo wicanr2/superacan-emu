@@ -171,8 +171,12 @@
   `$FCDB80–$FCDBAF` 的生成寫入。兩段 code 分別在 frame 15／16 由 `$FFFF80B6` 生成；
   writer 簽章 `12C3:60E4:0028:002C` 可精確回查 word-swap 後 ROM `$00073A54`。
 - `$FFFFDA5C` 片段只在前五個 words 與 ROM `$74C86` 相同，後續立即值不同；`$FFFFDB90`
-  完整簽章不存在 ROM。故已證實 runtime code generation，解包／搬移或 relocation 僅列
-  強推論；source pointer、長度與編碼仍待追，不冒稱已解出壓縮格式。
+  完整簽章不存在 ROM。故已證實 runtime code generation；當時尚未界定 source 與長度，
+  後續 register probe 結果如下，仍不冒稱已完整解出格式。
+- 後續 register probe 修正解碼器 RAM 基址為 `$FFFF8000`，並界定同一次 frame 5–16 呼叫：
+  A0 `$73B44→$74BEC`、實際 bitstream `$73BE8–$74BEB`（`$1004` bytes），A1
+  `$FFFFB800→$FFFFDC56`（輸出 `$2456` bytes）。兩段 mode producer 都屬同一次連續輸出，
+  不是兩次解壓；完整格式欄位仍待離線解碼器逐 byte 驗證。
 
 ## 2026-08-31：雙 CPU sound boot 與第一筆 VRAM 初始化
 

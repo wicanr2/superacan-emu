@@ -28,6 +28,8 @@
 #include <vector>
 
 extern uint32_t g_dbgPc;  // bus.cpp 的除錯 watchpoint 用
+extern uint32_t g_dbgA0;
+extern uint32_t g_dbgA1;
 extern uint32_t g_dbgSp;  // bus.cpp：A7
 extern uint64_t g_dbgFrame;  // bus.cpp；ACAN_TRACE65 日誌幀號
 
@@ -447,10 +449,29 @@ int main(int argc, char **argv) {
         applyIrq();
     };
 
+    uint32_t previousProbePc = 0xFFFFFFFF;
     while (!quit) {
         const uint32_t pc = cpu.getPC();
         g_dbgPc = pc;
         g_dbgSp = cpu.getA(7);
+        g_dbgA0 = cpu.getA(0);
+        g_dbgA1 = cpu.getA(1);
+
+        // F003 runtime decompressor probe.  The cartridge copies ROM $7399E
+        // to Work RAM $FFFF8000; log only its entry and final RTS so the
+        // source/destination contract can be reconstructed without changing
+        // execution or turning this deprecated oracle into a debugger API.
+        if (std::getenv("ACAN_WATCH") && pc != previousProbePc &&
+            (pc == 0xFFFF8000 || pc == 0xFFFF80E2)) {
+            std::fprintf(stderr,
+                         "[watchdecomp] f=%llu pc=$%08X "
+                         "a0=$%08X a1=$%08X a2=$%08X a3=$%08X "
+                         "d0=$%08X d1=$%08X d2=$%08X d3=$%08X\n",
+                         (unsigned long long)g_dbgFrame, pc,
+                         cpu.getA(0), cpu.getA(1), cpu.getA(2), cpu.getA(3),
+                         cpu.getD(0), cpu.getD(1), cpu.getD(2), cpu.getD(3));
+        }
+        previousProbePc = pc;
 
         if (traceCount > 0 && traced < traceCount) {
             cpu.disassemble(dasm, pc);

@@ -48,3 +48,7 @@ register 副作用；`code` 用於把 Work RAM 執行片段反查至卡帶 copy 
 `watchpixcode`，並附寫入者 PC 起的四個 words；範圍只涵蓋 F003 已觀察的兩段 RAM producer，
 用於定位其 copy／generator，
 不代表這些位址是硬體介面。
+
+F003 搬入 `$FFFF8000` 的 runtime decompressor 在入口與最後 `RTS` 另輸出
+`watchdecomp`，保存 A0–A3、D0–D3 及 frame，用來界定壓縮來源、輸出範圍與呼叫契約；同樣
+只讀取 CPU state，不改變執行結果。

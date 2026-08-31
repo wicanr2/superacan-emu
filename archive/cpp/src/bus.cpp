@@ -7,6 +7,8 @@
 #include <cstdlib>
 
 uint32_t g_dbgPc = 0;  // 除錯：main 每條指令前更新
+uint32_t g_dbgA0 = 0;
+uint32_t g_dbgA1 = 0;
 uint32_t g_dbgSp = 0;  // 除錯：main 每條指令前更新（A7）
 uint64_t g_dbgFrame = 0;  // 除錯：main 每幀更新（ACAN_TRACE65 用）
 
@@ -186,8 +188,10 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
             if ((o >= 0xDA50 && o < 0xDA70) || (o >= 0xDB80 && o < 0xDBB0))
                 std::fprintf(stderr,
                              "[watchpixcode] f=%llu $FC%04X <- $%02X "
-                             "(pc=$%08X op=%04X:%04X:%04X:%04X)\n",
+                             "(pc=$%08X a0=$%08X a1=$%08X "
+                             "op=%04X:%04X:%04X:%04X)\n",
                              (unsigned long long)g_dbgFrame, o, val, g_dbgPc,
+                             g_dbgA0, g_dbgA1,
                              read16(g_dbgPc), read16(g_dbgPc + 2),
                              read16(g_dbgPc + 4), read16(g_dbgPc + 6));
             if (o == 0x0020 || o == 0x001A || o == 0x0078 || o == 0x0424 || o == 0x0000 || o == 0x0001)
