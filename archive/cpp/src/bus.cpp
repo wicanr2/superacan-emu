@@ -183,6 +183,13 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
     if (addr >= 0xFC0000) {
         if (std::getenv("ACAN_WATCH")) {
             const uint32_t o = addr & 0xFFFF;
+            if ((o >= 0xDA50 && o < 0xDA70) || (o >= 0xDB80 && o < 0xDBB0))
+                std::fprintf(stderr,
+                             "[watchpixcode] f=%llu $FC%04X <- $%02X "
+                             "(pc=$%08X op=%04X:%04X:%04X:%04X)\n",
+                             (unsigned long long)g_dbgFrame, o, val, g_dbgPc,
+                             read16(g_dbgPc), read16(g_dbgPc + 2),
+                             read16(g_dbgPc + 4), read16(g_dbgPc + 6));
             if (o == 0x0020 || o == 0x001A || o == 0x0078 || o == 0x0424 || o == 0x0000 || o == 0x0001)
                 std::fprintf(stderr, "[watch] $FC%04X <- $%02X (pc=$%08X)\n", o, val, g_dbgPc);
             if (o >= 0x80F8 && o < 0x8110)
@@ -201,8 +208,13 @@ void SystemBus::write16(uint32_t addr, uint16_t val) {
     // （實測 Boom Zoo 標題 tilemap1 雜訊的根因；MAME video_w 為 word 單次）。
     if (addr >= 0xF00000 && addr < 0xF00200) {
         if (std::getenv("ACAN_WATCH") && addr == 0xF001F0)
-            std::fprintf(stderr, "[watchpix] f=%llu $F001F0 <- $%04X (pc=$%08X)\n",
-                         (unsigned long long)g_dbgFrame, val, g_dbgPc);
+            std::fprintf(stderr,
+                         "[watchpix] f=%llu $F001F0 <- $%04X "
+                         "(pc=$%08X code=%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X)\n",
+                         (unsigned long long)g_dbgFrame, val, g_dbgPc,
+                         read16(g_dbgPc), read16(g_dbgPc + 2), read16(g_dbgPc + 4),
+                         read16(g_dbgPc + 6), read16(g_dbgPc + 8), read16(g_dbgPc + 10),
+                         read16(g_dbgPc + 12), read16(g_dbgPc + 14));
         video_.writeReg((addr & 0x1FF) >> 1, val);
         return;
     }

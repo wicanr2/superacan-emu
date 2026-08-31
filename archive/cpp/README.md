@@ -36,9 +36,15 @@ cmake --build /tmp/superacan-cpp-build -j2
 設定 `ACAN_WATCH=1` 時，16-bit 寫入 `$F001F0` 會輸出：
 
 ```text
-[watchpix] f=<frame> $F001F0 <- $<value> (pc=$<pc>)
+[watchpix] f=<frame> $F001F0 <- $<value> (pc=$<pc> code=<word0>:...:<word7>)
 ```
 
-此探針只記錄 frame、完整 word value 與原始 PC，不改變 register 副作用；用途是驗證
+此探針只記錄 frame、完整 word value、原始 PC 與該 PC 起的八個 instruction words，不改變
+register 副作用；`code` 用於把 Work RAM 執行片段反查至卡帶 copy source。用途是驗證
 `../acan/docs/f003-video-mode.md` 的 ROM producer。它不是 production 除錯 API，也不能把
 `pixel_mode` 名稱升格為硬體語意。
+
+同一開關另窄記錄 Work RAM `$DA50–$DA6F`、`$DB80–$DBAF` 的 byte writes，標籤為
+`watchpixcode`，並附寫入者 PC 起的四個 words；範圍只涵蓋 F003 已觀察的兩段 RAM producer，
+用於定位其 copy／generator，
+不代表這些位址是硬體介面。
