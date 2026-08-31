@@ -314,6 +314,18 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveWordDisplacementToData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.W (d16,A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionMOVEByteDisplacementToData:
+		if err := c.moveByteDisplacementToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (d16,A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionADDWordDataToAbsoluteLong:
+		if err := c.addWordDataToAbsoluteLong(decoded.SourceRegister); err != nil {
+			return result, fmt.Errorf("m68k ADD.W D%d,(xxx).L: %w", decoded.SourceRegister, err)
+		}
+	case InstructionADDQLongAbsoluteLong:
+		if err := c.addqLongAbsoluteLong(decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ADDQ.L #%d,(xxx).L: %w", decoded.Quick, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)

@@ -30,6 +30,20 @@ func (c *CPU) add16(destination, source uint16) uint16 {
 	return result
 }
 
+func (c *CPU) add32(destination, source uint32) uint32 {
+	result := destination + source
+	c.setNZ32(result)
+	if ^(destination^source)&(destination^result)&0x8000_0000 != 0 {
+		c.state.SR |= flagOverflow
+	}
+	if uint64(destination)+uint64(source) > 0xffff_ffff {
+		c.state.SR |= flagCarry | flagExtend
+	} else {
+		c.state.SR &^= flagExtend
+	}
+	return result
+}
+
 func (c *CPU) sub8(destination, source uint8) uint8 {
 	result := destination - source
 	c.setNZ8(result)

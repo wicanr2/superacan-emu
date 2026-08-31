@@ -14,6 +14,18 @@ func TestSub32Flags(t *testing.T) {
 	}
 }
 
+func TestAdd32Flags(t *testing.T) {
+	cpu, _ := newExecutionCPU(map[uint32]uint16{})
+	cpu.state.SR = flagExtend
+	if result := cpu.add32(0xffff_ffff, 1); result != 0 || cpu.state.SR&0x1f != flagZero|flagCarry|flagExtend {
+		t.Fatalf("carry result=$%08X CCR=$%02X", result, cpu.state.SR&0x1f)
+	}
+	cpu.state.SR = flagExtend
+	if result := cpu.add32(0x7fff_ffff, 1); result != 0x8000_0000 || cpu.state.SR&0x1f != flagNegative|flagOverflow {
+		t.Fatalf("overflow result=$%08X CCR=$%02X", result, cpu.state.SR&0x1f)
+	}
+}
+
 func TestMULUAndDIVURegisterSemantics(t *testing.T) {
 	cpu, _ := newExecutionCPU(map[uint32]uint16{0x404: 0x4e71})
 	cpu.state = State{D: [8]uint32{1: 3, 2: 0x0001_0002}, PC: 0x400, IRC: 0x4e71}

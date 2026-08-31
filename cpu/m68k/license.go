@@ -147,6 +147,23 @@ func (c *CPU) addLongDataToData(source, destination uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) addWordDataToAbsoluteLong(source uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.add16(value, uint16(c.state.D[source]))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) addxByteData(source, destination uint8) error {
 	left, right := uint8(c.state.D[destination]), uint8(c.state.D[source])
 	extend := uint16(0)
@@ -525,6 +542,23 @@ func (c *CPU) addqWordAbsoluteLong(quick uint8) error {
 	}
 	value = c.add16(value, uint16(quick))
 	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) addqLongAbsoluteLong(quick uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	value = c.add32(value, uint32(quick))
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
 		return err
 	}
 	return stream.finish()
@@ -1106,6 +1140,22 @@ func (c *CPU) moveWordDisplacementToData(source, destination uint8) error {
 	}
 	c.state.D[destination] = c.state.D[destination]&0xffff0000 | uint32(value)
 	c.setNZ16(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveByteDisplacementToData(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[source])+int32(int16(displacement))) & addressMask
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffffff00 | uint32(value)
+	c.setNZ8(value)
 	return stream.finish()
 }
 
