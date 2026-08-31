@@ -466,6 +466,79 @@ func (c *CPU) jmpAddressIndirect(register uint8) error {
 	return c.refillPrefetch(c.state.A[register]&addressMask, 0)
 }
 
+func (c *CPU) jsrAddressIndirect(register uint8) error {
+	target := c.state.A[register] & addressMask
+	returnAddress := (c.state.PC + 2) & addressMask
+	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	if err := c.writeLong(c.state.A[7], returnAddress, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.refillPrefetch(target, 0)
+}
+
+func (c *CPU) clearLongDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	if _, err := c.readLong(address, FCSupervisorData); err != nil {
+		return err
+	}
+	c.setNZ32(0)
+	if err := c.writeLong(address, 0, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) addWordDataToPostincrement(source, destination uint8) error {
+	address := c.state.A[destination]
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.add16(value, uint16(c.state.D[source]))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (address + 2) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) moveAWordAbsoluteLong(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = uint32(int32(int16(value)))
+	return stream.finish()
+}
+
+func (c *CPU) moveLongDataToPostincrement(source, destination uint8) error {
+	address := c.state.A[destination]
+	value := c.state.D[source]
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (address + 4) & addressMask
+	c.setNZ32(value)
+	return c.prefetch()
+}
+
+func (c *CPU) moveWordAddressToData(source, destination uint8) error {
+	value := uint16(c.state.A[source])
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return c.prefetch()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)
@@ -1440,6 +1513,21 @@ func (c *CPU) moveLongDataToDisplacement(source, destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveLongAddressToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	value := c.state.A[source]
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.setNZ32(value)
+	return stream.finish()
+}
+
 func (c *CPU) extLongData(register uint8) error {
 	c.state.D[register] = uint32(int32(int16(c.state.D[register])))
 	c.setNZ32(c.state.D[register])
@@ -1503,6 +1591,38 @@ func (c *CPU) divuWordData(source, destination uint8) error {
 		return err
 	}
 	return c.prefetch()
+}
+
+func (c *CPU) divuWordImmediate(destination uint8) error {
+	stream := c.newInstructionStream()
+	divisor, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	if divisor == 0 {
+		return fmt.Errorf("divide-by-zero exception is not implemented")
+	}
+	dividend := c.state.D[destination]
+	quotient := dividend / uint32(divisor)
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	internal := uint8(136)
+	if quotient > 0xffff {
+		c.state.SR |= flagOverflow
+		internal = 6
+	} else {
+		remainder := dividend % uint32(divisor)
+		c.state.D[destination] = remainder<<16 | quotient
+		if uint16(quotient) == 0 {
+			c.state.SR |= flagZero
+		}
+		if quotient&0x8000 != 0 {
+			c.state.SR |= flagNegative
+		}
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: internal}); err != nil {
+		return err
+	}
+	return stream.finish()
 }
 
 func (c *CPU) moveWordDataToPredecrement(source, destination uint8) error {

@@ -230,6 +230,46 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveLongRegisterToData(c.state.A[decoded.SourceRegister], decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.L A%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionMOVELongAddressToAddressIndirect:
+		if err := c.moveLongAddressToAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L A%d,(A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionADDQLongData:
+		if err := c.addqLongData(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ADDQ.L #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionMOVELongAddressToDisplacement:
+		if err := c.moveLongAddressToDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L A%d,(d16,A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionDIVUWordImmediate:
+		if err := c.divuWordImmediate(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k DIVU.W #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionCLRLongDisplacement:
+		if err := c.clearLongDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CLR.L (d16,A%d): %w", decoded.Register, err)
+		}
+	case InstructionJSRAddressIndirect:
+		if err := c.jsrAddressIndirect(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k JSR (A%d): %w", decoded.Register, err)
+		}
+	case InstructionADDWordDataToPostincrement:
+		if err := c.addWordDataToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADD.W D%d,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEAWordAbsoluteLong:
+		if err := c.moveAWordAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.W (xxx).L,A%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVELongDataToPostincrement:
+		if err := c.moveLongDataToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L D%d,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordAddressToData:
+		if err := c.moveWordAddressToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W A%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionSUBALongAddress:
 		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
@@ -1167,6 +1207,23 @@ func (c *CPU) moveLongAbsoluteLongToData(register uint8) error {
 func (c *CPU) moveLongRegisterToData(value uint32, destination uint8) error {
 	c.state.D[destination] = value
 	c.setNZ32(value)
+	return c.prefetch()
+}
+
+func (c *CPU) moveLongAddressToAddressIndirect(source, destination uint8) error {
+	value := c.state.A[source]
+	c.setNZ32(value)
+	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) addqLongData(register, quick uint8) error {
+	c.state.D[register] = c.add32(c.state.D[register], uint32(quick))
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
 	return c.prefetch()
 }
 
