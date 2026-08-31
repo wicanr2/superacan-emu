@@ -949,6 +949,66 @@ func (c *CPU) moveByteImmediateToAddressIndirect(destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) btstImmediateDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	bit := uint8(immediate & 7)
+	c.state.SR &^= flagZero
+	if value&(uint8(1)<<bit) == 0 {
+		c.state.SR |= flagZero
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveLongPostincrementToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	c.setNZ32(value)
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) addWordDataToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.add16(value, uint16(c.state.D[source]))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)

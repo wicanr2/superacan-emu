@@ -2152,6 +2152,60 @@ func TestMOVEByteImmediateToAddressIndirect(t *testing.T) {
 	}
 }
 
+func TestBTSTImmediateDisplacementUsesModulo8AndOnlyChangesZero(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x082e, 0x0402: 9, 0x0404: 4, 0x0406: 0x4e71, 0x0408: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[6] = 0x012000
+	cpu.state.SR |= flagNegative | flagCarry | flagZero
+	bus.bytes = map[uint32]uint8{0x012004: 0x02}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagNegative|flagCarry {
+		t.Fatalf("cycles=%d SR=$%04X", result.Cycles, state.SR)
+	}
+}
+
+func TestMOVELongPostincrementToDisplacement(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x255b, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71,
+		0x011000: 0x89ab, 0x011002: 0xcdef,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[3] = 0x011000
+	cpu.state.A[2] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012004, value: 0x89ab}, {address: 0x012006, value: 0xcdef}}
+	if state := cpu.State(); result.Cycles != 24 || state.A[3] != 0x011004 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d A3=$%06X SR=$%04X writes=%+v", result.Cycles, state.A[3], state.SR, bus.writes)
+	}
+}
+
+func TestADDWordDataToDisplacementReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0xdf6e, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71, 0x012004: 0x7fff})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[6] = 0x012000
+	cpu.state.D[7] = 1
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012004, value: 0x8000}}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagNegative|flagOverflow || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{
