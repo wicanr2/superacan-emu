@@ -34,6 +34,7 @@ Boom Zoo 的完整 BIOS 120 幀真實 ROM 回歸可完成：聲音 CPU 執行 2,
 `91fefc8420991941dfd87d412301e76b33ece35a789cca104b54eac57d2fd0a7`。接通每幀
 NMI 與 START 輸入後，同一回歸仍完成並得到 64,602 個非零樣本；這證明內建聲音
 BIOS、W65C02、UMC6619 與輸入掃描已形成可執行垂直鏈，但尚不等同人耳驗收。
+48 kHz 純 Go 重取樣與 WAV 的獨立證據見 `docs/audio-presentation.md`。
 
 ## 尚待證實
 

@@ -25,6 +25,7 @@ func main() {
 	steps := flag.Uint64("instructions", 1, "number of 68000 instructions to execute")
 	frames := flag.Uint64("frames", 0, "run this many completed hardware frames instead of --instructions")
 	screenshot := flag.String("screenshot", "", "write the final framebuffer as PNG")
+	wavPath := flag.String("wav", "", "write resampled 48000 Hz signed 16-bit stereo WAV")
 	layerMask := flag.Uint("layer-mask", uint(umc6618.AllLayers), "diagnostic render mask: tilemaps=1/2/4 sprite=8 ROZ=16 windows=32")
 	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
 	watch := flag.String("watch", "", "comma-separated hexadecimal bus addresses/ranges")
@@ -65,6 +66,14 @@ func main() {
 	}
 	audioHash := sha256.New()
 	var audioNonzero uint64
+	var pcm48 []byte
+	var resampler *presentation.StereoResampler
+	if *wavPath != "" {
+		resampler = presentation.NewStereoResampler(umc6619.ClockHz, umc6619.CyclesPerSample, 48000, func(left, right int16) {
+			pcm48 = binary.LittleEndian.AppendUint16(pcm48, uint16(left))
+			pcm48 = binary.LittleEndian.AppendUint16(pcm48, uint16(right))
+		})
+	}
 	system.SoundBus.Audio().SetSampleSink(func(sample umc6619.Sample) {
 		var encoded [4]byte
 		binary.LittleEndian.PutUint16(encoded[0:2], uint16(sample.Left))
@@ -72,6 +81,9 @@ func main() {
 		_, _ = audioHash.Write(encoded[:])
 		if sample.Left != 0 || sample.Right != 0 {
 			audioNonzero++
+		}
+		if resampler != nil {
+			resampler.Push(sample.Left, sample.Right)
 		}
 	})
 	type observedTransaction struct {
@@ -168,6 +180,20 @@ func main() {
 		}
 		if closeErr != nil {
 			fail(fmt.Sprintf("close screenshot: %v", closeErr))
+		}
+	}
+	if *wavPath != "" {
+		output, createErr := os.Create(*wavPath)
+		if createErr != nil {
+			fail(fmt.Sprintf("create WAV: %v", createErr))
+		}
+		encodeErr := presentation.EncodePCM16WAV(output, 48000, pcm48)
+		closeErr := output.Close()
+		if encodeErr != nil {
+			fail(fmt.Sprintf("encode WAV: %v", encodeErr))
+		}
+		if closeErr != nil {
+			fail(fmt.Sprintf("close WAV: %v", closeErr))
 		}
 	}
 }
