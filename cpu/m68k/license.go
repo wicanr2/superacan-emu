@@ -181,6 +181,27 @@ func (c *CPU) addWordDataToAbsoluteLong(source uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) addiLongAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	value = c.add32(value, immediate)
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) addxByteData(source, destination uint8) error {
 	left, right := uint8(c.state.D[destination]), uint8(c.state.D[source])
 	extend := uint16(0)
@@ -637,6 +658,25 @@ func (c *CPU) lsrWordImmediate(register, count uint8) error {
 	}
 	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
 	c.setNZ16(value)
+	c.state.SR &^= flagExtend
+	if carry {
+		c.state.SR |= flagCarry | flagExtend
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) lsrByteImmediate(register, count uint8) error {
+	value := uint8(c.state.D[register])
+	var carry bool
+	for range count {
+		carry = value&1 != 0
+		value >>= 1
+	}
+	c.state.D[register] = c.state.D[register]&0xffffff00 | uint32(value)
+	c.setNZ8(value)
 	c.state.SR &^= flagExtend
 	if carry {
 		c.state.SR |= flagCarry | flagExtend
@@ -1160,6 +1200,27 @@ func (c *CPU) moveLongImmediateToAbsoluteLong() error {
 		return err
 	}
 	c.setNZ32(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveLongAbsoluteLongToAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	source, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	destination, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(source, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ32(value)
+	if err := c.writeLong(destination, value, FCSupervisorData); err != nil {
+		return err
+	}
 	return stream.finish()
 }
 

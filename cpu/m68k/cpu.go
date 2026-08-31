@@ -380,6 +380,25 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.prefetch(); err != nil {
 			return result, fmt.Errorf("m68k EOR.B D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionLSRByteImmediate:
+		if err := c.lsrByteImmediate(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k LSR.B #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionORByteDataToData:
+		value := uint8(c.state.D[decoded.Register]) | uint8(c.state.D[decoded.SourceRegister])
+		c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffffff00 | uint32(value)
+		c.setNZ8(value)
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k OR.B D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionADDILongAbsoluteLong:
+		if err := c.addiLongAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k ADDI.L #imm,(xxx).L: %w", err)
+		}
+	case InstructionMOVELongAbsoluteLongToAbsoluteLong:
+		if err := c.moveLongAbsoluteLongToAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L (xxx).L,(xxx).L: %w", err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)

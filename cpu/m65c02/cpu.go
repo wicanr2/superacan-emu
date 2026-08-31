@@ -346,6 +346,16 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.compare(c.state.A, value)
 		}
+	case 0xc5: // CMP zp
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			value, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			c.compare(c.state.A, value)
+		}
 	case 0x69: // ADC #imm
 		c.state.PC++
 		var value uint8

@@ -19,6 +19,8 @@
   vector、第一條 `SEI` 與共享 RAM 有整合測試。
 - 真實 driver 從 `$F000` 起跑，完成 UM6619 register 初始化並寫 sound RAM
   `$0300=$FF`；68000 第 395,493 條指令的 `CMPI.B` 首次讀取即看到 ack。
+- Speedy Dragon 執行至 616 幀後動態命中 `$FA05` 的 `CMP zp`；新增 3-cycle
+  zero-page compare 後，聲音 CPU 繼續執行，整機阻塞重新回到 68000 路徑。
 
 ## 尚未完成
 

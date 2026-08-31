@@ -167,6 +167,20 @@ func TestCompareIndexImmediate(t *testing.T) {
 	}
 }
 
+func TestCMPZeroPage(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001], machine.memory[0x0042] = 0xc5, 0x42, 2
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 1, P: flagUnused | flagOverflow}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Cycles != 3 || cpu.state.PC != 0x8002 || cpu.state.A != 1 || cpu.state.P&flagCarry != 0 || cpu.state.P&flagZero != 0 || cpu.state.P&flagNegative == 0 || cpu.state.P&flagOverflow == 0 {
+		t.Fatalf("result=%+v state=%+v", result, cpu.state)
+	}
+}
+
 func TestAccumulatorRotateUsesCarry(t *testing.T) {
 	machine := &testMachine{}
 	machine.memory[0x8000] = 0x2a
