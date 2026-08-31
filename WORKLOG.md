@@ -66,3 +66,5 @@
   CPU branch 計算缺陷。
 - 驗證：Go 1.26.7 無網路容器內 `go test ./...`、`go test -race ./...`、`go vet ./...`
   均通過；本輪容器使用 `--rm`，未留下專案容器。
+- Git：decoder、MOVEQ、BRA／Bcc 與證據文件已提交為 `8a67cae`，並推送至
+  `origin/master`。
