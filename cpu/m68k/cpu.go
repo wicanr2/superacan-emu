@@ -342,6 +342,11 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.cmpWordAbsoluteLongToData(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k CMP.W (xxx).L,D%d: %w", decoded.Register, err)
 		}
+	case InstructionCMPWordDataToData:
+		c.setCompare16(uint16(c.state.D[decoded.Register]), uint16(c.state.D[decoded.SourceRegister]))
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k CMP.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)

@@ -102,6 +102,7 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0x1e39, Decoded{Instruction: InstructionMOVEByteAbsoluteLongToData, Register: 7}},
 		{0xbe39, Decoded{Instruction: InstructionCMPByteAbsoluteLongToData, Register: 7}},
 		{0xb279, Decoded{Instruction: InstructionCMPWordAbsoluteLongToData, Register: 1}},
+		{0xbc45, Decoded{Instruction: InstructionCMPWordDataToData, Register: 6, SourceRegister: 5}},
 		{0x95ce, Decoded{Instruction: InstructionSUBALongAddress, Register: 2, SourceRegister: 6}},
 		{0x3011, Decoded{Instruction: InstructionMOVEWordAddressIndirectToData, Register: 0, SourceRegister: 1}},
 		{0x341a, Decoded{Instruction: InstructionMOVEWordPostincrementToData, Register: 2, SourceRegister: 2}},

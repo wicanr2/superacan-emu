@@ -1138,6 +1138,25 @@ func TestCMPWordAbsoluteLongToDataPreservesOperandAndExtend(t *testing.T) {
 	}
 }
 
+func TestCMPWordDataToDataPreservesOperandsAndExtend(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xbc45, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5], cpu.state.D[6] = 2, 1
+	cpu.state.SR |= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if result.Cycles != 4 || state.D[5] != 2 || state.D[6] != 1 || state.SR&0x1f != flagExtend|flagNegative|flagCarry {
+		t.Fatalf("cycles=%d D5=$%08X D6=$%08X SR=$%04X", result.Cycles, state.D[5], state.D[6], state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{
