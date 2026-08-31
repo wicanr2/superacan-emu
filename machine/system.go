@@ -1,6 +1,8 @@
 package machine
 
 import (
+	"fmt"
+
 	"github.com/wicanr2/superacan-emu/cpu/m65c02"
 	"github.com/wicanr2/superacan-emu/cpu/m68k"
 )
@@ -19,6 +21,29 @@ type System struct {
 	IRQAcknowledgements [8]uint64
 	soundReset          bool
 	soundCredit         int64
+}
+
+// RunFrame advances the shared hardware timeline until UM6618 completes one
+// additional frame. maxInstructions is a fail-closed bound for broken timing
+// or software loops; the frontend does not manufacture vblank events.
+func (s *System) RunFrame(maxInstructions uint64) (uint64, error) {
+	if maxInstructions == 0 {
+		return 0, fmt.Errorf("machine: frame instruction bound must be nonzero")
+	}
+	target := s.Bus.Video().Frame() + 1
+	var executed uint64
+	for s.Bus.Video().Frame() < target {
+		if executed == maxInstructions {
+			return executed, fmt.Errorf("machine: frame did not complete within %d instructions", maxInstructions)
+		}
+		s.M68K.SetInterruptLevel(s.Bus.Video().HighestIRQLevel())
+		if _, err := s.M68K.Step(); err != nil {
+			return executed, err
+		}
+		s.Instructions++
+		executed++
+	}
+	return executed, nil
 }
 
 func NewSystem(ipl, rom, key []byte) (*System, error) {

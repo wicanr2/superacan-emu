@@ -6,6 +6,36 @@ import (
 	"github.com/wicanr2/superacan-emu/cpu/m68k"
 )
 
+func TestRunFrameAdvancesHardwareTimeline(t *testing.T) {
+	ipl := make([]byte, IPLSize)
+	rom := make([]byte, 0x40000)
+	for offset := 0; offset < len(ipl); offset += 2 {
+		ipl[offset], ipl[offset+1] = 0x4e, 0x71
+	}
+	for offset := 0; offset < len(rom); offset += 2 {
+		rom[offset], rom[offset+1] = 0x4e, 0x71
+	}
+	ipl[0], ipl[1], ipl[2], ipl[3] = 0x00, 0x01, 0xff, 0xfe
+	ipl[4], ipl[5], ipl[6], ipl[7] = 0x00, 0x00, 0x04, 0x00
+	system, err := NewSystem(ipl, rom, make([]byte, 16))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := system.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	executed, err := system.RunFrame(50_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if executed == 0 || system.Bus.Video().Frame() != 1 || system.Bus.Video().Scanline() != 240 {
+		t.Fatalf("executed=%d frame=%d line=%d", executed, system.Bus.Video().Frame(), system.Bus.Video().Scanline())
+	}
+	if _, err := system.RunFrame(0); err == nil {
+		t.Fatal("zero instruction bound was accepted")
+	}
+}
+
 func TestSystemResetUsesSharedTimeline(t *testing.T) {
 	ipl := make([]byte, IPLSize)
 	rom := make([]byte, 2)
