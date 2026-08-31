@@ -223,6 +223,35 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.prefetch(); err != nil {
 			return result, fmt.Errorf("m68k TST.W D%d: %w", decoded.Register, err)
 		}
+	case InstructionTSTByteAbsoluteLong:
+		if err := c.tstByteAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k TST.B (xxx).L: %w", err)
+		}
+	case InstructionEORWordDataToData:
+		value := uint16(c.state.D[decoded.Register]) ^ uint16(c.state.D[decoded.SourceRegister])
+		c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffff0000 | uint32(value)
+		c.setNZ16(value)
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k EOR.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionNOTWordData:
+		value := ^uint16(c.state.D[decoded.Register])
+		c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffff0000 | uint32(value)
+		c.setNZ16(value)
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k NOT.W D%d: %w", decoded.Register, err)
+		}
+	case InstructionANDWordDataToData:
+		value := uint16(c.state.D[decoded.Register]) & uint16(c.state.D[decoded.SourceRegister])
+		c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffff0000 | uint32(value)
+		c.setNZ16(value)
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k AND.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEByteImmediateToData:
+		if err := c.moveByteImmediateToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B #imm,D%d: %w", decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
@@ -760,6 +789,18 @@ func (c *CPU) moveWordImmediateToData(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveByteImmediateToData(register uint8) error {
+	stream := c.newInstructionStream()
+	word, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value := uint8(word)
+	c.state.D[register] = c.state.D[register]&0xffffff00 | uint32(value)
+	c.setNZ8(value)
+	return stream.finish()
+}
+
 func (c *CPU) moveWordDataToData(source, destination uint8) error {
 	value := uint16(c.state.D[source])
 	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
@@ -831,6 +872,20 @@ func (c *CPU) tstByteAddressIndirect(register uint8) error {
 	}
 	c.setNZ8(value)
 	return c.prefetch()
+}
+
+func (c *CPU) tstByteAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ8(value)
+	return stream.finish()
 }
 
 func (c *CPU) cmpiWordData(register uint8) error {
