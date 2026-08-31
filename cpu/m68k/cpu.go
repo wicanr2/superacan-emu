@@ -318,8 +318,194 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.jsrAbsoluteLong(); err != nil {
 			return result, fmt.Errorf("m68k JSR (xxx).L: %w", err)
 		}
+	case InstructionMOVEMLongRegistersToPredecrement:
+		if err := c.movemLongRegistersToPredecrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEM.L regs,-(A%d): %w", decoded.Register, err)
+		}
+	case InstructionMOVEMLongPostincrementToRegisters:
+		if err := c.movemLongPostincrementToRegisters(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEM.L (A%d)+,regs: %w", decoded.Register, err)
+		}
+	case InstructionRTS:
+		if err := c.rts(); err != nil {
+			return result, fmt.Errorf("m68k RTS: %w", err)
+		}
+	case InstructionMOVEBytePostincrementToData:
+		if err := c.moveBytePostincrementToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (A%d)+,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionADDQAddress:
+		if err := c.addqAddress(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ADDQ #%d,A%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionLSLWordImmediate:
+		if err := c.lslWordImmediate(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k LSL.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionCMPIByteData:
+		if err := c.cmpiByteData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMPI.B #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEWordImmediateToPostincrement:
+		if err := c.moveWordImmediateToPostincrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W #imm,(A%d)+: %w", decoded.Register, err)
+		}
+	case InstructionMOVEBytePredecrementToData:
+		if err := c.moveBytePredecrementToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B -(A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEByteDataToData:
+		if err := c.moveByteDataToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordIndexedToData:
+		if err := c.moveWordIndexedToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (d8,A%d,Xn),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordDataToIndexed:
+		if err := c.moveWordDataToIndexed(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W D%d,(d8,A%d,Xn): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionSUBQWordData:
+		if err := c.subqWordData(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k SUBQ.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionADDQWordData:
+		if err := c.addqWordData(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ADDQ.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionLSRWordImmediate:
+		if err := c.lsrWordImmediate(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k LSR.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionADDIWordData:
+		if err := c.addiWordData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADDI.W #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEWordDataToPostincrement:
+		if err := c.moveWordDataToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W D%d,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionLEAAbsoluteLong:
+		if err := c.leaAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k LEA (xxx).L,A%d: %w", decoded.Register, err)
+		}
+	case InstructionLSLByteImmediate:
+		if err := c.lslByteImmediate(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k LSL.B #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionROXLWordImmediate:
+		if err := c.roxlWordImmediate(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ROXL.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionMOVEByteDataToPostincrement:
+		if err := c.moveByteDataToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B D%d,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEALongPostincrement:
+		if err := c.moveALongPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L (A%d)+,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEBytePCIndexedToData:
+		if err := c.moveBytePCIndexedToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (d8,PC,Xn),D%d: %w", decoded.Register, err)
+		}
+	case InstructionADDAWordData:
+		if err := c.addaWordData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADDA.W D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionCMPALongImmediate:
+		if err := c.cmpaLongImmediate(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMPA.L #imm,A%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVELongPostincrementToAddressIndirect:
+		if err := c.moveLongPostincrementToAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L (A%d)+,(A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionSUBAWordImmediate:
+		if err := c.subaWordImmediate(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k SUBA.W #imm,A%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEByteIndexedToData:
+		if err := c.moveByteIndexedToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (d8,A%d,Xn),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionBSETDataData:
+		if err := c.bsetDataData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k BSET D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionORWordDataToData:
+		if err := c.orWordDataToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k OR.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionSUBAWordData:
+		if err := c.subaWordData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k SUBA.W D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionSUBIWordData:
+		if err := c.subiWordData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k SUBI.W #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionJMPPCIndexed:
+		if err := c.jmpPCIndexed(); err != nil {
+			return result, fmt.Errorf("m68k JMP (d8,PC,Xn): %w", err)
+		}
+	case InstructionMOVEBytePostincrementToPostincrement:
+		if err := c.moveBytePostincrementToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (A%d)+,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEALongPCIndexed:
+		if err := c.moveALongPCIndexed(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L (d8,PC,Xn),A%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEByteIndexedToPostincrement:
+		if err := c.moveByteIndexedToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (d8,A%d,Xn),(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordPostincrementToPostincrement:
+		if err := c.moveWordPostincrementToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (A%d)+,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEAWordImmediate:
+		if err := c.moveAWordImmediate(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.W #imm,A%d: %w", decoded.Register, err)
+		}
+	case InstructionPEAPCDisplacement:
+		if err := c.peaPCDisplacement(); err != nil {
+			return result, fmt.Errorf("m68k PEA (d16,PC): %w", err)
+		}
+	case InstructionMOVELongImmediateToPredecrement:
+		if err := c.moveLongImmediateToPredecrement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L #imm,-(A%d): %w", decoded.Register, err)
+		}
+	case InstructionMOVELongAddressToPredecrement:
+		if err := c.moveLongAddressToPredecrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L A%d,-(A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionLEAPCDisplacement:
+		if err := c.leaPCDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k LEA (d16,PC),A%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVELongPostincrementToPostincrement:
+		if err := c.moveLongPostincrementToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L (A%d)+,(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionROLByteImmediate:
+		if err := c.rolByteImmediate(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ROL.B #%d,D%d: %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionMOVEWordPCIndexedToData:
+		if err := c.moveWordPCIndexedToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (d8,PC,Xn),D%d: %w", decoded.Register, err)
+		}
+	case InstructionJSRAddressIndexed:
+		if err := c.jsrAddressIndexed(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k JSR (d8,A%d,Xn): %w", decoded.Register, err)
+		}
 	case InstructionBSR:
-		return result, fmt.Errorf("m68k: unimplemented BSR opcode $%04X at $%06X", c.state.IRD, c.state.PC)
+		if err := c.bsr(decoded.Immediate8); err != nil {
+			return result, fmt.Errorf("m68k BSR: %w", err)
+		}
 	default:
 		return result, fmt.Errorf("m68k: unimplemented opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	}
@@ -562,6 +748,23 @@ func (c *CPU) setCompare16(destination, source uint16) {
 		c.state.SR |= flagNegative
 	}
 	if (destination^source)&(destination^result)&0x8000 != 0 {
+		c.state.SR |= flagOverflow
+	}
+	if source > destination {
+		c.state.SR |= flagCarry
+	}
+}
+
+func (c *CPU) setCompare32(destination, source uint32) {
+	result := destination - source
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	if result == 0 {
+		c.state.SR |= flagZero
+	}
+	if result&0x8000_0000 != 0 {
+		c.state.SR |= flagNegative
+	}
+	if (destination^source)&(destination^result)&0x8000_0000 != 0 {
 		c.state.SR |= flagOverflow
 	}
 	if source > destination {

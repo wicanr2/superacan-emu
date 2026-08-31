@@ -20,7 +20,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 
 | 功能 | 狀態 | 證據等級／限制 |
 |---|---|---|
-| decoder | NOP、MOVEQ、BRA、BSR 分流、Bcc | ISA-spec；BSR 尚未執行 |
+| decoder | 啟動路徑所需 opcode 採明確 encoding 分流，未知值失敗即關閉 | ISA-spec；尚非完整 ISA matrix |
 | condition code | 16 種條件 exhaustive boolean tests | ISA-spec |
 | MOVEQ | sign extension、Dn、N/Z/V/C、X 保留 | ISA-spec；4-cycle prefetch phase |
 | BRA.b／BRA.w | PC+2 base、signed displacement、queue refill | ISA-spec；User's Manual 10 cycles／2 reads |
@@ -45,6 +45,9 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | 真實 IPL | fixed SHA-256，自 `$400` 完成至 `$620` 並進入卡帶 | 87,204 指令；雙 overlay 關閉 |
 | checksum ISA | CLR、ADD/SUB/ADDX/ADDQ/SUBQ、CMPM、MULS、BTST、NEG、SWAP | 真實 UMC6650 與卡帶授權兩階段通過 |
 | control transfer | JMP/JSR absolute long、JMP (An)、MOVEA absolute word | 預取跨 high-overlay regression |
+| stack／subroutine | BSR、RTS、MOVEM.L predecrement／postincrement、PEA、立即數／An long push | ISA-spec；合成堆疊 round-trip 回歸 |
+| indexed／PC-relative | 68000 brief extension 的 Dn／An、word／long index；JSR／JMP／LEA／MOVE／MOVEA | ISA-spec；拒絕混入 68020 full extension／scale |
+| 真實卡帶路徑 | Boom Zoo 由 IPL `$400` 無錯執行 200,000 條，PC 到 `$FF80A0` | software-observed；不代表完整 ISA 或遊戲可玩 |
 | phase trace | `StepResult.Phases` | 只含目前已建模 phase，尚無 exception trace |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
@@ -52,13 +55,15 @@ displacement 是後續 CPU 型號能力，本核心目前不得套用。
 
 ## 尚未完成
 
-- BSR、其餘 JSR addressing modes、exception、interrupt acknowledge 與 bus/address error。
-- 一般化 effective-address decoder、byte／word／long operand helpers；目前 long write 只在
-  JSR 堆疊路徑以兩次有序 word transaction 建模。
+- 未被目前路徑涵蓋的 JSR／effective-address 模式、exception、interrupt acknowledge 與
+  bus/address error。
+- 一般化 effective-address decoder 與統一的 byte／word／long operand helpers；目前只為
+  已觀察路徑組合定址模式，但所有 long read／write 都維持兩次有序 word transaction。
 - user／supervisor function code 動態選擇。
 - 真實 BIOS／ROM 只由外部路徑載入，版控內仍只保留合成 fixture；headless 探測已驗證
   IPL SHA-256 `2e4d88bec69b5e7e4803368c233ce0d20f6dd107c5af0cfcc0089d310c695d7c`。
 - Motorola reset phase 的更細 bus timing 審查；目前 40-cycle reset 是 sample-derived
   起始契約，文件中不得標成硬體已證實。
 - 與獨立公開 opcode vectors 及 archived oracle 的自動差分 harness。
-- 卡帶入口下一個缺口為 `$2B22 MOVEM.L`；完整 ISA、exception 與 IRQ 尚未完成。
+- 卡帶入口 `$2B22 MOVEM.L` 已通過；目前 200,000 指令上限內沒有未知 opcode，完整
+  ISA、exception 與 IRQ 仍未完成。

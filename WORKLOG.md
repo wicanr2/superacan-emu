@@ -138,3 +138,22 @@
   overlay 後，已預取的 `$620 JMP (A0)` 仍執行並從卡帶向量進入 `$400`。
 - 真實結果：成功完成 87,204 條指令、797,418 cycles；low/high overlay 均為 off，
   執行卡帶 `$420 JSR $2B22` 後停於 `$2B22 MOVEM.L`（opcode `$48E7`）。
+
+## 2026-08-31：卡帶啟動與高位址 IPL 服務路徑
+
+- 從 Boom Zoo `$2B22` 開始，以未知 opcode 失敗即關閉的方式逐段擴充一般 68000
+  語意；沒有依 ROM hash、PC 或遊戲名稱加入特判。
+- 堆疊／呼叫：新增 MOVEM.L predecrement／postincrement、BSR、RTS、PEA、long push，
+  以及 brief-indexed JSR；回傳位址、A7 更新與 long-word bus 順序可觀察。
+- 定址：新增 MC68000 brief extension 的 Dn／An、word／long index，套用於卡帶路徑所需
+  MOVE／MOVEA／JMP／JSR；另補 PC-relative LEA。未接受 68020 full extension 或 scale。
+- 算術／搬移：補齊實際路徑要求的 byte／word／long MOVE 變體、quick／immediate
+  ADD/SUB/CMP、shift／rotate、BSET 與 OR；各 encoding 是一般暫存器形式而非單一 opcode
+  stub。
+- 真實驗證：固定 IPL `2e4d88…c695d7c` 與 Boom Zoo ROM `090827…370077` 在 Go
+  headless runner 無錯完成 200,000 條指令、1,935,470 cycles，PC `$FF80A0`、opcode
+  `$6AF0`，low/high overlay 均為 off；結束原因是指定指令上限。
+- 回歸：新增 MOVEM push／restore round-trip、PEA effective-address push、indexed JSR
+  return／prefetch、ROL flags／timing，以及本批真實 opcode 的 decoder cases。
+- 證據限制：這證明固定軟體路徑已前進，不代表完整 MC68000、exception／IRQ 或遊戲
+  可玩；下一步須以裝置交易 checkpoint 判定 UM6618／UM6619／sound RAM 初始化進度。

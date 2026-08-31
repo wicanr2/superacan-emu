@@ -19,8 +19,9 @@ driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的純 Go �
 不再新增功能。Go 68000 核心採獨立實作；Moira 只作 sample，不直接翻譯。
 
 Go 主線目前已有 media manifest、整機 bus、UMC6650、phase timeline、headless runner，
-並以固定 IPL SHA-256 完成真實 Boom Zoo IPL、UMC6650、卡帶授權與 overlay 轉交，
-目前已進入卡帶程式並停於 `$2B22 MOVEM.L`。下列完整相容性仍是
+並以固定 IPL SHA-256 完成真實 Boom Zoo IPL、UMC6650、卡帶授權與 overlay 轉交；
+目前可無錯執行 200,000 條指令，已跨過卡帶的 MOVEM／函式呼叫與高位址 IPL 服務路徑。
+尚未完成完整 68000 ISA、exception／IRQ 與影音晶片 Go 移植。下列完整相容性仍是
 deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）

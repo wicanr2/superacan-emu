@@ -304,3 +304,509 @@ func (c *CPU) jsrAbsoluteLong() error {
 	}
 	return c.refillPrefetch(target, 0)
 }
+
+func (c *CPU) moveBytePostincrementToData(source, destination uint8) error {
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + addressStep(source, WidthByte)) & addressMask
+	c.state.D[destination] = c.state.D[destination]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	return c.prefetch()
+}
+
+func (c *CPU) addqAddress(register, quick uint8) error {
+	c.state.A[register] += uint32(quick)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) lslWordImmediate(register, count uint8) error {
+	value := uint16(c.state.D[register])
+	var carry bool
+	for i := uint8(0); i < count; i++ {
+		carry = value&0x8000 != 0
+		value <<= 1
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	c.state.SR &^= flagExtend
+	if carry {
+		c.state.SR |= flagCarry | flagExtend
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) cmpiByteData(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.setCompare8(uint8(c.state.D[register]), uint8(immediate))
+	return stream.finish()
+}
+
+func (c *CPU) moveWordImmediateToPostincrement(register uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.setNZ16(value)
+	if err := c.writeWord(c.state.A[register], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[register] = (c.state.A[register] + 2) & addressMask
+	return stream.finish()
+}
+
+func (c *CPU) moveBytePredecrementToData(source, destination uint8) error {
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] - addressStep(source, WidthByte)) & addressMask
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	return c.prefetch()
+}
+
+func (c *CPU) moveByteDataToData(source, destination uint8) error {
+	value := uint8(c.state.D[source])
+	c.state.D[destination] = c.state.D[destination]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	return c.prefetch()
+}
+
+func (c *CPU) moveWordIndexedToData(base, destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress(c.state.A[base])
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveWordDataToIndexed(source, base uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress(c.state.A[base])
+	if err != nil {
+		return err
+	}
+	value := uint16(c.state.D[source])
+	c.setNZ16(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) subqWordData(register, quick uint8) error {
+	result := c.sub16(uint16(c.state.D[register]), uint16(quick))
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(result)
+	return c.prefetch()
+}
+
+func (c *CPU) addqWordData(register, quick uint8) error {
+	result := c.add16(uint16(c.state.D[register]), uint16(quick))
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(result)
+	return c.prefetch()
+}
+
+func (c *CPU) lsrWordImmediate(register, count uint8) error {
+	value := uint16(c.state.D[register])
+	var carry bool
+	for i := uint8(0); i < count; i++ {
+		carry = value&1 != 0
+		value >>= 1
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	c.state.SR &^= flagExtend
+	if carry {
+		c.state.SR |= flagCarry | flagExtend
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) addiWordData(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	result := c.add16(uint16(c.state.D[register]), immediate)
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(result)
+	return stream.finish()
+}
+
+func (c *CPU) moveWordDataToPostincrement(source, destination uint8) error {
+	value := uint16(c.state.D[source])
+	c.setNZ16(value)
+	if err := c.writeWord(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + 2) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) leaAbsoluteLong(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = address
+	return stream.finish()
+}
+
+func (c *CPU) lslByteImmediate(register, count uint8) error {
+	value := uint8(c.state.D[register])
+	var carry bool
+	for i := uint8(0); i < count; i++ {
+		carry = value&0x80 != 0
+		value <<= 1
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	c.state.SR &^= flagExtend
+	if carry {
+		c.state.SR |= flagCarry | flagExtend
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) roxlWordImmediate(register, count uint8) error {
+	value := uint16(c.state.D[register])
+	extend := c.state.SR&flagExtend != 0
+	for i := uint8(0); i < count; i++ {
+		newExtend := value&0x8000 != 0
+		value <<= 1
+		if extend {
+			value |= 1
+		}
+		extend = newExtend
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	c.state.SR &^= flagExtend
+	if extend {
+		c.state.SR |= flagCarry | flagExtend
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) moveByteDataToPostincrement(source, destination uint8) error {
+	value := uint8(c.state.D[source])
+	c.setNZ8(value)
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + addressStep(destination, WidthByte)) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) moveALongPostincrement(source, destination uint8) error {
+	value, err := c.readLong(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.state.A[destination] = value
+	return c.prefetch()
+}
+
+func (c *CPU) moveBytePCIndexedToData(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress((c.state.PC + 2) & addressMask)
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) addaWordData(source, destination uint8) error {
+	c.state.A[destination] = uint32(int32(c.state.A[destination]) + int32(int16(c.state.D[source])))
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) cmpaLongImmediate(destination uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	c.setCompare32(c.state.A[destination], value)
+	return stream.finish()
+}
+
+func (c *CPU) moveLongPostincrementToAddressIndirect(source, destination uint8) error {
+	value, err := c.readLong(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.setNZ32(value)
+	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) subaWordImmediate(destination uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = uint32(int32(c.state.A[destination]) - int32(int16(value)))
+	return stream.finish()
+}
+
+func (c *CPU) moveByteIndexedToData(base, destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress(c.state.A[base])
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) bsetDataData(bitRegister, dataRegister uint8) error {
+	bit := c.state.D[bitRegister] & 31
+	mask := uint32(1) << bit
+	c.state.SR &^= flagZero
+	if c.state.D[dataRegister]&mask == 0 {
+		c.state.SR |= flagZero
+	}
+	c.state.D[dataRegister] |= mask
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) orWordDataToData(source, destination uint8) error {
+	value := uint16(c.state.D[destination]) | uint16(c.state.D[source])
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return c.prefetch()
+}
+
+func (c *CPU) subaWordData(source, destination uint8) error {
+	c.state.A[destination] = uint32(int32(c.state.A[destination]) - int32(int16(c.state.D[source])))
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) subiWordData(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	result := c.sub16(uint16(c.state.D[register]), immediate)
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(result)
+	return stream.finish()
+}
+
+func (c *CPU) jmpPCIndexed() error {
+	target := c.briefIndexedAddress((c.state.PC+2)&addressMask, c.state.IRC)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 6}); err != nil {
+		return err
+	}
+	return c.refillPrefetch(target, 0)
+}
+
+func (c *CPU) moveBytePostincrementToPostincrement(source, destination uint8) error {
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + addressStep(source, WidthByte)) & addressMask
+	c.setNZ8(value)
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + addressStep(destination, WidthByte)) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) moveALongPCIndexed(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress((c.state.PC + 2) & addressMask)
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = value
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveByteIndexedToPostincrement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress(c.state.A[source])
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ8(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + addressStep(destination, WidthByte)) & addressMask
+	return stream.finish()
+}
+
+func (c *CPU) moveWordPostincrementToPostincrement(source, destination uint8) error {
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + 2) & addressMask
+	c.setNZ16(value)
+	if err := c.writeWord(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + 2) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) moveAWordImmediate(destination uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = uint32(int32(int16(value)))
+	return stream.finish()
+}
+
+func (c *CPU) leaPCDisplacement(destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = uint32(int32((c.state.PC+2)&addressMask)+int32(int16(displacement))) & addressMask
+	return stream.finish()
+}
+
+func (c *CPU) moveLongPostincrementToPostincrement(source, destination uint8) error {
+	value, err := c.readLong(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.setNZ32(value)
+	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[destination] = (c.state.A[destination] + 4) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) rolByteImmediate(register, count uint8) error {
+	value := uint8(c.state.D[register])
+	var carry bool
+	for i := uint8(0); i < count; i++ {
+		carry = value&0x80 != 0
+		value <<= 1
+		if carry {
+			value |= 1
+		}
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_ff00 | uint32(value)
+	c.setNZ8(value)
+	if carry {
+		c.state.SR |= flagCarry
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) moveWordPCIndexedToData(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress((c.state.PC + 2) & addressMask)
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}

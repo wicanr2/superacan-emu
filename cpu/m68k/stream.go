@@ -39,6 +39,28 @@ func (s *instructionStream) nextLong() (uint32, error) {
 	return uint32(hi)<<16 | uint32(lo), nil
 }
 
+func (s *instructionStream) nextBriefIndexedAddress(base uint32) (uint32, error) {
+	extension, err := s.nextWord()
+	if err != nil {
+		return 0, err
+	}
+	return s.cpu.briefIndexedAddress(base, extension), nil
+}
+
+func (c *CPU) briefIndexedAddress(base uint32, extension uint16) uint32 {
+	// Full extension format and scale factors belong to 68020, not MC68000.
+	indexRegister := uint8(extension >> 12 & 7)
+	index := c.state.D[indexRegister]
+	if extension&0x8000 != 0 {
+		index = c.state.A[indexRegister]
+	}
+	if extension&0x0800 == 0 {
+		index = uint32(int32(int16(index)))
+	}
+	displacement := int32(int8(extension))
+	return uint32(int32(base)+int32(index)+displacement) & addressMask
+}
+
 func (s *instructionStream) finish() error {
 	next, err := s.cpu.readWord(s.nextAddress, FCSupervisorProgram, PhaseInstructionFetch)
 	if err != nil {

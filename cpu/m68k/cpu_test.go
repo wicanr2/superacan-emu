@@ -47,6 +47,7 @@ func (b *testBus) Write8(address uint32, value uint8) error {
 func (b *testBus) Write16(address uint32, value uint16) error {
 	b.log.events = append(b.log.events, "write16")
 	b.writes = append(b.writes, wordWrite{address: address, value: value})
+	b.words[address] = value
 	return nil
 }
 

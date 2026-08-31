@@ -74,6 +74,18 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0x6002, Decoded{Instruction: InstructionBRA, Immediate8: 2}},
 		{0x6100, Decoded{Instruction: InstructionBSR, Condition: 1}},
 		{0x66fe, Decoded{Instruction: InstructionBcc, Condition: 6, Immediate8: 0xfe}},
+		{0x48e7, Decoded{Instruction: InstructionMOVEMLongRegistersToPredecrement, Register: 7}},
+		{0x4cdf, Decoded{Instruction: InstructionMOVEMLongPostincrementToRegisters, Register: 7}},
+		{0x4e75, Decoded{Instruction: InstructionRTS}},
+		{0x327c, Decoded{Instruction: InstructionMOVEAWordImmediate, Register: 1}},
+		{0x487a, Decoded{Instruction: InstructionPEAPCDisplacement}},
+		{0x2f3c, Decoded{Instruction: InstructionMOVELongImmediateToPredecrement, Register: 7}},
+		{0x2f0d, Decoded{Instruction: InstructionMOVELongAddressToPredecrement, Register: 7, SourceRegister: 5}},
+		{0x41fa, Decoded{Instruction: InstructionLEAPCDisplacement, Register: 0}},
+		{0x2ad8, Decoded{Instruction: InstructionMOVELongPostincrementToPostincrement, Register: 5, SourceRegister: 0}},
+		{0xe319, Decoded{Instruction: InstructionROLByteImmediate, Register: 1, Quick: 1}},
+		{0x3e3b, Decoded{Instruction: InstructionMOVEWordPCIndexedToData, Register: 7}},
+		{0x4eb3, Decoded{Instruction: InstructionJSRAddressIndexed, Register: 3}},
 		{0xffff, Decoded{Instruction: InstructionIllegal}},
 	}
 	for _, test := range tests {
