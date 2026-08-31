@@ -172,6 +172,7 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0x2cbc, Decoded{Instruction: InstructionMOVELongImmediateToAddressIndirect, Register: 6}},
 		{0x5379, Decoded{Instruction: InstructionSUBQWordAbsoluteLong, Quick: 1}},
 		{0x2d68, Decoded{Instruction: InstructionMOVELongDisplacementToDisplacement, Register: 6, SourceRegister: 0}},
+		{0x2d51, Decoded{Instruction: InstructionMOVELongAddressIndirectToDisplacement, Register: 6, SourceRegister: 1}},
 		{0x95ce, Decoded{Instruction: InstructionSUBALongAddress, Register: 2, SourceRegister: 6}},
 		{0x3011, Decoded{Instruction: InstructionMOVEWordAddressIndirectToData, Register: 0, SourceRegister: 1}},
 		{0x341a, Decoded{Instruction: InstructionMOVEWordPostincrementToData, Register: 2, SourceRegister: 2}},

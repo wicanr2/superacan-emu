@@ -2402,6 +2402,26 @@ func TestMOVELongDisplacementToDisplacement(t *testing.T) {
 	}
 }
 
+func TestMOVELongAddressIndirectToDisplacement(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x2d51, 0x0402: 8, 0x0404: 0x4e71, 0x0406: 0x4e71,
+		0x011000: 0x89ab, 0x011002: 0xcdef,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[1] = 0x011000
+	cpu.state.A[6] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012008, value: 0x89ab}, {address: 0x01200a, value: 0xcdef}}
+	if state := cpu.State(); result.Cycles != 24 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

@@ -430,6 +430,10 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveLongDisplacementToDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.L (d16,A%d),(d16,A%d): %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionMOVELongAddressIndirectToDisplacement:
+		if err := c.moveLongAddressIndirectToDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L (A%d),(d16,A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionSUBALongAddress:
 		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
