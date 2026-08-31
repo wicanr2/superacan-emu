@@ -72,6 +72,8 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | 跨 ROM bit／結構搬移 | `BTST #imm,(d16,An)`、`MOVE.L (An)+,(d16,Am)`、`ADD.W Dn,(d16,An)` | Motorola ISA／Moira phase 模型；BTST 記憶體 bit 採 modulo 8 且僅改 Z，已由 Boom Zoo／Formosa Duel 同時動態命中；後兩條通過 long bus order 與 read-modify-write 合成測試，待下一輪真實 ROM 回歸 |
 | 跨 ROM 記憶體讀改寫 | `OR.W Dn,(An)`、`CLR.B (d16,An)` | Motorola ISA／Moira phase 模型；word OR 與 byte CLR 均保留 read-before-write，CLR 的 phase 測試明確驗證 extension fetch、byte data read、byte data write、final prefetch 次序；待下一輪真實 ROM 回歸 |
 | 跨 ROM displacement 圖形路徑 | `OR.W Dn,(d16,An)`、`SUBQ.W #n,(d16,An)`、`MOVE.W (d8,An,Xn),(d16,Am)`、`CLR.W (d16,An)` | Motorola ISA／Moira phase 模型；前兩條已讓 Formosa Duel 推進至 14,136,451 條／900 幀，DMA ch1 59 次、IRQ5 1,357 次、framebuffer 56,538 個非黑像素；後兩條通過 indexed 22-cycle 與 word RMW 合成測試，待下一輪真實 ROM 回歸 |
+| Formosa Duel 1,200 幀回歸 | `EXT.W Dn`、`MOVE.B #imm,(d16,An)`；後續無未知 opcode | software-observed；完成 19,272,069 條指令，DMA ch0/ch1 5/59 次、IRQ7/5 978/1,955 次、VRAM 非零 41,974 bytes、framebuffer 76,800 個非黑像素，SHA-256 `5e5e2f585abfa42790a9b36302ba729319cf469e5a2e01e1f02079aec7363477`；PNG 人工確認為可辨識的遊戲標題／開始畫面 |
+| Boom Zoo long immediate 結構寫入 | `MOVE.L #imm,(An)` | Motorola ISA／Moira phase 模型；20-cycle、high-word→low-word bus order 與 NZVC 測試通過，待下一輪真實 ROM 回歸 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。

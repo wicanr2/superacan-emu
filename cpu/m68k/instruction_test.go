@@ -2316,6 +2316,54 @@ func TestCLRWordDisplacementReadModifyWrite(t *testing.T) {
 	}
 }
 
+func TestEXTWordDataSignExtendsByte(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{0x0400: 0x4880, 0x0402: 0x4e71, 0x0404: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[0] = 0x1234_0080
+	cpu.state.SR |= flagExtend | flagZero | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 4 || state.D[0] != 0x1234_ff80 || state.SR&0x1f != flagExtend|flagNegative {
+		t.Fatalf("cycles=%d D0=$%08X SR=$%04X", result.Cycles, state.D[0], state.SR)
+	}
+}
+
+func TestMOVEByteImmediateToDisplacement(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x117c, 0x0402: 0x0080, 0x0404: 4, 0x0406: 0x4e71, 0x0408: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []byteWrite{{address: 0x012004, value: 0x80}}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.byteWrites, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.byteWrites)
+	}
+}
+
+func TestMOVELongImmediateToAddressIndirect(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x2cbc, 0x0402: 0x89ab, 0x0404: 0xcdef, 0x0406: 0x4e71, 0x0408: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[6] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012000, value: 0x89ab}, {address: 0x012002, value: 0xcdef}}
+	if state := cpu.State(); result.Cycles != 20 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{
