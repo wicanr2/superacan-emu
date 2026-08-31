@@ -168,3 +168,29 @@ func TestFRCWordTransactionsConfigureDeviceOnce(t *testing.T) {
 		t.Fatalf("remaining=%d", b.FRC().RemainingCycles())
 	}
 }
+
+func TestHostDMAUsesAtomicControlAndMachineBusTransactions(t *testing.T) {
+	b := testMachineBus(t)
+	b.rom[0x10000], b.rom[0x10001], b.rom[0x10002], b.rom[0x10003] = 0x12, 0x34, 0x56, 0x78
+	for address, value := range map[uint32]uint16{
+		0xe90020: 0x0001, 0xe90022: 0x0000,
+		0xe90024: 0x00fc, 0xe90026: 0x0200,
+		0xe90028: 0x0001,
+	} {
+		if err := b.Write16(address, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := b.Write16(0xe9002a, 0x9000); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := b.Read16(0xfc0200); got != 0x1234 {
+		t.Fatalf("first word=$%04X", got)
+	}
+	if got, _ := b.Read16(0xfc0202); got != 0x5678 {
+		t.Fatalf("second word=$%04X", got)
+	}
+	if b.HostDMA().Channel(0).Triggers != 1 {
+		t.Fatalf("triggers=%d", b.HostDMA().Channel(0).Triggers)
+	}
+}

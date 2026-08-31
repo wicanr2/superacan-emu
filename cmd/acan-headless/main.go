@@ -141,15 +141,17 @@ func main() {
 		system.Bus.Video().RenderFrameLayers(uint8(*layerMask))
 	}
 	soundState := system.M65C02.State()
+	dma0, dma1 := system.Bus.HostDMA().Channel(0), system.Bus.HostDMA().Channel(1)
 	vramSHA := system.Bus.Video().VRAMSHA256()
 	framebufferSHA := system.Bus.Video().FramebufferSHA256()
-	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_bios=%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X frc=$%04X/$%04X,pending:%t,supported:%t irq_ack=7:%d,6:%d,5:%d,4:%d,3:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
+	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_bios=%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X frc=$%04X/$%04X,pending:%t,supported:%t dma_triggers=0:%d,1:%d irq_ack=7:%d,6:%d,5:%d,4:%d,3:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
 		hex.EncodeToString(ipl.RawSHA256[:]), hex.EncodeToString(rom.RawSHA256[:]),
 		system.Instructions, state.PC, result.Opcode, state.Cycles,
 		system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled(),
 		*soundBIOS1Path != "", system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundBus.Audio().SampleCount(), audioNonzero, audioHash.Sum(nil), system.SoundBus.IRQStatus(), system.SoundResetAsserted(),
 		system.Bus.Video().Frame(), system.Bus.Video().Scanline(), system.Bus.Video().VideoFlags(),
 		system.Bus.FRC().Control(), system.Bus.FRC().Frequency(), system.Bus.FRC().Pending(), system.Bus.FRC().SupportedMode(),
+		dma0.Triggers, dma1.Triggers,
 		system.IRQAcknowledgements[7], system.IRQAcknowledgements[6], system.IRQAcknowledgements[5], system.IRQAcknowledgements[4],
 		system.IRQAcknowledgements[3],
 		system.Bus.Video().NonzeroVRAMBytes(), hex.EncodeToString(vramSHA[:]),

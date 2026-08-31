@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/wicanr2/superacan-emu/chip/frc"
+	"github.com/wicanr2/superacan-emu/chip/hostdma"
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
 	"github.com/wicanr2/superacan-emu/chip/umc6650"
 )
@@ -25,6 +26,7 @@ type Bus struct {
 	lockout         *umc6650.Device
 	video           *umc6618.Device
 	frc             *frc.Device
+	dma             *hostdma.Device
 	e90b3c          uint16
 	control         uint16
 	loOff           bool
@@ -45,6 +47,7 @@ func NewBus(ipl, rom, key []byte) (*Bus, error) {
 		return nil, fmt.Errorf("machine: UMC6650 key size %d, want %d", len(key), umc6650.KeySize)
 	}
 	b := &Bus{rom: append([]byte(nil), rom...), lockout: umc6650.New(key), video: umc6618.New(), frc: frc.New()}
+	b.dma = hostdma.New(b)
 	copy(b.ipl[:], ipl)
 	b.video.SetDMAAccess(
 		func(address uint32) uint16 { value, _ := b.Read16(address); return value },
@@ -56,6 +59,7 @@ func NewBus(ipl, rom, key []byte) (*Bus, error) {
 func (b *Bus) Lockout() *umc6650.Device { return b.lockout }
 func (b *Bus) Video() *umc6618.Device   { return b.video }
 func (b *Bus) FRC() *frc.Device         { return b.frc }
+func (b *Bus) HostDMA() *hostdma.Device { return b.dma }
 func (b *Bus) LowOverlayEnabled() bool  { return !b.loOff }
 func (b *Bus) HighOverlayEnabled() bool { return !b.hiOff }
 func (b *Bus) Control() uint16          { return b.control }
@@ -132,6 +136,13 @@ func (b *Bus) read8(address uint32) (uint8, error) {
 		return uint8(b.frc.Frequency() >> 8), nil
 	case address == 0xe90017:
 		return uint8(b.frc.Frequency()), nil
+	case address >= 0xe90020 && address < 0xe90040:
+		channel := int(address>>4) & 1
+		value := b.dma.ReadRegister(channel, int(address>>1)&7)
+		if address&1 != 0 {
+			return uint8(value), nil
+		}
+		return uint8(value >> 8), nil
 	case address == 0xe90b3c:
 		return uint8(b.e90b3c >> 8), nil
 	case address == 0xe90b3d:
@@ -231,6 +242,8 @@ func (b *Bus) write8(address uint32, value uint8) error {
 		b.frc.WriteFrequency(b.frc.Frequency()&0x00ff | uint16(value)<<8)
 	case address == 0xe90017:
 		b.frc.WriteFrequency(b.frc.Frequency()&0xff00 | uint16(value))
+	case address >= 0xe90020 && address < 0xe90040:
+		return b.dma.WriteRegisterByte(int(address>>4)&1, int(address>>1)&7, address&1 != 0, value)
 	case address == 0xe90b3c:
 		b.e90b3c = b.e90b3c&0x00ff | uint16(value)<<8
 	case address == 0xe90b3d:
@@ -276,6 +289,10 @@ func (b *Bus) Write16(address uint32, value uint16) error {
 		b.frc.WriteControl(value)
 	case address == 0xe90016:
 		b.frc.WriteFrequency(value)
+	case address >= 0xe90020 && address < 0xe90040:
+		if err := b.dma.WriteRegister(int(address>>4)&1, int(address>>1)&7, value); err != nil {
+			return err
+		}
 	case address >= 0xf00000 && address < 0xf00200:
 		b.video.WriteRegister(uint16(address&0x1ff)>>1, value)
 	case address >= 0xf00200 && address < 0xf00400:

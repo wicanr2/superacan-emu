@@ -132,6 +132,14 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.prefetch(); err != nil {
 			return result, fmt.Errorf("m68k NOP prefetch: %w", err)
 		}
+	case InstructionMOVEImmediateToSR:
+		if err := c.moveImmediateToSR(); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W #imm,SR: %w", err)
+		}
+	case InstructionMOVELongImmediateToAbsoluteLong:
+		if err := c.moveLongImmediateToAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L #imm,(xxx).L: %w", err)
+		}
 	case InstructionMOVEQ:
 		c.state.D[decoded.Register] = uint32(int32(int8(decoded.Immediate8)))
 		c.setNZ32(c.state.D[decoded.Register])
@@ -193,6 +201,27 @@ func (c *CPU) Step() (StepResult, error) {
 	case InstructionCMPIWordAbsoluteLong:
 		if err := c.cmpiWordAbsoluteLong(); err != nil {
 			return result, fmt.Errorf("m68k CMPI.W #imm,(xxx).L: %w", err)
+		}
+	case InstructionORIWordAbsoluteLong:
+		if err := c.oriWordAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k ORI.W #imm,(xxx).L: %w", err)
+		}
+	case InstructionMOVEByteDataToAbsoluteLong:
+		if err := c.moveByteDataToAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B D%d,(xxx).L: %w", decoded.Register, err)
+		}
+	case InstructionTSTByteAddressIndirect:
+		if err := c.tstByteAddressIndirect(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k TST.B (A%d): %w", decoded.Register, err)
+		}
+	case InstructionSUBALongAddress:
+		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionTSTWordData:
+		c.setNZ16(uint16(c.state.D[decoded.Register]))
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k TST.W D%d: %w", decoded.Register, err)
 		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
@@ -261,6 +290,10 @@ func (c *CPU) Step() (StepResult, error) {
 	case InstructionADDAWordImmediate:
 		if err := c.addaWordImmediate(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k ADDA.W #imm,A%d: %w", decoded.Register, err)
+		}
+	case InstructionADDALongImmediate:
+		if err := c.addaLongImmediate(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADDA.L #imm,A%d: %w", decoded.Register, err)
 		}
 	case InstructionSWAP:
 		if err := c.swap(decoded.Register); err != nil {
@@ -333,6 +366,10 @@ func (c *CPU) Step() (StepResult, error) {
 	case InstructionMOVEWordAddressIndirectToData:
 		if err := c.moveWordAddressIndirectToData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.W (A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordPostincrementToData:
+		if err := c.moveWordPostincrementToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (A%d)+,D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
 	case InstructionMOVEWordDataToAddressIndirect:
 		if err := c.moveWordDataToAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
@@ -454,6 +491,10 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.addaWordData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k ADDA.W D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionADDALongData:
+		if err := c.addaLongData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADDA.L D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionCMPALongImmediate:
 		if err := c.cmpaLongImmediate(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k CMPA.L #imm,A%d: %w", decoded.Register, err)
@@ -573,6 +614,10 @@ func (c *CPU) Step() (StepResult, error) {
 	case InstructionMOVELongDataToAbsoluteLong:
 		if err := c.moveLongDataToAbsoluteLong(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.L D%d,(xxx).L: %w", decoded.Register, err)
+		}
+	case InstructionMOVELongAddressToAbsoluteLong:
+		if err := c.moveLongAddressToAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L A%d,(xxx).L: %w", decoded.Register, err)
 		}
 	case InstructionMOVEWordDataToDisplacement:
 		if err := c.moveWordDataToDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
@@ -765,6 +810,29 @@ func (c *CPU) moveWordImmediateToAbsoluteLong() error {
 	return stream.finish()
 }
 
+func (c *CPU) moveByteDataToAbsoluteLong(register uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value := uint8(c.state.D[register])
+	c.setNZ8(value)
+	if err := c.writeByte(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) tstByteAddressIndirect(register uint8) error {
+	value, err := c.readByte(c.state.A[register], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ8(value)
+	return c.prefetch()
+}
+
 func (c *CPU) cmpiWordData(register uint8) error {
 	stream := c.newInstructionStream()
 	source, err := stream.nextWord()
@@ -790,6 +858,34 @@ func (c *CPU) cmpiWordAbsoluteLong() error {
 		return err
 	}
 	c.setCompare16(value, immediate)
+	return stream.finish()
+}
+
+func (c *CPU) oriWordAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value |= immediate
+	c.setNZ16(value)
+	// Moira's 68000 path accounts for the immediate-memory read/modify/write
+	// handoff before the write bus cycle. Together with absolute-long EA
+	// fetches this produces Motorola's documented 28-cycle total.
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
 	return stream.finish()
 }
 

@@ -51,6 +51,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | indexed／PC-relative | 68000 brief extension 的 Dn／An、word／long index；JSR／JMP／LEA／MOVE／MOVEA | ISA-spec；拒絕混入 68020 full extension／scale |
 | 真實卡帶路徑 | Boom Zoo 由 IPL `$400` 無錯執行 200,000 條，PC 到 `$FF80A0` | software-observed；不代表完整 ISA 或遊戲可玩 |
 | phase trace | `StepResult.Phases` | 含 interrupt acknowledge；一般 exception 尚未建模 |
+| Speedy Dragon DMA 後續路徑 | `MOVE.W (An)+,Dn`、`MOVE #imm,SR`、`MOVE.L An/#imm,(xxx).L`、`ADDA.L #imm/Dn,An`、`ORI.W #imm,(xxx).L`、`MOVE.B Dn,(xxx).L`、`TST.B (An)` | ISA-spec 與 Moira phase sample；真實 ROM 動態命中，尚持續補齊後續指令 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。

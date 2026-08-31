@@ -248,11 +248,41 @@ func (c *CPU) oriWordData(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveImmediateToSR() error {
+	if c.state.SR&0x2000 == 0 {
+		return fmt.Errorf("privilege violation exception is not implemented")
+	}
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	if value&0x2000 == 0 {
+		return fmt.Errorf("user stack pointer switch is not implemented")
+	}
+	c.state.SR = value
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 8}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) moveWordAddressIndirectToData(source, destination uint8) error {
 	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
 	if err != nil {
 		return err
 	}
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return c.prefetch()
+}
+
+func (c *CPU) moveWordPostincrementToData(source, destination uint8) error {
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] + 2) & addressMask
 	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
 	c.setNZ16(value)
 	return c.prefetch()
@@ -593,6 +623,14 @@ func (c *CPU) addaWordData(source, destination uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) addaLongData(source, destination uint8) error {
+	c.state.A[destination] += c.state.D[source]
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
 func (c *CPU) cmpaLongImmediate(destination uint8) error {
 	stream := c.newInstructionStream()
 	value, err := stream.nextLong()
@@ -667,6 +705,14 @@ func (c *CPU) orWordDataToData(source, destination uint8) error {
 
 func (c *CPU) subaWordData(source, destination uint8) error {
 	c.state.A[destination] = uint32(int32(c.state.A[destination]) - int32(int16(c.state.D[source])))
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) subaLongAddress(source, destination uint8) error {
+	c.state.A[destination] -= c.state.A[source]
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
 		return err
 	}
@@ -940,6 +986,50 @@ func (c *CPU) moveLongDataToAbsoluteLong(source uint8) error {
 		return err
 	}
 	c.setNZ32(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveLongAddressToAbsoluteLong(source uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value := c.state.A[source]
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.setNZ32(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveLongImmediateToAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	c.setNZ32(value)
+	return stream.finish()
+}
+
+func (c *CPU) addaLongImmediate(register uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	c.state.A[register] += value
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
 	return stream.finish()
 }
 

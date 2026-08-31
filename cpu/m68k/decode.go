@@ -129,6 +129,17 @@ const (
 	InstructionMOVELongDataToPredecrement
 	InstructionCLRWordAddressIndirect
 	InstructionCLRLongPredecrement
+	InstructionMOVEWordPostincrementToData
+	InstructionMOVEImmediateToSR
+	InstructionMOVELongAddressToAbsoluteLong
+	InstructionMOVELongImmediateToAbsoluteLong
+	InstructionADDALongImmediate
+	InstructionORIWordAbsoluteLong
+	InstructionMOVEByteDataToAbsoluteLong
+	InstructionADDALongData
+	InstructionTSTByteAddressIndirect
+	InstructionSUBALongAddress
+	InstructionTSTWordData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -147,6 +158,20 @@ func Decode(opcode uint16) Decoded {
 	switch {
 	case opcode == 0x4e71:
 		return Decoded{Instruction: InstructionNOP}
+	case opcode == 0x46fc:
+		return Decoded{Instruction: InstructionMOVEImmediateToSR}
+	case opcode == 0x23fc:
+		return Decoded{Instruction: InstructionMOVELongImmediateToAbsoluteLong}
+	case opcode == 0x0079:
+		return Decoded{Instruction: InstructionORIWordAbsoluteLong}
+	case opcode&0xfff8 == 0x13c0:
+		return Decoded{Instruction: InstructionMOVEByteDataToAbsoluteLong, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4a10:
+		return Decoded{Instruction: InstructionTSTByteAddressIndirect, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4a40:
+		return Decoded{Instruction: InstructionTSTWordData, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x91c8:
+		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:
 		return Decoded{Instruction: InstructionJSRAbsoluteWord}
 	case opcode&0xf1ff == 0x207c:
@@ -255,6 +280,8 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEAAddressToAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1ff == 0xd0fc:
 		return Decoded{Instruction: InstructionADDAWordImmediate, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1ff == 0xd1fc:
+		return Decoded{Instruction: InstructionADDALongImmediate, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xfff8 == 0x4840:
 		return Decoded{Instruction: InstructionSWAP, Register: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x4280:
@@ -385,6 +412,8 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEBytePCIndexedToData, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xf1f8 == 0xd0c0:
 		return Decoded{Instruction: InstructionADDAWordData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xd1c0:
+		return Decoded{Instruction: InstructionADDALongData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1ff == 0xb1fc:
 		return Decoded{Instruction: InstructionCMPALongImmediate, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xf1f8 == 0x2098:
@@ -449,6 +478,8 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionTSTWordAbsoluteLong}
 	case opcode&0xfff8 == 0x23c0:
 		return Decoded{Instruction: InstructionMOVELongDataToAbsoluteLong, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x23c8:
+		return Decoded{Instruction: InstructionMOVELongAddressToAbsoluteLong, Register: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3140:
 		return Decoded{Instruction: InstructionMOVEWordDataToDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x2140:
@@ -479,6 +510,8 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionORIWordData, Register: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3010:
 		return Decoded{Instruction: InstructionMOVEWordAddressIndirectToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3018:
+		return Decoded{Instruction: InstructionMOVEWordPostincrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3080:
 		return Decoded{Instruction: InstructionMOVEWordDataToAddressIndirect, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1ff == 0x2078:
