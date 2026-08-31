@@ -607,6 +607,48 @@ func (c *CPU) moveWordIndexedToData(base, destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveALongIndexed(base, destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextBriefIndexedAddress(c.state.A[base])
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = value
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) andiWordAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value &= immediate
+	c.setNZ16(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) moveWordDataToIndexed(source, base uint8) error {
 	stream := c.newInstructionStream()
 	address, err := stream.nextBriefIndexedAddress(c.state.A[base])
@@ -698,6 +740,25 @@ func (c *CPU) lsrByteImmediate(register, count uint8) error {
 	}
 	c.state.D[register] = c.state.D[register]&0xffffff00 | uint32(value)
 	c.setNZ8(value)
+	c.state.SR &^= flagExtend
+	if carry {
+		c.state.SR |= flagCarry | flagExtend
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) lsrLongImmediate(register, count uint8) error {
+	value := c.state.D[register]
+	var carry bool
+	for range count {
+		carry = value&1 != 0
+		value >>= 1
+	}
+	c.state.D[register] = value
+	c.setNZ32(value)
 	c.state.SR &^= flagExtend
 	if carry {
 		c.state.SR |= flagCarry | flagExtend

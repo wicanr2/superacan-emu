@@ -178,6 +178,14 @@ const (
 	InstructionADDILongAbsoluteLong
 	InstructionMOVELongAbsoluteLongToAbsoluteLong
 	InstructionSUBILongAbsoluteLong
+	InstructionCLRLongAbsoluteLong
+	InstructionLSRLongImmediate
+	InstructionMOVEALongIndexed
+	InstructionANDIWordAbsoluteLong
+	InstructionTSTLongAddressIndirect
+	InstructionMOVELongAbsoluteLongToData
+	InstructionMOVELongDataToData
+	InstructionMOVELongAddressToData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -206,6 +214,14 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEByteDataToAbsoluteLong, Register: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x4a10:
 		return Decoded{Instruction: InstructionTSTByteAddressIndirect, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4a90:
+		return Decoded{Instruction: InstructionTSTLongAddressIndirect, Register: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x2039:
+		return Decoded{Instruction: InstructionMOVELongAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0x2000:
+		return Decoded{Instruction: InstructionMOVELongDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x2008:
+		return Decoded{Instruction: InstructionMOVELongAddressToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x4a40:
 		return Decoded{Instruction: InstructionTSTWordData, Register: uint8(opcode & 7)}
 	case opcode == 0x4a39:
@@ -296,6 +312,16 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVELongAbsoluteLongToAbsoluteLong}
 	case opcode == 0x04b9:
 		return Decoded{Instruction: InstructionSUBILongAbsoluteLong}
+	case opcode == 0x42b9:
+		return Decoded{Instruction: InstructionCLRLongAbsoluteLong}
+	case opcode == 0x0279:
+		return Decoded{Instruction: InstructionANDIWordAbsoluteLong}
+	case opcode&0xf1f8 == 0xe088:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionLSRLongImmediate, Register: uint8(opcode & 7), Quick: quick}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:
@@ -490,6 +516,8 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEByteDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3030:
 		return Decoded{Instruction: InstructionMOVEWordIndexedToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x2070:
+		return Decoded{Instruction: InstructionMOVEALongIndexed, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3180:
 		return Decoded{Instruction: InstructionMOVEWordDataToIndexed, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x5140:

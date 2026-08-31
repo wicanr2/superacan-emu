@@ -12,7 +12,8 @@ func (c *CPU) clearAbsoluteLong(size Width) error {
 	if err != nil {
 		return err
 	}
-	if size == WidthByte {
+	switch size {
+	case WidthByte:
 		if _, err := c.readByte(address, FCSupervisorData); err != nil {
 			return err
 		}
@@ -20,12 +21,20 @@ func (c *CPU) clearAbsoluteLong(size Width) error {
 		if err := c.writeByte(address, 0, FCSupervisorData); err != nil {
 			return err
 		}
-	} else {
+	case WidthWord:
 		if _, err := c.readWord(address, FCSupervisorData, PhaseDataRead); err != nil {
 			return err
 		}
 		c.setNZ16(0)
 		if err := c.writeWord(address, 0, FCSupervisorData); err != nil {
+			return err
+		}
+	case WidthLong:
+		if _, err := c.readLong(address, FCSupervisorData); err != nil {
+			return err
+		}
+		c.setNZ32(0)
+		if err := c.writeLong(address, 0, FCSupervisorData); err != nil {
 			return err
 		}
 	}

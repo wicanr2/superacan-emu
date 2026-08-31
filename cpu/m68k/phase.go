@@ -22,6 +22,7 @@ const (
 	WidthNone Width = 0
 	WidthByte Width = 8
 	WidthWord Width = 16
+	WidthLong Width = 32
 )
 
 // FunctionCode is the value driven on the 68000 FC2-FC0 pins.
