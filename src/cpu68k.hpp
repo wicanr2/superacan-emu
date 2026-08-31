@@ -4,6 +4,7 @@
 #pragma once
 
 #include "bus.hpp"
+#include "state.hpp"
 
 #include <Moira/Moira.h>
 
@@ -13,6 +14,39 @@ public:
 
     // IRQ ack 回呼（模擬 MAME HOLD_LINE：CPU 受理中斷後 IRQ 線自動解除）
     std::function<void(int level)> onIrqAck;
+
+    // save state：Moira 無序列化 API，逐個複製其 protected POD 狀態
+    // （M68000 不使用 iCache；lookup table 為常數不存）
+    void saveState(StateWriter &w) const {
+        w.put(clock);
+        w.put(reg);
+        w.put(queue);
+        w.put(irqMode);
+        w.put(ipl);
+        w.put(fcl);
+        w.put(fcSource);
+        w.put(exception);
+        w.put(cp);
+        w.put(loopModeDelay);
+        w.put(readBuffer);
+        w.put(writeBuffer);
+        w.put(flags);
+    }
+    void loadState(StateReader &r) {
+        r.get(clock);
+        r.get(reg);
+        r.get(queue);
+        r.get(irqMode);
+        r.get(ipl);
+        r.get(fcl);
+        r.get(fcSource);
+        r.get(exception);
+        r.get(cp);
+        r.get(loopModeDelay);
+        r.get(readBuffer);
+        r.get(writeBuffer);
+        r.get(flags);
+    }
 
 protected:
     moira::u8  read8(moira::u32 addr) const override  { return bus_.read8(addr); }

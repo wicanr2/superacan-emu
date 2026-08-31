@@ -29,6 +29,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "state.hpp"
+
 class UM6619 {
 public:
     static constexpr int CLOCK = 3579545;             // Hz（知識庫 §1 (a)）
@@ -55,6 +57,26 @@ public:
 
     uint8_t rawReg(int i) const { return regs_[i & 0xFF]; }
     uint16_t activeChannels() const { return active_; }
+
+    // save state（state.hpp；payload 內子區段）
+    void saveState(StateWriter &w) const {
+        w.putArray(regs_);
+        for (const auto &c : ch_) w.put(c);
+        w.put(active_);
+        w.put(sampleAcc_);
+        w.put(timerCount_);
+        w.put(timerIrq_);
+        w.put(dmaIrq_);
+    }
+    void loadState(StateReader &r) {
+        r.getArray(regs_);
+        for (auto &c : ch_) r.get(c);
+        r.get(active_);
+        r.get(sampleAcc_);
+        r.get(timerCount_);
+        r.get(timerIrq_);
+        r.get(dmaIrq_);
+    }
 
 private:
     struct Channel {

@@ -24,6 +24,7 @@
 
 #include "umc6650.hpp"
 #include "video/um6618.hpp"
+#include "state.hpp"
 
 #include <array>
 #include <cstdint>
@@ -37,6 +38,11 @@ public:
     void loadIpl(const uint8_t *data, size_t len);       // internal_68k.bin（已還原）
     void loadSoundRam(const uint8_t *data, size_t len, uint32_t dst); // 6502 取樣資料
     void loadSram(const uint8_t *data, size_t len);      // 卡帶 SRAM（可選）
+
+    // save state
+    void saveState(StateWriter &w) const;
+    void loadState(StateReader &r);
+    uint64_t romHash() const;  // FNV-1a 64-bit（識別用，非加密）
 
     UMC6650 &lockout() { return lockout_; }
     UM6618 &video() { return video_; }
@@ -60,6 +66,12 @@ public:
 
     // $E9001C 寫入時的通知（runner 用來 log overlay 狀態變化）
     std::function<void(uint16_t oldVal, uint16_t newVal)> onControlWrite;
+
+    // FRC（$E90014/$16；行為依 MAME update_frc_state (b)，其本身即
+    // case-by-case HACK——真實計時公式待查證）
+    uint16_t frcControl() const { return frcControl_; }
+    uint16_t frcFreq() const { return frcFreq_; }
+    std::function<void()> onFrcWrite;
 
     uint8_t  read8(uint32_t addr) const;
     uint16_t read16(uint32_t addr) const;

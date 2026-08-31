@@ -12,6 +12,8 @@
 #include <cstddef>
 #include <array>
 
+#include "state.hpp"
+
 class UMC6650 {
 public:
     // 載入 16 byte 金鑰（umc6650.bin 內容）
@@ -20,6 +22,9 @@ public:
     void writeAddrPort(uint8_t v) { addr_ = v & 0x7F; }
     uint8_t readDataPort() const { return mem_[addr_]; }
     void writeDataPort(uint8_t v);
+
+    void saveState(StateWriter &w) const { w.putArray(mem_); w.put(addr_); }
+    void loadState(StateReader &r) { r.getArray(mem_); r.get(addr_); }
 
 private:
     std::array<uint8_t, 256> mem_{};

@@ -14,6 +14,7 @@
 #include "bus.hpp"
 #include "cpu68k.hpp"
 #include "cpu65c02.hpp"
+#include "state.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -26,6 +27,7 @@
 #include <vector>
 
 extern uint32_t g_dbgPc;  // bus.cpp 的除錯 watchpoint 用
+extern uint32_t g_dbgSp;  // bus.cpp：A7
 extern uint64_t g_dbgFrame;  // bus.cpp；ACAN_TRACE65 日誌幀號
 
 #ifndef NO_SDL
@@ -65,7 +67,10 @@ void usage(const char *argv0) {
         "  --frames N          跑 N 幀後結束（預設：SDL 模式跑到關窗）\n"
         "  --screenshot <f>    結束時把最後一幀寫成 24-bit BMP\n"
         "  --wav <f>           把全程音訊寫成 48 kHz 16-bit stereo WAV\n"
-        "  --press <spec>      headless 按鍵注入：frame:BTN+BTN,...（按住 10 幀）\n"
+        "  --press <spec>      headless 按鍵注入（P1）：frame:BTN+BTN,...（按住 10 幀）\n"
+        "  --press2 <spec>     同上，注入 P2\n"
+        "  --save-state <f>    結束時把模擬器全狀態寫入 <f>\n"
+        "  --load-state <f>    啟動時從 <f> 載入全狀態（跳過 IPL）\n"
         "                      BTN = A/B/X/Y/L/R/START/SELECT/UP/DOWN/LEFT/RIGHT\n",
         argv0);
 }
@@ -197,7 +202,8 @@ std::vector<PressEvent> parsePress(const std::string &spec) {
 } // namespace
 
 int main(int argc, char **argv) {
-    std::string biosDir, romPath, screenshotPath, wavPath, pressSpec;
+    std::string biosDir, romPath, screenshotPath, wavPath, pressSpec, press2Spec;
+    std::string saveStatePath, loadStatePath;
     long traceCount = 0, postEntryInstrs = 5000, frameLimit = -1;
     bool headless = false;
     for (int i = 1; i < argc; i++) {
@@ -215,6 +221,9 @@ int main(int argc, char **argv) {
         else if (a == "--screenshot") screenshotPath = next("--screenshot");
         else if (a == "--wav") wavPath = next("--wav");
         else if (a == "--press") pressSpec = next("--press");
+        else if (a == "--press2") press2Spec = next("--press2");
+        else if (a == "--save-state") saveStatePath = next("--save-state");
+        else if (a == "--load-state") loadStatePath = next("--load-state");
         else { usage(argv[0]); return 1; }
     }
     if (biosDir.empty() || romPath.empty()) { usage(argv[0]); return 1; }
@@ -274,12 +283,16 @@ int main(int argc, char **argv) {
     audio.keepWav = !wavPath.empty();
     soundCpu.soundChip().onSample = [&audio](int16_t l, int16_t r) { audio.push(l, r); };
 
-    // 手把輸入（P1；16-bit active low，memory-map.md §7）
-    uint16_t padState = 0xFFFF;
-    bus.setPad(0, padState);
+    // 手把輸入（P1+P2；16-bit active low，memory-map.md §7）
+    uint16_t padState[2] = { 0xFFFF, 0xFFFF };
+    bus.setPad(0, padState[0]);
+    bus.setPad(1, padState[1]);
     std::vector<PressEvent> pressEvents = parsePress(pressSpec);
     for (const auto &ev : pressEvents)
-        std::printf("[input] 預約按鍵：frame %ld press $%04X（10 幀）\n", ev.frame, ev.bits);
+        std::printf("[input] 預約按鍵（P1）：frame %ld press $%04X（10 幀）\n", ev.frame, ev.bits);
+    std::vector<PressEvent> pressEvents2 = parsePress(press2Spec);
+    for (const auto &ev : pressEvents2)
+        std::printf("[input] 預約按鍵（P2）：frame %ld press $%04X（10 幀）\n", ev.frame, ev.bits);
 
     bus.onControlWrite = [&soundCpu](uint16_t oldV, uint16_t newV) {
         // 只 log bit0-3 變化（卡帶會頻繁翻其他位元，避免洗版）
@@ -293,6 +306,34 @@ int main(int argc, char **argv) {
 
     cpu.reset();
     std::printf("[boot] reset：SSP=$%08X PC=$%08X（IPL 向量表）\n", cpu.getA(7), cpu.getPC());
+
+    // ---- save state（格式見 state.hpp）----
+    // runner 狀態變數提前宣告（主迴圈直接使用這些）
+    uint64_t romHash = bus.romHash();
+    int vpos = 0;
+    int64_t lineCycles = 0;
+    int soundCycleAcc = 0;   // 65C02 = 68k/3（§1 (a)）
+    int currentIpl = 0;
+    bool frcPending = false;
+    int64_t frcNext = -1;
+    auto collectState = [&]() -> std::vector<uint8_t> {
+        StateWriter w;
+        bus.saveState(w);
+        soundCpu.saveState(w);
+        cpu.saveState(w);
+        w.put(vpos); w.put(lineCycles); w.put(soundCycleAcc);
+        w.put(currentIpl); w.put(soundIrq6); w.put(frcPending); w.put(frcNext);
+        return w.buf;
+    };
+    auto applyState = [&](const std::vector<uint8_t> &buf) -> bool {
+        StateReader r(buf.data(), buf.size());
+        bus.loadState(r);
+        soundCpu.loadState(r);
+        cpu.loadState(r);
+        r.get(vpos); r.get(lineCycles); r.get(soundCycleAcc);
+        r.get(currentIpl); r.get(soundIrq6); r.get(frcPending); r.get(frcNext);
+        return r.ok && r.left == 0;
+    };
 
     const uint32_t expectedEntry = bus.cartVector(1);
     std::printf("[info] 卡帶向量表入口 PC=$%08X SSP=$%08X\n", expectedEntry, bus.cartVector(0));
@@ -341,13 +382,46 @@ int main(int argc, char **argv) {
     long traced = 0, postRun = 0;
     const long maxIplInstrs = 2000000;
     long total = 0;
-    int vpos = 0;
-    int64_t lineCycles = 0;
-    int soundCycleAcc = 0;   // 65C02 = 68k/3（§1 (a)）
-    int currentIpl = 0;
     bool quit = false;
 
+    // save state 熱鍵用槽位檔名
+    int stateSlot = 0;
+    auto slotPath = [&]() -> std::string {
+        return romPath + ".st" + std::to_string(stateSlot);
+    };
+
+    // --load-state：跳過 IPL，直接進入卡帶後狀態
+    if (!loadStatePath.empty()) {
+        std::vector<uint8_t> buf;
+        bool mism = false;
+        if (!readStateFile(loadStatePath.c_str(), romHash, buf, &mism) || !applyState(buf)) {
+            std::fprintf(stderr, "錯誤：save state 載入失敗：%s\n", loadStatePath.c_str());
+            return 1;
+        }
+        if (mism) std::fprintf(stderr, "警告：save state 的 ROM hash 與目前 ROM 不符（仍載入）\n");
+        atCartEntry = true;
+        if (frameLimit > 0) frameLimit += long(bus.video().frameNumber());  // --frames = 再多跑 N 幀
+        std::printf("[state] 已載入 %s（frame=%llu）\n", loadStatePath.c_str(),
+                    (unsigned long long)bus.video().frameNumber());
+    }
+
     char dasm[128];
+    // FRC（$E90014/$16 → 68k IRQ3；MAME update_frc_state 的 case 表 (b)，
+    // 其本身即 case-by-case HACK，真實公式待查證）
+    auto frcUpdate = [&]() {
+        const uint16_t ctrl = bus.frcControl();
+        if ((ctrl & 0xFF00) != 0xA200) { frcNext = -1; return; }
+        const uint32_t period = (uint32_t(ctrl & 0xFF) << 16) | bus.frcFreq();
+        int64_t cyc = -1;
+        switch (ctrl & 0xF) {
+        case 0: cyc = 10738635; break;            // MAME HACK：1 Hz
+        case 1: cyc = 1024LL * period; break;
+        case 0xF: cyc = 8192LL * period; break;
+        default: break;                            // 未知組合：關閉（MAME popmessage）
+        }
+        frcNext = (cyc < 0) ? -1 : cpu.getClock() + cyc;
+    };
+    bus.onFrcWrite = frcUpdate;
     auto applyIrq = [&]() {
         // vblank（IRQ7）> mailbox（IRQ6）> raster（IRQ4）；mask 在 $E90010（§6 (b)）
         int lvl = 0;
@@ -355,6 +429,7 @@ int main(int argc, char **argv) {
         else if (soundIrq6) lvl = 6;
         else if (bus.video().irq5Pending()) lvl = 5;
         else if (bus.video().rasterActive()) lvl = 4;
+        else if (frcPending) lvl = 3;
         if (lvl != currentIpl) { cpu.setIPL(uint8_t(lvl)); currentIpl = lvl; }
     };
     // HOLD_LINE 語意：CPU 受理中斷（Moira willInterrupt）即解除對應 IRQ 線。
@@ -367,12 +442,14 @@ int main(int argc, char **argv) {
         else if (level == 6) soundIrq6 = false;
         else if (level == 5) bus.video().clearIrq5();
         else if (level == 4) bus.video().clearRaster();
+        else if (level == 3) { frcPending = false; frcUpdate(); }  // 重新排程（MAME 行為）
         applyIrq();
     };
 
     while (!quit) {
         const uint32_t pc = cpu.getPC();
         g_dbgPc = pc;
+        g_dbgSp = cpu.getA(7);
 
         if (traceCount > 0 && traced < traceCount) {
             cpu.disassemble(dasm, pc);
@@ -436,6 +513,9 @@ int main(int argc, char **argv) {
             }
         }
 
+        // FRC 計時器（IRQ3，HOLD_LINE）
+        if (frcNext > 0 && cpu.getClock() >= frcNext) { frcPending = true; frcNext = -1; applyIrq(); }
+
         // 掃描線推進
         const int budget = bus.video().h320() ? 728 : 684;
         if (lineCycles < budget) continue;
@@ -452,20 +532,36 @@ int main(int argc, char **argv) {
             bus.video().renderFrame();
             g_dbgFrame = bus.video().frameNumber();
             soundCpu.pulseNmi();    // MAME：vblank 時 pulse 65C02 NMI
+            if (std::getenv("ACAN_STAGING")) {   // 臨時：追蹤 staging buffer 前 16 word 變化
+                static uint16_t prev[16] = {};
+                uint16_t cur[16];
+                for (int i = 0; i < 16; i++) cur[i] = bus.read16(0xFC0800 + i * 2);
+                if (std::memcmp(prev, cur, sizeof(cur)) != 0) {
+                    std::fprintf(stderr, "[staging] f=%llu", (unsigned long long)bus.video().frameNumber());
+                    for (int i = 0; i < 16; i++) std::fprintf(stderr, " %04x", cur[i]);
+                    std::fprintf(stderr, "\n");
+                    std::memcpy(prev, cur, sizeof(cur));
+                }
+            }
             if (std::getenv("ACAN_DEBUG"))
                 std::fprintf(stderr, "[dbg] frame=%llu pc=$%08X 65c02pc=$%04X\n",
                              (unsigned long long)bus.video().frameNumber(), cpu.getPC(), soundCpu.getPC());
 
             if (frameLimit > 0 && int64_t(bus.video().frameNumber()) >= frameLimit) quit = true;
 
-            // --press 注入：到幀按下、10 幀後放開
-            if (!pressEvents.empty()) {
+            // --press/--press2 注入：到幀按下、10 幀後放開
+            if (!pressEvents.empty() || !pressEvents2.empty()) {
                 const long f = long(bus.video().frameNumber());
                 for (const auto &ev : pressEvents) {
-                    if (f == ev.frame) padState &= ~ev.bits;
-                    if (f == ev.frame + 10) padState |= ev.bits;
+                    if (f == ev.frame) padState[0] &= ~ev.bits;
+                    if (f == ev.frame + 10) padState[0] |= ev.bits;
                 }
-                bus.setPad(0, padState);
+                for (const auto &ev : pressEvents2) {
+                    if (f == ev.frame) padState[1] &= ~ev.bits;
+                    if (f == ev.frame + 10) padState[1] |= ev.bits;
+                }
+                bus.setPad(0, padState[0]);
+                bus.setPad(1, padState[1]);
             }
 
 #ifndef NO_SDL
@@ -480,9 +576,34 @@ int main(int argc, char **argv) {
                     if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) {
                         if (ev.key.repeat) continue;
                         const bool down = ev.type == SDL_KEYDOWN;
+                        if (down && ev.key.keysym.sym == SDLK_F5) {   // 存檔
+                            if (writeStateFile(slotPath().c_str(), romHash, collectState()))
+                                std::printf("[state] 已存檔：%s\n", slotPath().c_str());
+                            else std::fprintf(stderr, "錯誤：無法寫入 %s\n", slotPath().c_str());
+                            continue;
+                        }
+                        if (down && ev.key.keysym.sym == SDLK_F6) {   // 切槽
+                            stateSlot = (stateSlot + 1) % 10;
+                            std::printf("[state] 槽位 → %d\n", stateSlot);
+                            continue;
+                        }
+                        if (down && ev.key.keysym.sym == SDLK_F7) {   // 讀檔
+                            std::vector<uint8_t> buf;
+                            bool mism = false;
+                            if (readStateFile(slotPath().c_str(), romHash, buf, &mism) && applyState(buf)) {
+                                if (mism) std::fprintf(stderr, "警告：ROM hash 不符（仍載入）\n");
+                                std::printf("[state] 已讀檔：%s\n", slotPath().c_str());
+                            } else {
+                                std::fprintf(stderr, "錯誤：讀檔失敗 %s\n", slotPath().c_str());
+                            }
+                            continue;
+                        }
                         uint16_t bit = 0;
-                        // 方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R（Bcan.ini 預設風格），
+                        int player = 0;
+                        // P1：方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R（Bcan.ini 預設風格），
                         // Enter=Start、右 Shift=Select
+                        // P2：I/J/K/L 方向 + U/O/N/M = A/B/X/Y、逗號/句號=L/R、
+                        // 右 Ctrl=Start、左 Shift=Select
                         switch (ev.key.keysym.sym) {
                         case SDLK_UP: bit = BTN_UP; break;
                         case SDLK_DOWN: bit = BTN_DOWN; break;
@@ -496,11 +617,23 @@ int main(int argc, char **argv) {
                         case SDLK_w: bit = BTN_R; break;
                         case SDLK_RETURN: bit = BTN_START; break;
                         case SDLK_RSHIFT: bit = BTN_SELECT; break;
+                        case SDLK_i: player = 1; bit = BTN_UP; break;
+                        case SDLK_k: player = 1; bit = BTN_DOWN; break;
+                        case SDLK_j: player = 1; bit = BTN_LEFT; break;
+                        case SDLK_l: player = 1; bit = BTN_RIGHT; break;
+                        case SDLK_u: player = 1; bit = BTN_A; break;
+                        case SDLK_o: player = 1; bit = BTN_B; break;
+                        case SDLK_n: player = 1; bit = BTN_X; break;
+                        case SDLK_m: player = 1; bit = BTN_Y; break;
+                        case SDLK_COMMA: player = 1; bit = BTN_L; break;
+                        case SDLK_PERIOD: player = 1; bit = BTN_R; break;
+                        case SDLK_RCTRL: player = 1; bit = BTN_START; break;
+                        case SDLK_LSHIFT: player = 1; bit = BTN_SELECT; break;
                         default: break;
                         }
                         if (bit) {
-                            if (down) padState &= ~bit; else padState |= bit;
-                            bus.setPad(0, padState);
+                            if (down) padState[player] &= ~bit; else padState[player] |= bit;
+                            bus.setPad(player, padState[player]);
                         }
                     }
                 }
@@ -517,14 +650,21 @@ int main(int argc, char **argv) {
                 (unsigned long long)bus.video().frameNumber(), cpu.getPC(),
                 bus.video().readReg(0x04), bus.video().irqMask(),
                 soundCpu.halted() ? "HALT" : "run", bus.soundRamData()[0x300]);
-    std::printf("[done] IRQ ack 計數：VBL7=%ld MBOX6=%ld LINE5=%ld RASTER4=%ld\n",
-                irqAckCount[7], irqAckCount[6], irqAckCount[5], irqAckCount[4]);
+    std::printf("[done] IRQ ack 計數：VBL7=%ld MBOX6=%ld LINE5=%ld RASTER4=%ld FRC3=%ld\n",
+                irqAckCount[7], irqAckCount[6], irqAckCount[5], irqAckCount[4], irqAckCount[3]);
 
     if (!screenshotPath.empty()) {
         if (writeBmp(screenshotPath, bus.video().framebuffer(), UM6618::WIDTH, UM6618::HEIGHT))
             std::printf("[done] 截圖已輸出：%s\n", screenshotPath.c_str());
         else
             std::fprintf(stderr, "錯誤：截圖寫入失敗 %s\n", screenshotPath.c_str());
+    }
+
+    if (!saveStatePath.empty()) {
+        if (writeStateFile(saveStatePath.c_str(), romHash, collectState()))
+            std::printf("[done] save state 已輸出：%s\n", saveStatePath.c_str());
+        else
+            std::fprintf(stderr, "錯誤：save state 寫入失敗 %s\n", saveStatePath.c_str());
     }
 
     if (!wavPath.empty()) {

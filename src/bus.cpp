@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 uint32_t g_dbgPc = 0;  // 除錯：main 每條指令前更新
+uint32_t g_dbgSp = 0;  // 除錯：main 每條指令前更新（A7）
 uint64_t g_dbgFrame = 0;  // 除錯：main 每幀更新（ACAN_TRACE65 用）
 
 void SystemBus::loadRom(std::vector<uint8_t> rom) { rom_ = std::move(rom); }
@@ -111,10 +112,10 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
         if (addr == 0xE90B3C) { e90b3c_ = uint16_t((e90b3c_ & 0x00FF) | (val << 8)); return; }
         if (addr == 0xE90B3D) { e90b3c_ = uint16_t((e90b3c_ & 0xFF00) | val); return; }
         if (addr == 0xE90010 || addr == 0xE90011) { video_.setIrqMask(val); return; }
-        if (addr == 0xE90014) { frcControl_ = uint16_t((frcControl_ & 0x00FF) | (val << 8)); return; }
-        if (addr == 0xE90015) { frcControl_ = uint16_t((frcControl_ & 0xFF00) | val); return; }
-        if (addr == 0xE90016) { frcFreq_ = uint16_t((frcFreq_ & 0x00FF) | (val << 8)); return; }
-        if (addr == 0xE90017) { frcFreq_ = uint16_t((frcFreq_ & 0xFF00) | val); return; }
+        if (addr == 0xE90014) { frcControl_ = uint16_t((frcControl_ & 0x00FF) | (val << 8)); if (onFrcWrite) onFrcWrite(); return; }
+        if (addr == 0xE90015) { frcControl_ = uint16_t((frcControl_ & 0xFF00) | val); if (onFrcWrite) onFrcWrite(); return; }
+        if (addr == 0xE90016) { frcFreq_ = uint16_t((frcFreq_ & 0x00FF) | (val << 8)); if (onFrcWrite) onFrcWrite(); return; }
+        if (addr == 0xE90017) { frcFreq_ = uint16_t((frcFreq_ & 0xFF00) | val); if (onFrcWrite) onFrcWrite(); return; }
         if (addr >= 0xE90020 && addr < 0xE90040) {
             // 主機 DMA ch0/ch1：16-bit 暫存器，byte 寫入做 read-modify-write
             const int ch = (addr >> 4) & 1;
@@ -155,6 +156,11 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
     if (addr >= 0xF00000 && addr < 0xF00200) {
         // UM6618 暫存器：16-bit，byte 寫入 read-modify-write
         const uint16_t idx = (addr & 0x1FF) >> 1;
+        if (std::getenv("ACAN_WATCH") && idx >= 0x80 && idx <= 0xAF)
+            std::fprintf(stderr, "[watchv] $F00%03X <- $%02X (pc=$%08X)\n", idx * 2, val, g_dbgPc);
+        if (std::getenv("ACAN_WATCH") && idx == 4)   // $F00008 video flags
+            std::fprintf(stderr, "[watchf] f=%llu video_flags <- $%02X (pc=$%08X)\n",
+                         (unsigned long long)g_dbgFrame, val, g_dbgPc);
         uint16_t w = video_.readReg(idx);
         w = (addr & 1) ? uint16_t((w & 0xFF00) | val) : uint16_t((w & 0x00FF) | (val << 8));
         video_.writeReg(idx, w);
@@ -167,7 +173,12 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
         video_.writePalette(idx, w);
         return;
     }
-    if (addr >= 0xF40000 && addr < 0xF60000) { video_.writeVramByte(addr & 0x1FFFF, val); return; }
+    if (addr >= 0xF40000 && addr < 0xF60000) {
+        if (std::getenv("ACAN_WATCH") && (addr & 0x1FFFF) >= 0x1E800 && (addr & 0x1FFFF) < 0x1F000)
+            std::fprintf(stderr, "[watch3] f=%llu VRAM+$%05X <- $%02X (pc=$%08X)\n",
+                         (unsigned long long)g_dbgFrame, addr & 0x1FFFF, val, g_dbgPc);
+        video_.writeVramByte(addr & 0x1FFFF, val); return;
+    }
     if (addr >= 0xFC0000) {
         if (std::getenv("ACAN_WATCH")) {
             const uint32_t o = addr & 0xFFFF;
@@ -182,8 +193,57 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
 }
 
 void SystemBus::write16(uint32_t addr, uint16_t val) {
+    addr &= 0xFFFFFF;
+    // UM6618 暫存器/調色盤：word 寫入必須單次生效——byte 拆分會讓
+    // 觸發型暫存器（sprite DMA $F0001E 等）在高/低 byte 各觸發一次，
+    // 且第一次觸發已推進 src/dst，第二次等於用推進後的指標再複製一遍
+    // （實測 Boom Zoo 標題 tilemap1 雜訊的根因；MAME video_w 為 word 單次）。
+    if (addr >= 0xF00000 && addr < 0xF00200) {
+        video_.writeReg((addr & 0x1FF) >> 1, val);
+        return;
+    }
+    if (addr >= 0xF00200 && addr < 0xF00400) {
+        video_.writePalette((addr & 0x1FF) >> 1, val);
+        return;
+    }
     write8(addr, uint8_t(val >> 8));
     write8(addr + 1, uint8_t(val));
+}
+
+// ---- save state ----
+uint64_t SystemBus::romHash() const {
+    // FNV-1a 64-bit
+    uint64_t h = 14695981039346656037ull;
+    for (uint8_t b : rom_) { h ^= b; h *= 1099511628211ull; }
+    return h;
+}
+
+void SystemBus::saveState(StateWriter &w) const {
+    for (uint8_t b : wram_) w.put(b);
+    for (uint8_t b : soundRam_) w.put(b);
+    for (uint8_t b : sram_) w.put(b);
+    w.put(e90b3c_); w.put(ctrl_);
+    w.put(loOverlayOff_); w.put(hiOverlayOff_);
+    w.putArray(pad_);
+    w.put(frcControl_); w.put(frcFreq_);
+    for (const auto &d : dma_) w.put(d);
+    lockout_.saveState(w);
+    video_.saveState(w);
+}
+
+void SystemBus::loadState(StateReader &r) {
+    for (uint8_t &b : wram_) r.get(b);
+    for (uint8_t &b : soundRam_) r.get(b);
+    for (uint8_t &b : sram_) r.get(b);
+    r.get(e90b3c_); r.get(ctrl_);
+    r.get(loOverlayOff_); r.get(hiOverlayOff_);
+    // 逐項讀取可避免 GCC 13 在最佳化 range-for template 時誤判為 pad_[2] 越界，
+    // 同時讓固定的兩個手把欄位在 state 格式中一目了然。
+    r.get(pad_[0]); r.get(pad_[1]);
+    r.get(frcControl_); r.get(frcFreq_);
+    for (auto &d : dma_) r.get(d);
+    lockout_.loadState(r);
+    video_.loadState(r);
 }
 
 // ---- 主機 DMA（$E90020-$3F；行為依 MAME dma_w，(b)）----

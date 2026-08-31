@@ -19,6 +19,8 @@
 #include <functional>
 #include <vector>
 
+#include "state.hpp"
+
 class UM6618 {
 public:
     static constexpr int WIDTH = 320;   // 最大 X 寬（video flags bit8 決定 320/256）
@@ -82,6 +84,10 @@ public:
     uint8_t irqMask() const { return irqMask_; }
     void setIrqMask(uint8_t v) { irqMask_ = v; }
 
+    // save state（framebuffer_ 等畫面緩衝為衍生狀態，不存）
+    void saveState(StateWriter &w) const;
+    void loadState(StateReader &r);
+
 private:
     // ---- 暫存器衍生狀態（對齊 MAME 欄位） ----
     std::array<uint16_t, 256> regs_{};
@@ -107,6 +113,13 @@ private:
     uint16_t windowScrollX_[2]{};
     uint16_t windowScrollY_[2]{};
 
+    // ROZ（$180-$19E；行為依 MAME draw_roz_layer/get_roz_tilemap_info (b)）
+    uint16_t rozMode_ = 0, rozTileMode_ = 0;
+    uint32_t rozScrollX_ = 0, rozScrollY_ = 0;      // 24.8 固定小數點
+    int32_t rozCoeffA_ = 0, rozCoeffB_ = 0, rozCoeffC_ = 0, rozCoeffD_ = 0;  // 8.8
+    uint32_t rozBase_ = 0, rozUnk0_ = 0, rozUnk1_ = 0, rozUnk2_ = 0;
+    uint16_t rozTileBank_ = 0;
+
     // sprite DMA
     uint32_t sprDmaSrc_ = 0, sprDmaDst_ = 0;
     uint16_t sprDmaSrcInc_ = 0, sprDmaDstInc_ = 0, sprDmaCount_ = 0;
@@ -126,6 +139,10 @@ private:
     std::array<uint8_t, WIDTH * HEIGHT> prio_{};        // 高 nibble=tilemap 優先、低 nibble=sprite
     std::array<uint16_t, WIDTH * HEIGHT> spriteBuf_{};
     std::array<uint8_t, WIDTH * HEIGHT> maskBuf_{};
+    // 1bpp-alt（ROZ mode 0 開機 logo）用的位址重排 VRAM 副本
+    // （MAME m_vram_addr_swapped (b)：低 7 bit 重排 [b2b1b0b6b5b4b3]，
+    // 讓 64x64 1bpp tile 能當 8x8 解碼）
+    std::array<uint8_t, 0x20000> vramSwap_{};
 
     // ---- 內部 ----
     int tilemapRegion(int layer) const;                 // 0=8bpp 1=4bpp 2=2bpp
@@ -133,8 +150,10 @@ private:
     int fetchTilePixel(int region, int tile, int x, int y) const;
     uint16_t tilemapPixel(int layer, int x, int y) const;  // 回調色盤索引（0=透明）
     void drawTilemapLayer(int layer, int priority);
+    void drawRoz(int priority);
+    uint16_t rozPixel(uint32_t sx, uint32_t sy) const;  // 回調色盤索引（0=透明）
     void drawSprites();
     void drawSpriteTile(int tile, int palette, bool xf, bool yf,
                         int dstx, int dsty, int prio, int maskMode);
-    void drawWindow(int priority);
+    void drawWindow(int win, int priority);
 };

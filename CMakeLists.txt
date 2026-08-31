@@ -23,8 +23,8 @@ if(NOT moira_POPULATED)
     add_subdirectory(${moira_SOURCE_DIR}/Moira ${moira_BINARY_DIR})
 endif()
 
-# CLK（Thomas Harte，MIT）：取其 WDC 65C02 核心（Processors/6502Mk2，header-only）
-# 本里程碑只整合進 build 與建立 Bus 介面 stub，不實際執行副 CPU。
+# CLK（Thomas Harte，MIT）：取其 WDC 65C02 核心（Processors/6502Mk2，header-only）；
+# 副 CPU 已實際執行音效驅動、手把掃描、IRQ/NMI 與 UM6619 通訊。
 FetchContent_Declare(
     clk
     GIT_REPOSITORY https://github.com/TomHarte/CLK
@@ -44,6 +44,7 @@ add_executable(superacan-emu
     src/cpu65c02.cpp
     src/video/um6618.cpp
     src/audio/um6619.cpp
+    src/state.cpp
 )
 
 target_include_directories(superacan-emu PRIVATE

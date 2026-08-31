@@ -18,6 +18,7 @@
 #pragma once
 
 #include "audio/um6619.hpp"
+#include "state.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -101,6 +102,30 @@ public:
 
     // UM6619 存取
     UM6619 &soundChip() { return um6619_; }
+
+    // save state
+    void saveState(StateWriter &w) const {
+        cpu_.saveState(w);
+        w.put(halted_);
+        w.put(irqEnable_); w.put(irqSource_);
+        w.put(shiftCtrl_);
+        w.putArray(shiftRegs_); w.putArray(latched_);
+        w.putArray(latch_); w.putArray(latchFull_);
+        w.put(um6619Addr_);
+        w.put(resetRelease_);
+        um6619_.saveState(w);
+    }
+    void loadState(StateReader &r) {
+        cpu_.loadState(r);
+        r.get(halted_);
+        r.get(irqEnable_); r.get(irqSource_);
+        r.get(shiftCtrl_);
+        r.getArray(shiftRegs_); r.getArray(latched_);
+        r.getArray(latch_); r.getArray(latchFull_);
+        r.get(um6619Addr_);
+        r.get(resetRelease_);
+        um6619_.loadState(r);
+    }
 
     // 手把狀態（16-bit active low，由 Bus 提供）
     std::function<uint16_t(int player)> getPad;
@@ -233,8 +258,44 @@ private:
         using BusHandlerT = SoundCpu;
     };
 
+    // 可序列化的 CLK Processor：Storage 內部全為 POD 成員（protected），
+    // 由此子類逐成員複製（save state 用；CLK 本身無序列化 API）。
+    // 注意不可宣告 ctor：Processor/Storage 依賴 C++20 aggregate paren-init
+    // （`cpu_(*this)` 直接初始化到 Storage 的 BusHandlerT& 建構子）。
+    struct Cpu : MOS6502Mk2::Processor<MOS6502Mk2::Model::WDC65C02, Traits> {
+        // Processor 無具名 ctor（aggregate）；明確轉發給 Storage 的 handler ctor
+        explicit Cpu(SoundCpu &handler)
+            : MOS6502Mk2::Processor<MOS6502Mk2::Model::WDC65C02, Traits>{handler} {}
+        void saveState(StateWriter &w) const {
+            w.put(this->registers_);
+            w.put(this->opcode_);
+            w.put(this->operand_);
+            w.put(this->decoded_);
+            w.put(this->operation_pc_);
+            w.put(this->address_);
+            w.put(this->did_adjust_top_);
+            w.put(this->cycles_);
+            w.put(this->resume_point_);
+            w.put(this->inputs_);
+            w.put(this->captured_interrupt_requests_);
+        }
+        void loadState(StateReader &r) {
+            r.get(this->registers_);
+            r.get(this->opcode_);
+            r.get(this->operand_);
+            r.get(this->decoded_);
+            r.get(this->operation_pc_);
+            r.get(this->address_);
+            r.get(this->did_adjust_top_);
+            r.get(this->cycles_);
+            r.get(this->resume_point_);
+            r.get(this->inputs_);
+            r.get(this->captured_interrupt_requests_);
+        }
+    };
+
     uint8_t *ram_;
-    MOS6502Mk2::Processor<MOS6502Mk2::Model::WDC65C02, Traits> cpu_;
+    Cpu cpu_;
     bool halted_ = true;
 
     uint8_t irqEnable_ = 0, irqSource_ = 0;

@@ -9,6 +9,8 @@
 #include <cstring>
 
 extern uint32_t g_dbgPc;  // bus.cpp 除錯用
+extern uint32_t g_dbgSp;
+extern uint64_t g_dbgFrame;
 
 namespace {
 // tilemap 尺寸選擇（MAME get_tilemap_dimensions）：flags bit11-8
@@ -27,6 +29,8 @@ void UM6618::writeVramByte(uint32_t off, uint8_t val) {
     off &= 0x1FFFF;
     uint16_t &w = vram_[off >> 1];
     w = (off & 1) ? uint16_t((w & 0xFF00) | val) : uint16_t((w & 0x00FF) | (val << 8));
+    // 1bpp-alt 用的位址重排副本（MAME write_swapped_byte (b)）
+    vramSwap_[(off & ~0x7Fu) | ((off & 7) << 4) | ((off >> 3) & 0xF)] = val;
 }
 
 uint16_t UM6618::readReg(uint16_t index) {
@@ -59,9 +63,13 @@ void UM6618::writeReg(uint16_t index, uint16_t data) {
     case 0x0E: sprDmaSrcInc_ = data; break;
     case 0x0F:
         if (data & 0x8000) {
-            if (std::getenv("ACAN_DMA"))
-                std::fprintf(stderr, "[sprdma] src=$%08X dst=$%08X count=$%04X ctrl=$%04X inc=$%04X/$%04X (pc=$%08X)\n",
-                             sprDmaSrc_, sprDmaDst_, sprDmaCount_, data, sprDmaSrcInc_, sprDmaDstInc_, g_dbgPc);
+            if (std::getenv("ACAN_DMA")) {
+                uint32_t caller = 0;
+                // $25B0 進入後 movem.l d0/a0-a1 壓了 12 bytes，return address 在 sp+12
+                if (busRead16) caller = (uint32_t(busRead16(g_dbgSp + 12)) << 16) | busRead16(g_dbgSp + 14);
+                std::fprintf(stderr, "[sprdma] f=%llu src=$%08X dst=$%08X count=$%04X ctrl=$%04X inc=$%04X/$%04X (pc=$%08X caller=$%08X)\n",
+                             (unsigned long long)g_dbgFrame, sprDmaSrc_, sprDmaDst_, sprDmaCount_, data, sprDmaSrcInc_, sprDmaDstInc_, g_dbgPc, caller);
+            }
             if ((data & 0x2000) || (data & 0x4000)) sprDmaDst_ |= 0xF40000;
             for (uint32_t i = 0; i <= sprDmaCount_ && busWrite16 && busRead16; i++) {
                 if (data & 0x0100) {  // 0 填充模式
@@ -97,7 +105,22 @@ void UM6618::writeReg(uint16_t index, uint16_t data) {
     case 0x86: case 0x96: case 0xA6: tilemapLinescrollAddr_[(index - 0x86) >> 4] = data; break;
     case 0x87: case 0x97: case 0xA7: tilemapLineselectAddr_[(index - 0x87) >> 4] = data; break;
 
-    // ROZ（$180-$19E）：暫存器保留（regs_），渲染 stub — TODO
+    // ROZ（$180-$19E；行為依 MAME video_w (b)）
+    case 0xC0: rozMode_ = data; break;
+    case 0xC1: rozTileMode_ = data; break;
+    case 0xC2: rozScrollX_ = (uint32_t(data) << 16) | (rozScrollX_ & 0xFFFF); break;
+    case 0xC3: rozScrollX_ = (rozScrollX_ & 0xFFFF0000) | data; break;
+    case 0xC4: rozScrollY_ = (uint32_t(data) << 16) | (rozScrollY_ & 0xFFFF); break;
+    case 0xC5: rozScrollY_ = (rozScrollY_ & 0xFFFF0000) | data; break;
+    case 0xC6: rozCoeffA_ = int16_t(data); break;
+    case 0xC7: rozCoeffB_ = int16_t(data); break;
+    case 0xC8: rozCoeffC_ = int16_t(data); break;
+    case 0xC9: rozCoeffD_ = int16_t(data); break;
+    case 0xCA: rozBase_ = uint32_t(data) << 1; break;
+    case 0xCB: rozTileBank_ = data; break;
+    case 0xCC: rozUnk0_ = uint32_t(data) << 2; break;
+    case 0xCD: rozUnk1_ = uint32_t(data) << 2; break;
+    case 0xCF: rozUnk2_ = uint32_t(data) << 2; break;
 
     // window 0/1（$1D0-$1DE）
     case 0xE8: case 0xEC: windowControl_[(index - 0xE8) >> 2] = data; break;
@@ -107,6 +130,59 @@ void UM6618::writeReg(uint16_t index, uint16_t data) {
 
     case 0xF8: frcReg_ = data & 0x1F; break;  // $1F0：pixel mode (bit4-3) + gfx mode (bit2-0)
     default: break;
+    }
+}
+
+// ---- save state ----
+void UM6618::saveState(StateWriter &w) const {
+    w.putArray(regs_);
+    for (const auto &v : vram_) w.put(v);
+    w.putArray(palette_);
+    w.put(videoFlags_);
+    w.putArray(tilemapBase_); w.putArray(tilemapScrollX_); w.putArray(tilemapScrollY_);
+    w.putArray(tilemapFlags_); w.putArray(tilemapMode_); w.putArray(tilemapTileMode_);
+    w.putArray(tilemapLinescrollAddr_); w.putArray(tilemapLineselectAddr_);
+    w.put(spriteBaseAddr_); w.put(spriteCount_); w.put(spriteFlags_);
+    w.putArray(windowControl_); w.putArray(windowStartAddr_);
+    w.putArray(windowScrollX_); w.putArray(windowScrollY_);
+    w.put(rozMode_); w.put(rozTileMode_);
+    w.put(rozScrollX_); w.put(rozScrollY_);
+    w.put(rozCoeffA_); w.put(rozCoeffB_); w.put(rozCoeffC_); w.put(rozCoeffD_);
+    w.put(rozBase_); w.put(rozUnk0_); w.put(rozUnk1_); w.put(rozUnk2_); w.put(rozTileBank_);
+    w.put(sprDmaSrc_); w.put(sprDmaDst_);
+    w.put(sprDmaSrcInc_); w.put(sprDmaDstInc_); w.put(sprDmaCount_);
+    w.put(frcReg_); w.put(irqMask_);
+    w.put(vpos_); w.put(frame_);
+    w.put(vblankIrq_); w.put(rasterIrq_);
+    w.put(lineOn_); w.put(lineOff_); w.put(irq5_);
+}
+
+void UM6618::loadState(StateReader &r) {
+    r.getArray(regs_);
+    for (auto &v : vram_) r.get(v);
+    r.getArray(palette_);
+    r.get(videoFlags_);
+    r.getArray(tilemapBase_); r.getArray(tilemapScrollX_); r.getArray(tilemapScrollY_);
+    r.getArray(tilemapFlags_); r.getArray(tilemapMode_); r.getArray(tilemapTileMode_);
+    r.getArray(tilemapLinescrollAddr_); r.getArray(tilemapLineselectAddr_);
+    r.get(spriteBaseAddr_); r.get(spriteCount_); r.get(spriteFlags_);
+    r.getArray(windowControl_); r.getArray(windowStartAddr_);
+    r.getArray(windowScrollX_); r.getArray(windowScrollY_);
+    r.get(rozMode_); r.get(rozTileMode_);
+    r.get(rozScrollX_); r.get(rozScrollY_);
+    r.get(rozCoeffA_); r.get(rozCoeffB_); r.get(rozCoeffC_); r.get(rozCoeffD_);
+    r.get(rozBase_); r.get(rozUnk0_); r.get(rozUnk1_); r.get(rozUnk2_); r.get(rozTileBank_);
+    r.get(sprDmaSrc_); r.get(sprDmaDst_);
+    r.get(sprDmaSrcInc_); r.get(sprDmaDstInc_); r.get(sprDmaCount_);
+    r.get(frcReg_); r.get(irqMask_);
+    r.get(vpos_); r.get(frame_);
+    r.get(vblankIrq_); r.get(rasterIrq_);
+    r.get(lineOn_); r.get(lineOff_); r.get(irq5_);
+    // 重建 1bpp-alt 位址重排副本（衍生狀態）
+    for (uint32_t off = 0; off < 0x20000; off++) {
+        const uint16_t w = vram_[off >> 1];
+        vramSwap_[(off & ~0x7Fu) | ((off & 7) << 4) | ((off >> 3) & 0xF)] =
+            (off & 1) ? uint8_t(w) : uint8_t(w >> 8);
     }
 }
 
@@ -252,6 +328,100 @@ void UM6618::drawSpriteTile(int tile, int palette, bool xf, bool yf,
     }
 }
 
+// ---- ROZ 層（$180-$19E；行為依 MAME draw_roz_layer / get_roz_tilemap_info (b)，
+//      重新實作）。係數 A/B/C/D 為 8.8 固定小數點，scroll 為 24.8。
+uint16_t UM6618::rozPixel(uint32_t sx, uint32_t sy) const {
+    // region：roz_mode bit1-0 → {1bpp-alt, 2bpp, 4bpp, 8bpp}（MAME s_roz_mode_lut）
+    static const int lut[4] = { 4, 2, 1, 0 };
+    const int region = lut[rozMode_ & 3];
+    if (region == 4) {
+        // 1bpp-alt（ROZ mode 0，A'Can 開機 logo；MAME case 0 HACK decode (b)）：
+        // 不看 tilemap 資料，tile 由 count 算出，資料讀位址重排副本
+        const uint32_t count = (sy >> 3) * 32 + (sx >> 3);   // logo 為 32x32
+        int tile = 0x880 + int(count & 7) * 2;
+        if (count & 0x20) tile ^= 1;
+        tile |= int(count & 0xC0) >> 2;
+        const uint8_t byte = vramSwap_[(uint32_t(tile) * 8 + (sy & 7)) & 0x1FFFF];
+        return (byte >> (7 - (sx & 7))) & 1;   // 1bpp：palette 0/1（pix 即索引）
+    }
+
+    int xs = 32, ys = 32;
+    switch (rozMode_ & 0x0F00) {
+    case 0x200: xs = ys = 16; break;
+    case 0x400: xs = ys = 32; break;
+    case 0x600: xs = 64; ys = 32; break;
+    case 0xA00: xs = 128; ys = 32; break;
+    case 0xC00: xs = ys = 64; break;
+    default: break;
+    }
+    const int wpx = xs * 8, hpx = ys * 8;
+    if (rozMode_ & 2) sx = uint32_t(wpx - 1) - sx;   // 全層 X flip（MAME TILEMAP_FLIPX）
+    if (rozMode_ & 1) sy = uint32_t(hpx - 1) - sy;
+
+    const uint32_t count = (rozBase_ + ((sy >> 3) * xs + (sx >> 3))) & 0xFFFF;
+    const uint16_t entry = vram_[count];
+    uint8_t palBase = (entry & 0xF000) >> 12;
+    if (rozTileMode_ & 0x0200) palBase |= 8;         // tile_mode bit9
+    const int tile = (entry & 0x03FF) + ((rozTileBank_ & 0xF000) >> 3);
+    int px = sx & 7, py = sy & 7;
+    if (entry & 0x0800) px ^= 7;
+    if (entry & 0x0400) py ^= 7;
+    const int pix = fetchTilePixel(region, tile, px, py);
+    if (region == 0) return uint16_t(pix);
+    return uint16_t(palBase * 16 + pix);
+}
+
+void UM6618::drawRoz(int priority) {
+    int xs = 32, ys = 32;
+    switch (rozMode_ & 0x0F00) {
+    case 0x200: xs = ys = 16; break;
+    case 0x400: xs = ys = 32; break;
+    case 0x600: xs = 64; ys = 32; break;
+    case 0xA00: xs = 128; ys = 32; break;
+    case 0xC00: xs = ys = 64; break;
+    default: break;
+    }
+    static const int lut[4] = { 4, 2, 1, 0 };
+    const int region = lut[rozMode_ & 3];
+    const uint16_t transmask = (region == 0) ? 0xFF : (region == 1) ? 0x0F : (region == 2) ? 0x03 : 0x01;
+    const bool wrap = rozMode_ & 0x20;
+    const uint32_t wpx = uint32_t(xs * 8), hpx = uint32_t(ys * 8);
+
+    // 逐行參數表模式（MAME 的 HACK 分支：!(mode bit9) && priority 位元非 0，
+    // 用於 speedyd intro/bonus、A'Can logo；Boom Zoo 標題 priority=0 不走此路）
+    const bool perLine = !(rozMode_ & 0x0200) && (rozMode_ & 0xF000);
+
+    for (int y = 0; y < HEIGHT; y++) {
+        int32_t incxx = rozCoeffA_;
+        uint32_t scrollx = rozScrollX_, scrolly = rozScrollY_;
+        if (perLine) {
+            const uint16_t t0 = vram_[(rozUnk0_ / 2 + y) & 0xFFFF];
+            if (!t0) continue;                       // MAME：incxx 表值 0 → 該行不畫
+            incxx = int16_t(uint16_t(rozCoeffA_ + t0));
+            scrollx += (uint32_t(vram_[(rozUnk1_ / 2 + y * 2) & 0xFFFF]) << 16) |
+                       vram_[(rozUnk1_ / 2 + y * 2 + 1) & 0xFFFF];
+            scrolly += (uint32_t(vram_[(rozUnk2_ / 2 + y * 2) & 0xFFFF]) << 16) |
+                       vram_[(rozUnk2_ / 2 + y * 2 + 1) & 0xFFFF];
+        }
+        // 24.8 固定小數點累積（等效 MAME 的 <<8 進 16.16 再 >>16）
+        int32_t cx = int32_t(scrollx) + y * rozCoeffB_;
+        int32_t cy = int32_t(scrolly) + y * rozCoeffD_;
+        uint16_t *dst = &indexed_[y * WIDTH];
+        uint8_t *priop = &prio_[y * WIDTH];
+        for (int x = 0; x < WIDTH; x++) {
+            const int32_t sx = cx >> 8, sy = cy >> 8;
+            cx += incxx;
+            cy += rozCoeffC_;
+            if (!wrap && (sx < 0 || uint32_t(sx) >= wpx || sy < 0 || uint32_t(sy) >= hpx)) continue;
+            const uint16_t srcpix = rozPixel(uint32_t(sx) & (wpx - 1), uint32_t(sy) & (hpx - 1));
+            if ((srcpix & transmask) != 0 && priority < (priop[x] >> 4)) {
+                dst[x] = srcpix;
+                priop[x] = uint8_t((priop[x] & 0x0F) | (priority << 4));
+            }
+        }
+    }
+}
+
 void UM6618::drawSprites() {
     // MAME draw_sprites：sprite 表在 VRAM，每筆 4 word
     const int region = (spriteFlags_ & 1) ? 0 : 1;
@@ -304,18 +474,20 @@ void UM6618::drawSprites() {
     }
 }
 
-void UM6618::drawWindow(int priority) {
-    // MAME window 0（video_flags bit1 觸發）；window 1 尚無遊戲使用（TODO）
-    const int layerPrio = (windowControl_[0] >> 13) & 3;
+void UM6618::drawWindow(int win, int priority) {
+    // MAME window 0（video_flags bit1 觸發）。window 1（$1D8-$1DE）MAME 未接
+    // （「尚無遊戲使用」）；此處對稱實作，僅在 control 非 0 時啟用（保守推測，
+    // 待查證）。
+    const int layerPrio = (windowControl_[win] >> 13) & 3;
     if (priority != layerPrio) return;
-    const bool reverseClip = windowControl_[0] & 0x0800;
-    int scrollx = windowScrollX_[0] & 0x3FF;
+    const bool reverseClip = windowControl_[win] & 0x0800;
+    int scrollx = windowScrollX_[win] & 0x3FF;
     if (scrollx & 0x200) scrollx -= 0x400;
-    const uint8_t pen = windowControl_[0] & 0xFF;
+    const uint8_t pen = windowControl_[win] & 0xFF;
 
     for (int y = 0; y < HEIGHT; y++) {
-        const int ybase = (windowControl_[0] & 0x0100) ? y * 2 : 0;
-        const uint32_t base = ((uint32_t(windowStartAddr_[0]) << 1) + ybase) & 0xFFFF;
+        const int ybase = (windowControl_[win] & 0x0100) ? y * 2 : 0;
+        const uint32_t base = ((uint32_t(windowStartAddr_[win]) << 1) + ybase) & 0xFFFF;
         const int minx = int16_t(vram_[base]) + scrollx;
         const int maxx = int16_t(vram_[base + 1]) + scrollx;
         for (int x = 0; x < WIDTH; x++) {
@@ -349,8 +521,11 @@ void UM6618::renderFrame() {
             if (int((tilemapFlags_[layer] >> 13) & 7) != pri) continue;
             drawTilemapLayer(layer, pri);
         }
-        // ROZ 層（video flags bit2）：TODO（MAME 亦未完成）
-        if (videoFlags_ & 0x2) drawWindow(pri);
+        // ROZ 層（video flags bit2；優先度在 roz_mode bit15-13）
+        if ((videoFlags_ & 0x4) && (layerMask & 0x10) == 0x10 && int((rozMode_ >> 13) & 7) == pri)
+            drawRoz(pri);
+        if (videoFlags_ & 0x2) drawWindow(0, pri);
+        if ((videoFlags_ & 0x2) && windowControl_[1] != 0) drawWindow(1, pri);
     }
 
     // 合成 sprite：sprite 優先度 <= tilemap 優先度時蓋上

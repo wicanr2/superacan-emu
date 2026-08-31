@@ -1,13 +1,17 @@
 # superacan-emu
 
-Super A'Can（敦煌科技 Funtech，1995，台灣自製 16 位元遊戲機）模擬器的
-**Linux 重製**。Bcan 0.0.8b 為閉源 Windows 程式且無公開移植；本專案以知識庫
-[taiwan_history/acan](https://github.com/wicanr2/superacan)（`docs/` 內的 (a) 級逆向結論）＋
-MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎重新實作。
+Super A'Can（敦煌科技 Funtech，1995，台灣自製 16 位元遊戲機）的開源硬體模擬器。
+本專案模擬 68000／65C02、UMC6650、UM6618、UM6619、DMA、輸入與整機時間線；
+遊戲只用來驗證晶片行為，這不是遊戲 remake。
 
-長期目標：在 Linux 上重製 Bcan 的模擬能力（影像/音效/視窗後續以 SDL2 加入）。
+Bcan 0.0.8b 是閉源 Windows 模擬器且沒有公開移植。本專案依據唯讀知識庫
+[superacan](https://github.com/wicanr2/superacan) 的 Bcan／BIOS 逆向證據，以及 MAME
+driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的 C++ 實作。
 
-## 目前進度（里程碑 4）
+長期目標：以可追溯、可重現的晶片模型在 Linux 執行 Super A'Can 軟體，並在核心
+收斂後提供 macOS 版本。模擬器原始碼同時是硬體文件；相容性不能取代硬體證據。
+
+## 目前進度（里程碑 5 收斂中）
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）
 - [x] UMC6650 lockout 晶片完整實作（埠角色以 IPL 反組譯為準，見
@@ -32,7 +36,13 @@ MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎
 - [x] SDL2 視窗輸出 + headless 驗證模式（`--frames`/`--screenshot`/`--wav`/`--press`）
 - [x] 遊戲驗證：Boom Zoo、Monopoly（畫面+音樂+按鍵反應）、Speedy Dragon
       （**第二套音樂驅動已修復**，預設模式可跑；見 `docs/verify-audio-input.md`）
-- [ ] ROZ 層、雙人輸入、save state、latch 3-byte 封包語意
+- [x] ROZ、P2 輸入與自訂 save state 初版；sprite DMA word 雙觸發已修正
+      （見 `docs/verify-misc.md`）
+- [ ] 里程碑 5 尚待乾淨 Docker 建置與跨遊戲回歸；FRC 真實公式、UM6619 envelope、
+      latch 3-byte 用途與 window 1 仍未取得硬體級證據
+
+詳細現況以 [`CONTEXT.md`](CONTEXT.md) 為準，可執行待辦只看
+[`WORKLIST.md`](WORKLIST.md)。
 
 ## 遊戲截圖（開發驗證用途）
 
@@ -54,6 +64,9 @@ MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎
 
 需求：CMake ≥ 3.20、C++20 編譯器（GCC 13 驗證過）、git、網路
 （首次 configure 以 FetchContent 下載第三方 CPU 核心）。
+
+本儲存庫的開發、建置與測試一律在專案專用 Docker 工具鏈內進行；下列是容器內
+命令，不應直接在主機執行。目前里程碑 5 正在補齊固定版本的可重現 image。
 
 SDL2：優先用系統套件（`libsdl2-dev`）。本機無 sudo 時的替代：
 `apt-get download libsdl2-dev` 後把 headers 解到
@@ -98,13 +111,27 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - `--wav <file.wav>`：全程音訊錄成 48 kHz 16-bit stereo WAV
 - `--press <spec>`：headless 按鍵注入 `frame:BTN+BTN,...`（按住 10 幀）；
   BTN = A/B/X/Y/L/R/START/SELECT/UP/DOWN/LEFT/RIGHT
+- `--press2 <spec>`：以相同語法注入 P2
+- `--save-state <file>` / `--load-state <file>`：寫入／載入本專案的 `ACANEST1`
+  格式；不相容 Bcan save state，跨 ROM 使用目前仍在收緊
 - 視窗模式鍵盤：方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R、Enter=Start、右 Shift=Select
+- P2 鍵盤：I/J/K/L、U/O/N/M、逗號/句號、右 Ctrl、左 Shift；F5 存檔、F6 切槽、F7 讀檔
 - 除錯環境變數：`ACAN_DEBUG`、`ACAN_DMA`、`ACAN_WATCH`、`ACAN_TRACE65`、
   `ACAN_DBG65`（65C02 暫存器定期 dump）、`ACAN_LAYERMASK`、
   `ACAN_DUMP=<prefix>`（見 `docs/verify-video.md`）
 
 預期：通過 UMC6650 交握與授權比對後進入卡帶，vblank IRQ 驅動遊戲主迴圈，
 畫面經 SDL2 顯示（Boom Zoo 可見標題「爆爆動物園」）。
+
+## 文件
+
+- [`AGENTS.md`](AGENTS.md)：晶片模擬、證據、測試與 Docker 開發規範
+- [`CONTEXT.md`](CONTEXT.md)：目前真相、證據邊界與下一個交付閘門
+- [`WORKLIST.md`](WORKLIST.md)：唯一可執行待辦
+- [`WORKLOG.md`](WORKLOG.md)：逐輪工作歷程
+- [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
+  [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：
+  各里程碑的可重現證據與限制
 
 ## 第三方元件與版本（固定）
 
