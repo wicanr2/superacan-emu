@@ -139,3 +139,48 @@ func TestSoundCPUResetReleaseAndThreeToOneScheduling(t *testing.T) {
 		t.Fatalf("scheduled sound state=%+v instructions=%d", state, system.SoundInstructions)
 	}
 }
+
+func TestLoadSoundBIOSRequiresExactBanks(t *testing.T) {
+	system, err := NewSystem(make([]byte, IPLSize), []byte{0, 0}, make([]byte, 16))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bank0 := make([]byte, SoundBIOSBankSize)
+	bank1 := make([]byte, SoundBIOSBankSize)
+	bank0[0], bank1[0] = 0xa5, 0x5a
+	if err := system.LoadSoundBIOS(0, bank0); err != nil {
+		t.Fatal(err)
+	}
+	if err := system.LoadSoundBIOS(1, bank1); err != nil {
+		t.Fatal(err)
+	}
+	if system.Bus.soundRAM[0] != 0xa5 || system.Bus.soundRAM[SoundBIOSBankSize] != 0x5a {
+		t.Fatal("sound BIOS banks were not installed at $0000/$2000")
+	}
+	if err := system.LoadSoundBIOS(2, bank0); err == nil {
+		t.Fatal("invalid sound BIOS bank accepted")
+	}
+	if err := system.LoadSoundBIOS(0, bank0[:1]); err == nil {
+		t.Fatal("short sound BIOS accepted")
+	}
+}
+
+func TestSoundMailboxIRQ6HasPriorityAndAcknowledges(t *testing.T) {
+	system, err := NewSystem(make([]byte, IPLSize), []byte{0, 0}, make([]byte, 16))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := system.SoundBus.Write8(0x040a, 0xa5); err != nil {
+		t.Fatal(err)
+	}
+	system.Bus.Video().SetIRQMask(0x10)
+	system.Bus.Video().SetScanline(1)
+	system.Bus.Video().AdvanceM68KCycles(255)
+	if level := system.highestIRQLevel(); level != 6 {
+		t.Fatalf("highest IRQ=%d", level)
+	}
+	system.acknowledgeIRQ(6)
+	if system.soundIRQ6 || system.IRQAcknowledgements[6] != 1 {
+		t.Fatalf("IRQ6 pending=%v acknowledgements=%d", system.soundIRQ6, system.IRQAcknowledgements[6])
+	}
+}

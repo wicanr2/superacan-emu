@@ -123,3 +123,29 @@ func TestUMC6618WindowsAndWordWriteAreDeviceTransactions(t *testing.T) {
 		t.Fatalf("word write triggered sprite DMA %d times", b.Video().SpriteDMAStarts())
 	}
 }
+
+func TestControllerDirectModeAndSoundIOWindow(t *testing.T) {
+	b := testMachineBus(t)
+	sound := newSoundBus(&b.soundRAM)
+	b.attachSound(sound)
+	sound.SetPad(0, 0x7fff)
+	sound.SetPad(1, 0xbfff)
+	if p1, _ := b.Read16(0xe80200); p1 != 0x8000 {
+		t.Fatalf("P1 direct=$%04X", p1)
+	}
+	if p2, _ := b.Read16(0xe80202); p2 != 0x4000 {
+		t.Fatalf("P2 direct=$%04X", p2)
+	}
+	if err := b.Write8(0xe80404, 0xa5); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := sound.Read8(0x0404); got != 0xa5 {
+		t.Fatalf("forwarded latch=$%02X", got)
+	}
+	if err := b.Write8(0xe9000a, 1); err != nil {
+		t.Fatal(err)
+	}
+	if sound.IRQStatus()&0x20 == 0 {
+		t.Fatalf("command source=$%02X", sound.IRQStatus())
+	}
+}

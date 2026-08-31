@@ -19,6 +19,8 @@ import (
 func main() {
 	iplPath := flag.String("ipl", "", "path to word-swapped 4096-byte internal_68k.bin")
 	keyPath := flag.String("key", "", "path to 16-byte umc6650.bin")
+	soundBIOS1Path := flag.String("sound-bios1", "", "path to 8192-byte internal_6502_1.bin")
+	soundBIOS2Path := flag.String("sound-bios2", "", "path to 8192-byte internal_6502_2.bin")
 	romPath := flag.String("rom", "", "path to word-swapped cartridge ROM")
 	steps := flag.Uint64("instructions", 1, "number of 68000 instructions to execute")
 	frames := flag.Uint64("frames", 0, "run this many completed hardware frames instead of --instructions")
@@ -27,10 +29,23 @@ func main() {
 	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
 	watch := flag.String("watch", "", "comma-separated hexadecimal bus addresses/ranges")
 	watchLimit := flag.Uint64("watch-limit", 64, "maximum matching bus transactions to retain")
+	press := flag.String("press", "", "P1 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
+	press2 := flag.String("press2", "", "P2 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
 	flag.Parse()
 
 	if *iplPath == "" || *keyPath == "" || *romPath == "" {
 		fail("--ipl, --key and --rom are required")
+	}
+	if (*soundBIOS1Path == "") != (*soundBIOS2Path == "") {
+		fail("--sound-bios1 and --sound-bios2 must be supplied together")
+	}
+	presses, err := parsePresses(*press)
+	if err != nil {
+		fail(err.Error())
+	}
+	presses2, err := parsePresses(*press2)
+	if err != nil {
+		fail(err.Error())
 	}
 	ipl := loadWordSwapped(*iplPath, machine.IPLSize)
 	key := loadLinear(*keyPath, 16)
@@ -39,6 +54,14 @@ func main() {
 	system, err := machine.NewSystem(ipl.Bytes, rom.Bytes, key.Bytes)
 	if err != nil {
 		fail(err.Error())
+	}
+	if *soundBIOS1Path != "" {
+		if err := system.LoadSoundBIOS(0, loadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize).Bytes); err != nil {
+			fail(err.Error())
+		}
+		if err := system.LoadSoundBIOS(1, loadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize).Bytes); err != nil {
+			fail(err.Error())
+		}
 	}
 	audioHash := sha256.New()
 	var audioNonzero uint64
@@ -84,7 +107,12 @@ func main() {
 	if *frames == 0 {
 		result, err = system.RunInstructions(*steps)
 	} else {
-		for range *frames {
+		p1, p2 := machine.PadReleased, machine.PadReleased
+		for frame := uint64(0); frame < *frames; frame++ {
+			p1 = applyPresses(frame, p1, presses)
+			p2 = applyPresses(frame, p2, presses2)
+			system.SoundBus.SetPad(0, p1)
+			system.SoundBus.SetPad(1, p2)
 			if _, err = system.RunFrame(2_000_000); err != nil {
 				break
 			}
@@ -103,13 +131,13 @@ func main() {
 	soundState := system.M65C02.State()
 	vramSHA := system.Bus.Video().VRAMSHA256()
 	framebufferSHA := system.Bus.Video().FramebufferSHA256()
-	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X irq_ack=7:%d,5:%d,4:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
+	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_bios=%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X irq_ack=7:%d,6:%d,5:%d,4:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
 		hex.EncodeToString(ipl.RawSHA256[:]), hex.EncodeToString(rom.RawSHA256[:]),
 		system.Instructions, state.PC, result.Opcode, state.Cycles,
 		system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled(),
-		system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundBus.Audio().SampleCount(), audioNonzero, audioHash.Sum(nil), system.SoundBus.IRQStatus(), system.SoundResetAsserted(),
+		*soundBIOS1Path != "", system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundBus.Audio().SampleCount(), audioNonzero, audioHash.Sum(nil), system.SoundBus.IRQStatus(), system.SoundResetAsserted(),
 		system.Bus.Video().Frame(), system.Bus.Video().Scanline(), system.Bus.Video().VideoFlags(),
-		system.IRQAcknowledgements[7], system.IRQAcknowledgements[5], system.IRQAcknowledgements[4],
+		system.IRQAcknowledgements[7], system.IRQAcknowledgements[6], system.IRQAcknowledgements[5], system.IRQAcknowledgements[4],
 		system.Bus.Video().NonzeroVRAMBytes(), hex.EncodeToString(vramSHA[:]),
 		system.Bus.Video().NonblackPixels(), hex.EncodeToString(framebufferSHA[:]))
 	for _, record := range observed {

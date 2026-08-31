@@ -29,6 +29,7 @@ type Bus struct {
 	hiOff           bool
 	observer        func(Transaction)
 	controlObserver func(oldValue, newValue uint16) error
+	sound           *SoundBus
 }
 
 func NewBus(ipl, rom, key []byte) (*Bus, error) {
@@ -55,6 +56,8 @@ func (b *Bus) Video() *umc6618.Device   { return b.video }
 func (b *Bus) LowOverlayEnabled() bool  { return !b.loOff }
 func (b *Bus) HighOverlayEnabled() bool { return !b.hiOff }
 func (b *Bus) Control() uint16          { return b.control }
+
+func (b *Bus) attachSound(sound *SoundBus) { b.sound = sound }
 
 // SetObserver installs an optional synchronous observer for complete CPU bus
 // transactions. A 16-bit access produces one notification, even though plain
@@ -95,6 +98,22 @@ func (b *Bus) read8(address uint32) (uint8, error) {
 		}
 		return b.romByte(address), nil
 	case address >= 0xe80000 && address < 0xe90000:
+		if b.sound != nil {
+			switch address {
+			case 0xe80200, 0xe80201:
+				value := b.sound.Pad(0) ^ 0xffff
+				if address&1 != 0 {
+					return uint8(value), nil
+				}
+				return uint8(value >> 8), nil
+			case 0xe80202, 0xe80203:
+				value := b.sound.Pad(1) ^ 0xffff
+				if address&1 != 0 {
+					return uint8(value), nil
+				}
+				return uint8(value >> 8), nil
+			}
+		}
 		return b.soundRAM[address&0xffff], nil
 	case address == 0xe9001c:
 		return uint8(b.control >> 8), nil
@@ -180,6 +199,13 @@ func (b *Bus) write8(address uint32, value uint8) error {
 	switch {
 	case address >= 0xe80000 && address < 0xe90000:
 		b.soundRAM[address&0xffff] = value
+		if b.sound != nil && address&0xff00 == 0x0400 {
+			b.sound.WriteFrom68K(uint16(address&0xffff), value)
+		}
+	case address == 0xe9000a || address == 0xe9000b:
+		if b.sound != nil {
+			b.sound.RequestFrom68K()
+		}
 	case address == 0xe9001c:
 		return b.setControl(b.control&0x00ff | uint16(value)<<8)
 	case address == 0xe9001d:

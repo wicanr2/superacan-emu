@@ -46,15 +46,17 @@ type StepResult struct {
 	Opcode    uint8
 	Cycles    uint64
 	Interrupt bool
+	NMI       bool
 	Waiting   bool
 }
 
 type CPU struct {
-	bus       Bus
-	scheduler Scheduler
-	state     State
-	irqLine   bool
-	waiting   bool
+	bus        Bus
+	scheduler  Scheduler
+	state      State
+	irqLine    bool
+	nmiPending bool
+	waiting    bool
 }
 
 func New(bus Bus, scheduler Scheduler) *CPU {
@@ -70,12 +72,16 @@ func (c *CPU) State() State { return c.state }
 // sampled only at instruction boundaries, as on the physical processor.
 func (c *CPU) SetIRQ(asserted bool) { c.irqLine = asserted }
 
+// PulseNMI latches a rising edge until the next instruction boundary.
+func (c *CPU) PulseNMI() { c.nmiPending = true }
+
 // Reset models the seven-cycle reset entry and reads the little-endian vector
 // at $FFFC/$FFFD. The machine keeps reset asserted until the sound driver has
 // been uploaded and $E9001C bit 0 is released.
 func (c *CPU) Reset() error {
 	c.state = State{SP: 0xfd, P: flagInterruptDisable | flagUnused}
 	c.waiting = false
+	c.nmiPending = false
 	for range 5 {
 		if err := c.internal(); err != nil {
 			return err
@@ -97,7 +103,7 @@ func (c *CPU) Step() (StepResult, error) {
 	result := StepResult{PCBefore: c.state.PC}
 	start := c.state.Cycles
 	if c.waiting {
-		if !c.irqLine {
+		if !c.irqLine && !c.nmiPending {
 			err := c.internal()
 			result.PCAfter = c.state.PC
 			result.Cycles = c.state.Cycles - start
@@ -106,8 +112,17 @@ func (c *CPU) Step() (StepResult, error) {
 		}
 		c.waiting = false
 	}
+	if c.nmiPending {
+		c.nmiPending = false
+		err := c.serviceInterrupt(0xfffa)
+		result.PCAfter = c.state.PC
+		result.Cycles = c.state.Cycles - start
+		result.Interrupt = true
+		result.NMI = true
+		return result, err
+	}
 	if c.irqLine && c.state.P&flagInterruptDisable == 0 {
-		err := c.serviceIRQ()
+		err := c.serviceInterrupt(0xfffe)
 		result.PCAfter = c.state.PC
 		result.Cycles = c.state.Cycles - start
 		result.Interrupt = true
@@ -180,24 +195,99 @@ func (c *CPU) Step() (StepResult, error) {
 			}
 			c.setNZ(value)
 		}
-	case 0xa0: // LDY #imm
+	case 0xb5, 0xb6, 0xb4: // LDA zp,X / LDX zp,Y / LDY zp,X
 		c.state.PC++
-		c.state.Y, err = c.fetch()
-		if err == nil {
-			c.setNZ(c.state.Y)
+		var zeroPage, value, index uint8
+		zeroPage, err = c.fetch()
+		index = c.state.X
+		if opcode == 0xb6 {
+			index = c.state.Y
 		}
-	case 0xad: // LDA abs
-		c.state.PC++
-		var lo, hi uint8
-		lo, err = c.fetch()
 		if err == nil {
-			hi, err = c.fetch()
+			err = c.internal()
+		}
+		if err == nil {
+			value, err = c.read(uint16(zeroPage + index))
+		}
+		if err == nil {
+			switch opcode {
+			case 0xb5:
+				c.state.A = value
+			case 0xb6:
+				c.state.X = value
+			case 0xb4:
+				c.state.Y = value
+			}
+			c.setNZ(value)
+		}
+	case 0xa1: // LDA (zp,X)
+		c.state.PC++
+		var zeroPage, lo, hi uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			err = c.internal()
+		}
+		pointer := zeroPage + c.state.X
+		if err == nil {
+			lo, err = c.read(uint16(pointer))
+		}
+		if err == nil {
+			hi, err = c.read(uint16(pointer + 1))
 		}
 		if err == nil {
 			c.state.A, err = c.read(uint16(hi)<<8 | uint16(lo))
 		}
 		if err == nil {
 			c.setNZ(c.state.A)
+		}
+	case 0xb1: // LDA (zp),Y
+		c.state.PC++
+		var zeroPage, lo, hi uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			lo, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			hi, err = c.read(uint16(zeroPage + 1))
+		}
+		base := uint16(hi)<<8 | uint16(lo)
+		address := base + uint16(c.state.Y)
+		if err == nil && base&0xff00 != address&0xff00 {
+			err = c.internal()
+		}
+		if err == nil {
+			c.state.A, err = c.read(address)
+		}
+		if err == nil {
+			c.setNZ(c.state.A)
+		}
+	case 0xa0: // LDY #imm
+		c.state.PC++
+		c.state.Y, err = c.fetch()
+		if err == nil {
+			c.setNZ(c.state.Y)
+		}
+	case 0xad, 0xae, 0xac: // LDA/LDX/LDY abs
+		c.state.PC++
+		var lo, hi uint8
+		lo, err = c.fetch()
+		if err == nil {
+			hi, err = c.fetch()
+		}
+		var value uint8
+		if err == nil {
+			value, err = c.read(uint16(hi)<<8 | uint16(lo))
+		}
+		if err == nil {
+			switch opcode {
+			case 0xad:
+				c.state.A = value
+			case 0xae:
+				c.state.X = value
+			case 0xac:
+				c.state.Y = value
+			}
+			c.setNZ(value)
 		}
 	case 0xb9, 0xbd: // LDA abs,Y / abs,X
 		c.state.PC++
@@ -249,6 +339,47 @@ func (c *CPU) Step() (StepResult, error) {
 				c.compare(c.state.Y, value)
 			}
 		}
+	case 0xc9: // CMP #imm
+		c.state.PC++
+		var value uint8
+		value, err = c.fetch()
+		if err == nil {
+			c.compare(c.state.A, value)
+		}
+	case 0x69: // ADC #imm
+		c.state.PC++
+		var value uint8
+		value, err = c.fetch()
+		if err == nil {
+			err = c.adc(value)
+		}
+	case 0x65: // ADC zp
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			value, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			err = c.adc(value)
+		}
+	case 0xe9: // SBC #imm
+		c.state.PC++
+		var value uint8
+		value, err = c.fetch()
+		if err == nil {
+			err = c.sbc(value)
+		}
+	case 0xe5: // SBC zp
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			value, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			err = c.sbc(value)
+		}
 	case 0x29, 0x09, 0x49: // AND/ORA/EOR #imm
 		c.state.PC++
 		var value uint8
@@ -278,6 +409,32 @@ func (c *CPU) Step() (StepResult, error) {
 			case 0x05:
 				c.state.A |= value
 			case 0x45:
+				c.state.A ^= value
+			}
+			c.setNZ(c.state.A)
+		}
+	case 0x3d, 0x1d, 0x5d: // AND/ORA/EOR abs,X
+		c.state.PC++
+		var lo, hi, value uint8
+		lo, err = c.fetch()
+		if err == nil {
+			hi, err = c.fetch()
+		}
+		base := uint16(hi)<<8 | uint16(lo)
+		address := base + uint16(c.state.X)
+		if err == nil && base&0xff00 != address&0xff00 {
+			err = c.internal()
+		}
+		if err == nil {
+			value, err = c.read(address)
+		}
+		if err == nil {
+			switch opcode {
+			case 0x3d:
+				c.state.A &= value
+			case 0x1d:
+				c.state.A |= value
+			case 0x5d:
 				c.state.A ^= value
 			}
 			c.setNZ(c.state.A)
@@ -455,6 +612,22 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			err = c.write(uint16(zeroPage+c.state.X), c.state.A)
 		}
+	case 0x91: // STA (zp),Y
+		c.state.PC++
+		var zeroPage, lo, hi uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			lo, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			hi, err = c.read(uint16(zeroPage + 1))
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			err = c.write((uint16(hi)<<8|uint16(lo))+uint16(c.state.Y), c.state.A)
+		}
 	case 0x9d, 0x99: // STA abs,X / STA abs,Y
 		c.state.PC++
 		var lo, hi uint8
@@ -522,6 +695,31 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.setNZ(value)
 		}
+	case 0xf6, 0xd6: // INC/DEC zp,X
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			err = c.internal()
+		}
+		address := uint16(zeroPage + c.state.X)
+		if err == nil {
+			value, err = c.read(address)
+		}
+		if opcode == 0xf6 {
+			value++
+		} else {
+			value--
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			err = c.write(address, value)
+		}
+		if err == nil {
+			c.setNZ(value)
+		}
 	case 0xee, 0xce: // INC/DEC abs
 		c.state.PC++
 		var lo, hi, value uint8
@@ -568,6 +766,81 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.setNZ(value)
 		}
+	case 0x06, 0x26, 0x66: // ASL/ROL/ROR zp
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			value, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			oldCarry := c.state.P&flagCarry != 0
+			c.state.P &^= flagCarry
+			switch opcode {
+			case 0x06:
+				if value&0x80 != 0 {
+					c.state.P |= flagCarry
+				}
+				value <<= 1
+			case 0x26:
+				if value&0x80 != 0 {
+					c.state.P |= flagCarry
+				}
+				value <<= 1
+				if oldCarry {
+					value |= 1
+				}
+			case 0x66:
+				if value&1 != 0 {
+					c.state.P |= flagCarry
+				}
+				value >>= 1
+				if oldCarry {
+					value |= 0x80
+				}
+			}
+			err = c.write(uint16(zeroPage), value)
+		}
+		if err == nil {
+			c.setNZ(value)
+		}
+	case 0x0a, 0x2a, 0x4a, 0x6a: // ASL/ROL/LSR/ROR A
+		c.state.PC++
+		oldCarry := c.state.P&flagCarry != 0
+		c.state.P &^= flagCarry
+		switch opcode {
+		case 0x0a:
+			if c.state.A&0x80 != 0 {
+				c.state.P |= flagCarry
+			}
+			c.state.A <<= 1
+		case 0x2a:
+			if c.state.A&0x80 != 0 {
+				c.state.P |= flagCarry
+			}
+			c.state.A <<= 1
+			if oldCarry {
+				c.state.A |= 1
+			}
+		case 0x4a:
+			if c.state.A&1 != 0 {
+				c.state.P |= flagCarry
+			}
+			c.state.A >>= 1
+		case 0x6a:
+			if c.state.A&1 != 0 {
+				c.state.P |= flagCarry
+			}
+			c.state.A >>= 1
+			if oldCarry {
+				c.state.A |= 0x80
+			}
+		}
+		c.setNZ(c.state.A)
+		err = c.internal()
 	case 0xca: // DEX
 		c.state.PC++
 		c.state.X--
@@ -614,7 +887,7 @@ func (c *CPU) Step() (StepResult, error) {
 	return result, err
 }
 
-func (c *CPU) serviceIRQ() error {
+func (c *CPU) serviceInterrupt(vector uint16) error {
 	if err := c.internal(); err != nil {
 		return err
 	}
@@ -632,11 +905,11 @@ func (c *CPU) serviceIRQ() error {
 		return err
 	}
 	c.state.P = (c.state.P | flagInterruptDisable | flagUnused) &^ flagDecimal
-	lo, err := c.read(0xfffe)
+	lo, err := c.read(vector)
 	if err != nil {
 		return err
 	}
-	hi, err := c.read(0xffff)
+	hi, err := c.read(vector + 1)
 	if err != nil {
 		return err
 	}
@@ -701,6 +974,76 @@ func (c *CPU) compare(register, value uint8) {
 		c.state.P |= flagCarry
 	}
 	c.setNZ(register - value)
+}
+
+func (c *CPU) adc(value uint8) error {
+	a := c.state.A
+	carry := uint16(0)
+	if c.state.P&flagCarry != 0 {
+		carry = 1
+	}
+	binary := uint16(a) + uint16(value) + carry
+	c.state.P &^= flagCarry | flagOverflow
+	if (^(a ^ value) & (a ^ uint8(binary)) & 0x80) != 0 {
+		c.state.P |= flagOverflow
+	}
+	if c.state.P&flagDecimal != 0 {
+		low := uint16(a&0x0f) + uint16(value&0x0f) + carry
+		if low > 9 {
+			low += 6
+		}
+		decimal := uint16(a&0xf0) + uint16(value&0xf0) + low
+		if decimal > 0x9f {
+			decimal += 0x60
+		}
+		if decimal > 0xff {
+			c.state.P |= flagCarry
+		}
+		c.state.A = uint8(decimal)
+		c.setNZ(c.state.A)
+		return c.internal() // W65C02 decimal arithmetic takes one extra cycle.
+	}
+	if binary > 0xff {
+		c.state.P |= flagCarry
+	}
+	c.state.A = uint8(binary)
+	c.setNZ(c.state.A)
+	return nil
+}
+
+func (c *CPU) sbc(value uint8) error {
+	a := c.state.A
+	borrow := int16(1)
+	if c.state.P&flagCarry != 0 {
+		borrow = 0
+	}
+	binary := int16(a) - int16(value) - borrow
+	result := uint8(binary)
+	c.state.P &^= flagCarry | flagOverflow
+	if binary >= 0 {
+		c.state.P |= flagCarry
+	}
+	if ((a ^ result) & (a ^ value) & 0x80) != 0 {
+		c.state.P |= flagOverflow
+	}
+	if c.state.P&flagDecimal != 0 {
+		low := int16(a&0x0f) - int16(value&0x0f) - borrow
+		high := int16(a>>4) - int16(value>>4)
+		if low < 0 {
+			low -= 6
+			high--
+		}
+		if high < 0 {
+			high -= 6
+		}
+		result = uint8(high<<4)&0xf0 | uint8(low)&0x0f
+		c.state.A = result
+		c.setNZ(result)
+		return c.internal()
+	}
+	c.state.A = result
+	c.setNZ(result)
+	return nil
 }
 
 func (c *CPU) read(address uint16) (uint8, error) {

@@ -62,3 +62,41 @@ func TestSoundTimelineAdvancesNativeSampleDomain(t *testing.T) {
 		t.Fatalf("cycles=%d samples=%d", timeline.Cycles, sound.Audio().SampleCount())
 	}
 }
+
+func TestControllerShiftRegisterUsesFallingEdgesMSBFirst(t *testing.T) {
+	bus := testMachineBus(t)
+	sound := newSoundBus(&bus.soundRAM)
+	sound.SetPad(0, 0x7fff) // A pressed, all other controls released.
+	_ = sound.Write8(0x0407, 0x15)
+	_ = sound.Write8(0x0407, 0x14) // latch P1
+	_ = sound.Write8(0x0407, 0x10) // shift A bit
+	if got, _ := sound.Read8(0x0402); got != 0 {
+		t.Fatalf("first shift=$%02X", got)
+	}
+	_ = sound.Write8(0x0407, 0x14)
+	_ = sound.Write8(0x0407, 0x10) // shift B bit
+	if got, _ := sound.Read8(0x0402); got != 1 {
+		t.Fatalf("second shift=$%02X", got)
+	}
+	_ = sound.Write8(0x0407, 0x00) // clear P1 and issue probe IRQ
+	if got, _ := sound.Read8(0x0402); got != 0 || sound.IRQStatus()&0x08 == 0 {
+		t.Fatalf("clear shift=$%02X irq=$%02X", got, sound.IRQStatus())
+	}
+}
+
+func TestSoundLatchesAndCommandIRQHaveDedicatedAcks(t *testing.T) {
+	bus := testMachineBus(t)
+	sound := newSoundBus(&bus.soundRAM)
+	_ = sound.Write8(0x0410, 0x28)
+	sound.WriteFrom68K(0x0404, 0xa5)
+	sound.RequestFrom68K()
+	if sound.IRQStatus() != 0x28 || !sound.IRQAsserted() {
+		t.Fatalf("sources=$%02X asserted=%v", sound.IRQStatus(), sound.IRQAsserted())
+	}
+	if got, _ := sound.Read8(0x0404); got != 0xa5 || sound.IRQStatus() != 0x20 {
+		t.Fatalf("latch=$%02X sources=$%02X", got, sound.IRQStatus())
+	}
+	if _, _ = sound.Read8(0x040a); sound.IRQStatus() != 0 {
+		t.Fatalf("command ack sources=$%02X", sound.IRQStatus())
+	}
+}

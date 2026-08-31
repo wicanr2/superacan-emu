@@ -89,6 +89,23 @@ func TestIRQIsLevelSensitiveAndRTIRestoresExecution(t *testing.T) {
 	}
 }
 
+func TestNMIPreemptsMaskedIRQAndUsesNMIVector(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0xfffa], machine.memory[0xfffb] = 0x34, 0x12
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, SP: 0xfd, P: flagInterruptDisable | flagUnused}
+	cpu.SetIRQ(true)
+	cpu.PulseNMI()
+	result, err := cpu.Step()
+	if err != nil || !result.Interrupt || !result.NMI || result.Cycles != 7 || cpu.state.PC != 0x1234 {
+		t.Fatalf("result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+	result, err = cpu.Step()
+	if err == nil || result.NMI {
+		t.Fatalf("NMI edge repeated result=%+v err=%v", result, err)
+	}
+}
+
 func TestWAIWaitsForIRQAndRespectsInterruptMask(t *testing.T) {
 	machine := &testMachine{}
 	machine.memory[0x8000] = 0xcb
@@ -147,5 +164,63 @@ func TestCompareIndexImmediate(t *testing.T) {
 	result, err := cpu.Step()
 	if err != nil || result.Cycles != 2 || cpu.state.P&flagCarry == 0 || cpu.state.P&flagZero == 0 || cpu.state.P&flagNegative != 0 {
 		t.Fatalf("result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+}
+
+func TestAccumulatorRotateUsesCarry(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000] = 0x2a
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 0x80, P: flagCarry | flagUnused}
+	result, err := cpu.Step()
+	if err != nil || result.Cycles != 2 || cpu.state.A != 1 || cpu.state.P&flagCarry == 0 || cpu.state.P&flagZero != 0 {
+		t.Fatalf("result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+}
+
+func TestLDAIndexedIndirectWrapsZeroPage(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001] = 0xa1, 0xfe
+	machine.memory[0x00ff], machine.memory[0x0000] = 0x34, 0x12
+	machine.memory[0x1234] = 0x80
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, X: 1, P: flagUnused}
+	result, err := cpu.Step()
+	if err != nil || result.Cycles != 6 || cpu.state.A != 0x80 || cpu.state.P&flagNegative == 0 {
+		t.Fatalf("result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+}
+
+func TestADCImmediateBinaryAndDecimal(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001] = 0x69, 0x01
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 0x7f, P: flagUnused}
+	result, err := cpu.Step()
+	if err != nil || result.Cycles != 2 || cpu.state.A != 0x80 || cpu.state.P&flagOverflow == 0 || cpu.state.P&flagCarry != 0 {
+		t.Fatalf("binary result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+	machine.memory[0x8002], machine.memory[0x8003] = 0x69, 0x01
+	cpu.state = State{PC: 0x8002, A: 0x99, P: flagDecimal | flagUnused}
+	result, err = cpu.Step()
+	if err != nil || result.Cycles != 3 || cpu.state.A != 0 || cpu.state.P&flagCarry == 0 || cpu.state.P&flagZero == 0 {
+		t.Fatalf("decimal result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+}
+
+func TestSBCImmediateBinaryAndDecimal(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001] = 0xe9, 0x01
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 0x80, P: flagCarry | flagUnused}
+	result, err := cpu.Step()
+	if err != nil || result.Cycles != 2 || cpu.state.A != 0x7f || cpu.state.P&flagOverflow == 0 || cpu.state.P&flagCarry == 0 {
+		t.Fatalf("binary result=%+v state=%+v err=%v", result, cpu.state, err)
+	}
+	machine.memory[0x8002], machine.memory[0x8003] = 0xe9, 0x01
+	cpu.state = State{PC: 0x8002, A: 0x00, P: flagCarry | flagDecimal | flagUnused}
+	result, err = cpu.Step()
+	if err != nil || result.Cycles != 3 || cpu.state.A != 0x99 || cpu.state.P&flagCarry != 0 || cpu.state.P&flagNegative == 0 {
+		t.Fatalf("decimal result=%+v state=%+v err=%v", result, cpu.state, err)
 	}
 }

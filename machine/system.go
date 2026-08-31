@@ -7,6 +7,8 @@ import (
 	"github.com/wicanr2/superacan-emu/cpu/m68k"
 )
 
+const SoundBIOSBankSize = 8192
+
 // System wires the first production CPU, bus and shared timeline together.
 // Additional chips attach to Bus and Timeline without changing the CPU API.
 type System struct {
@@ -21,6 +23,7 @@ type System struct {
 	IRQAcknowledgements [8]uint64
 	soundReset          bool
 	soundCredit         int64
+	soundIRQ6           bool
 }
 
 // RunFrame advances the shared hardware timeline until UM6618 completes one
@@ -36,7 +39,7 @@ func (s *System) RunFrame(maxInstructions uint64) (uint64, error) {
 		if executed == maxInstructions {
 			return executed, fmt.Errorf("machine: frame did not complete within %d instructions", maxInstructions)
 		}
-		s.M68K.SetInterruptLevel(s.Bus.Video().HighestIRQLevel())
+		s.M68K.SetInterruptLevel(s.highestIRQLevel())
 		if _, err := s.M68K.Step(); err != nil {
 			return executed, err
 		}
@@ -53,6 +56,7 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 	}
 	timeline := &Timeline{}
 	soundBus := newSoundBus(&bus.soundRAM)
+	bus.attachSound(soundBus)
 	soundTimeline := &SoundTimeline{}
 	system := &System{
 		Bus: bus, Timeline: timeline,
@@ -62,9 +66,9 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 		soundReset: true,
 	}
 	system.M68K.SetInterruptAcknowledge(func(level uint8) {
-		system.IRQAcknowledgements[level&7]++
-		system.Bus.Video().ClearIRQ(level)
+		system.acknowledgeIRQ(level)
 	})
+	soundBus.SetIRQ6Handler(func() { system.soundIRQ6 = true })
 	timeline.OnAdvance = system.advanceDevices
 	soundTimeline.OnAdvance = system.SoundBus.Audio().Advance
 	bus.setControlObserver(system.controlChanged)
@@ -73,12 +77,25 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 
 func (s *System) Reset() error { return s.M68K.Reset() }
 
+// LoadSoundBIOS installs one of the two 8 KiB internal sound ROM dumps into
+// the shared boot window before the cartridge releases the W65C02 reset line.
+func (s *System) LoadSoundBIOS(bank int, data []byte) error {
+	if bank < 0 || bank > 1 {
+		return fmt.Errorf("machine: sound BIOS bank %d, want 0 or 1", bank)
+	}
+	if len(data) != SoundBIOSBankSize {
+		return fmt.Errorf("machine: sound BIOS bank %d size %d, want %d", bank, len(data), SoundBIOSBankSize)
+	}
+	copy(s.Bus.soundRAM[bank*SoundBIOSBankSize:], data)
+	return nil
+}
+
 func (s *System) SoundResetAsserted() bool { return s.soundReset }
 
 func (s *System) RunInstructions(count uint64) (m68k.StepResult, error) {
 	var result m68k.StepResult
 	for i := uint64(0); i < count; i++ {
-		s.M68K.SetInterruptLevel(s.Bus.Video().HighestIRQLevel())
+		s.M68K.SetInterruptLevel(s.highestIRQLevel())
 		var err error
 		result, err = s.M68K.Step()
 		if err != nil {
@@ -89,13 +106,31 @@ func (s *System) RunInstructions(count uint64) (m68k.StepResult, error) {
 	return result, nil
 }
 
+func (s *System) highestIRQLevel() uint8 {
+	level := s.Bus.Video().HighestIRQLevel()
+	if s.soundIRQ6 && level < 6 {
+		return 6
+	}
+	return level
+}
+
+func (s *System) acknowledgeIRQ(level uint8) {
+	s.IRQAcknowledgements[level&7]++
+	if level == 6 {
+		s.soundIRQ6 = false
+	} else {
+		s.Bus.Video().ClearIRQ(level)
+	}
+}
+
 func (s *System) controlChanged(oldValue, newValue uint16) error {
 	wasReset := oldValue&1 == 0
 	isReset := newValue&1 == 0
 	if !wasReset && isReset {
 		s.soundReset = true
 		s.soundCredit = 0
-		s.SoundBus.Audio().Reset()
+		s.soundIRQ6 = false
+		s.SoundBus.Reset()
 		return nil
 	}
 	if wasReset && !isReset {
@@ -119,6 +154,10 @@ func (s *System) advanceDevices(m68kCycles uint8) error {
 			s.soundCredit -= int64(result.Cycles) * 3
 		}
 	}
+	frame := s.Bus.Video().Frame()
 	s.Bus.Video().AdvanceM68KCycles(m68kCycles)
+	if s.Bus.Video().Frame() != frame {
+		s.M65C02.PulseNMI()
+	}
 	return nil
 }
