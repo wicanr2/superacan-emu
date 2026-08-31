@@ -18,3 +18,16 @@
 - Docker 清理：本輪 `docker run --rm` 容器均已移除；另有既存的
   `openbor-linux-build:local` 容器 `upbeat_rosalind` 正在執行，判定不屬本專案，未碰觸。
 - Git：里程碑 5 與文件基線已提交為 `8037a33`，並推送至 `origin/master`。
+
+## 2026-08-31：確認純 Go＋Ebitengine 轉向
+
+- 決策：全面以純 Go 重寫模擬核心，Ebitengine 作跨平台前端；排除 cgo、C ABI 與只換
+  前端。現有 C++ 留在同 repo 的 `archive/cpp/`，標為 deprecated oracle。
+- 68000：Moira `a4c273b` 只作 sample／差分 oracle，新 Go 核心獨立實作，不直接移植。
+- 時序：`Step` 對外一次一條指令，內部按 fetch／prefetch／read／write／internal／IRQ
+  poll phase 推進 scheduler；排除純 instruction-total timing 與 pin-level 模擬。
+- 調查：Moira 同時具 simple timing 與 precise timing；後者在 memory access 前後同步，
+  並於指定 prefetch／poll point 取樣 IPL。據此建立 `docs/chip-emulation-principles.md`，
+  但不把 Moira 行為升格為 Super A'Can 硬體證據。
+- 驗證：文件相對連結與 `git diff --check` 通過；本輪唯讀調查／文件檢查容器皆以
+  `docker run --rm` 結束，沒有留下本專案容器。

@@ -4,9 +4,18 @@
 
 ## 專案定位
 
-本專案是 Super A'Can 晶片與整機行為的跨平台模擬器，不是遊戲 remake。可執行遊戲
-是驗證硬體模型的方法，不代表可以用遊戲專屬特判取代晶片契約。`../acan/` 是唯讀的
-硬體／Bcan 逆向知識庫，目前由另一工作階段 review；本專案只引用固定證據，不回寫。
+本專案是 Super A'Can 晶片與整機行為的跨平台模擬器，不是遊戲 remake。2026-08-31
+已決定停止 C++ 產品線，改以純 Go 重寫 machine core，Ebitengine 負責畫面、音訊與
+輸入；禁止 cgo。現有 C++ 將移至同 repo 的 `archive/cpp/`，只作 deprecated 行為
+oracle 與歷史紀錄。可執行遊戲是驗證硬體模型的方法，不代表可以用遊戲專屬特判
+取代晶片契約。`../acan/` 是唯讀的硬體／Bcan 逆向知識庫，目前由另一工作階段
+review；本專案只引用固定證據，不回寫。
+
+CPU 路線也已定案：Go Motorola 68000 是獨立實作，Moira 固定版只作 sample 與差分
+oracle，不直接移植。CPU 對外一次 `Step` 一條指令，但內部按 fetch、prefetch、bus
+read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保 DMA、IRQ、
+雙 CPU 與觸發型 register 的時間順序可觀察。完整通則見
+[`docs/chip-emulation-principles.md`](docs/chip-emulation-principles.md)。
 
 MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件，可執行性用來驗證文件
 是否足夠準確。MAME 也把位址空間建模為具有資料寬度、位址寬度、端序與 address shift
@@ -22,10 +31,10 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 - MAME debugger：<https://docs.mamedev.org/debugger/index.html>
 - MAME watchpoint：<https://docs.mamedev.org/debugger/watchpoint.html>
 
-## 2026-08-31 目前狀態表
+## 2026-08-31 deprecated C++ 狀態表
 
-基準為 `master` 的 `18110af` 加上目前尚未提交的里程碑 5 工作樹。舊里程碑文件若與
-`docs/verify-misc.md` 衝突，以後者及目前程式為準。
+此表描述即將移入 `archive/cpp/` 的 `d923486` C++ oracle，不再代表 production 主線。
+舊里程碑文件若與 `docs/verify-misc.md` 衝突，以後者及該 commit 程式為準。
 
 | 類別 | 目前狀態 | 證據邊界 |
 |---|---|---|
@@ -59,6 +68,7 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 
 ## 下一個交付閘門
 
-先把目前里程碑 5 工作樹在隔離 Docker 工具鏈完成乾淨建置與回歸，修正 save state 的
-ROM 身分與失敗即關閉政策，並建立至少兩款遊戲的存讀檔決定性測試。通過後才進入
-macOS 可重現編譯規劃；macOS 移植不得改變核心時序或晶片語意。
+先把 C++ 完整移入 `archive/cpp/` 並證明 archived oracle 仍可重建，再建立純 Go module
+與 headless Motorola 68000 package。第一個 vertical slice 是 reset vector、prefetch、
+最小 opcode 集合與 phase trace；之後逐步擴到完整 68000 ISA，通過獨立向量、Moira
+差分與 Super A'Can IPL。Ebitengine 前端不能先於 headless machine core 決定 scheduler。

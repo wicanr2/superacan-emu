@@ -2,9 +2,25 @@
 
 更新日期：2026-08-31。狀態只反映目前程式與最近證據；歷史見 `WORKLOG.md`。
 
-## 進行中：里程碑 5 收斂
+## 進行中：純 Go 轉向
 
-- [ ] 在專案專用、可重現的 Docker image 內從乾淨 build 目錄完成 Release 建置。
+- [ ] 把目前 C++／CMake／SDL2 實作移至 `archive/cpp/`，在 archive README 標明
+  deprecated、最後 production commit `d923486`、證據限制與唯讀 oracle 用途。
+  完成條件：Docker 內仍可重建 archived binary，原有驗證文件與第三方 notice 可回查。
+- [ ] 建立純 Go module、package 邊界與 headless test runner；production path 禁止 cgo。
+  完成條件：`go test ./...` 在無網路固定 image 內通過，machine core 不 import Ebitengine。
+- [ ] 建立獨立 Go Motorola 68000 核心骨架。
+  完成條件：公開 bus／phase／IRQ API、register 與 prefetch state、`Step` result、reset
+  vector vertical slice；設計符合 `docs/chip-emulation-principles.md`。
+- [ ] 建立 opcode／addressing-mode／exception 測試階梯與 Moira 差分 harness。
+  完成條件：每個差異可分類為 Go bug、sample 差異或硬體 unknown，不以 Moira 自動定案。
+- [ ] Go 68000 跑通 Super A'Can IPL 第一段。
+  完成條件：固定 BIOS hash、reset SSP／PC、phase trace 與 C++ oracle 對照，逐步抵達
+  UMC6650 交握；缺 opcode 時明確停止，不用 stub NOP。
+
+## Deprecated C++ 收尾紀錄
+
+- [ ] 在專案專用、可重現的 Docker image 內從乾淨 archive build 目錄完成 Release 建置。
   完成條件：固定 compiler／CMake／SDL2 與依賴 commit，無主機 runtime 混入，輸出由
   目前 UID/GID 擁有。
 - [ ] 審查全部未提交程式變更，移除或隔離 `ACAN_STAGING` 等一次性探針。
@@ -28,10 +44,10 @@
 - [ ] window 1／複雜 ROZ line table：找到實際使用軟體與同狀態 oracle 後再升格。
 - [ ] partial update：只有出現可重現的 mid-frame 差異才實作，不因舊 TODO 自動開工。
 
-## 核心工程
+## Go 核心工程
 
-- [ ] 將 scheduler／runner 狀態從 `main.cpp` 抽離成可測核心，讓 Linux、headless 與未來
-  macOS 前端共用同一硬體時間線。
+- [ ] 建立純 Go phase scheduler，讓 Linux、headless、macOS 與 Ebitengine 前端共用
+  同一硬體時間線；不沿用 C++ `main.cpp` runner 架構。
 - [ ] 為 register transaction、IRQ edge／level／ack、DMA 邊界、reset 與 open-bus 建立
   不依賴商業 ROM 的單元／整合測試。
 - [ ] 將一次性環境變數 trace 整理成有界、可篩選的 device／address-space 除錯介面。

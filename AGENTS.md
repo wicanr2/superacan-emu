@@ -1,8 +1,12 @@
 # Super A'Can 模擬器開發守則
 
-本儲存庫實作 Super A'Can 主機與晶片的可攜式模擬器。目標是以可回查證據重建
-硬體可觀察行為，使商用軟體能在 Linux 上正常執行；這不是遊戲 remake 專案，
-不得套用遊戲內容重製、玩法補完或 `dist-all/` 交付規則。
+本儲存庫以純 Go 實作 Super A'Can 主機與晶片的可攜式模擬器，Ebitengine 負責平台
+前端。目標是以可回查證據重建硬體可觀察行為，使商用軟體能跨平台正常執行；
+這不是遊戲 remake 專案，不得套用遊戲內容重製、玩法補完或 `dist-all/` 交付規則。
+
+晶片、CPU、DMA、IRQ、scheduler、save state 與前端的共同契約以
+[`docs/chip-emulation-principles.md`](docs/chip-emulation-principles.md) 為準。現有 C++
+實作已 deprecated，將保存在 `archive/cpp/` 作歷史與差分 oracle，不再接受產品功能。
 
 ## 權威來源與文件職責
 
@@ -78,6 +82,8 @@
    soft reset、load state 後都必須有定義良好的狀態。
 6. 平台前端（SDL、Linux、未來 macOS）與模擬核心分離。平台移植不得改變硬體語意；
    headless 模式必須能執行核心回歸。
+7. 新 production path 必須是純 Go；禁止用 cgo、C ABI 或包裝 archived C++ CPU 核心
+   迴避重寫。Moira 只能作 sample／差分 oracle，不得逐行翻譯或複製其實作結構。
 
 ## 作業與交接
 

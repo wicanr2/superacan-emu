@@ -1,8 +1,9 @@
 # superacan-emu
 
 Super A'Can（敦煌科技 Funtech，1995，台灣自製 16 位元遊戲機）的開源硬體模擬器。
-本專案模擬 68000／65C02、UMC6650、UM6618、UM6619、DMA、輸入與整機時間線；
-遊戲只用來驗證晶片行為，這不是遊戲 remake。
+production 主線正改以純 Go 重寫 68000／65C02、UMC6650、UM6618、UM6619、DMA、
+輸入與整機時間線，Ebitengine 將負責跨平台前端；遊戲只用來驗證晶片行為，這不是
+遊戲 remake。
 
 Bcan 0.0.8b 是閉源 Windows 模擬器且沒有公開移植。本專案依據唯讀知識庫
 [superacan](https://github.com/wicanr2/superacan) 的 Bcan／BIOS 逆向證據，以及 MAME
@@ -11,7 +12,13 @@ driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的 C++ 實
 長期目標：以可追溯、可重現的晶片模型在 Linux 執行 Super A'Can 軟體，並在核心
 收斂後提供 macOS 版本。模擬器原始碼同時是硬體文件；相容性不能取代硬體證據。
 
-## 目前進度（里程碑 5 收斂中）
+## 目前進度（純 Go 轉向）
+
+2026-08-31 已決定停止 C++ production path。現有可執行 C++ 里程碑將保存在同 repo
+的 `archive/cpp/`，標為 deprecated reference implementation，作 Go 差分 oracle，
+不再新增功能。Go 68000 核心採獨立實作；Moira 只作 sample，不直接翻譯。
+
+Go 核心尚在開工階段；下列是 deprecated C++ oracle 已達到的相容性，不是 Go 版完成度：
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）
 - [x] UMC6650 lockout 晶片完整實作（埠角色以 IPL 反組譯為準，見
@@ -129,6 +136,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - [`CONTEXT.md`](CONTEXT.md)：目前真相、證據邊界與下一個交付閘門
 - [`WORKLIST.md`](WORKLIST.md)：唯一可執行待辦
 - [`WORKLOG.md`](WORKLOG.md)：逐輪工作歷程
+- [`docs/chip-emulation-principles.md`](docs/chip-emulation-principles.md)：CPU、bus phase、
+  DMA、IRQ、scheduler、save state 與 Ebitengine 邊界通則
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：
   各里程碑的可重現證據與限制
