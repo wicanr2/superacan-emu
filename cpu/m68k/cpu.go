@@ -22,19 +22,37 @@ type State struct {
 
 // StepResult describes one complete instruction without hiding its timing.
 type StepResult struct {
-	PCBefore uint32
-	PCAfter  uint32
-	Opcode   uint16
-	Cycles   uint64
-	Phases   []Phase
+	PCBefore       uint32
+	PCAfter        uint32
+	Opcode         uint16
+	Cycles         uint64
+	Phases         []Phase
+	InterruptLevel uint8
 }
 
 // CPU is an independent Motorola 68000 implementation.
 type CPU struct {
-	bus       Bus
-	scheduler Scheduler
-	state     State
-	stepTrace []Phase
+	bus                  Bus
+	scheduler            Scheduler
+	state                State
+	stepTrace            []Phase
+	interruptLevel       uint8
+	level7Pending        bool
+	interruptAcknowledge func(uint8)
+}
+
+// SetInterruptLevel drives the external IPL2-IPL0 pins. Level 7 is latched on
+// its rising edge, matching the 68000 non-maskable interrupt behavior.
+func (c *CPU) SetInterruptLevel(level uint8) {
+	level &= 7
+	if level == 7 && c.interruptLevel != 7 {
+		c.level7Pending = true
+	}
+	c.interruptLevel = level
+}
+
+func (c *CPU) SetInterruptAcknowledge(callback func(uint8)) {
+	c.interruptAcknowledge = callback
 }
 
 func New(bus Bus, scheduler Scheduler) *CPU {
@@ -97,6 +115,16 @@ func (c *CPU) Step() (StepResult, error) {
 	start := c.state.Cycles
 	c.stepTrace = make([]Phase, 0, 3)
 	defer func() { c.stepTrace = nil }()
+	if level := c.acceptedInterrupt(); level != 0 {
+		if err := c.serviceInterrupt(level); err != nil {
+			return result, fmt.Errorf("m68k interrupt level %d: %w", level, err)
+		}
+		result.PCAfter = c.state.PC
+		result.Cycles = c.state.Cycles - start
+		result.Phases = append(result.Phases, c.stepTrace...)
+		result.InterruptLevel = level
+		return result, nil
+	}
 
 	decoded := Decode(c.state.IRD)
 	switch decoded.Instruction {
@@ -374,6 +402,14 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.addqWordData(decoded.Register, decoded.Quick); err != nil {
 			return result, fmt.Errorf("m68k ADDQ.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
 		}
+	case InstructionADDQWordAbsoluteLong:
+		if err := c.addqWordAbsoluteLong(decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ADDQ.W #%d,(xxx).L: %w", decoded.Quick, err)
+		}
+	case InstructionRTE:
+		if err := c.rte(); err != nil {
+			return result, fmt.Errorf("m68k RTE: %w", err)
+		}
 	case InstructionLSRWordImmediate:
 		if err := c.lsrWordImmediate(decoded.Register, decoded.Quick); err != nil {
 			return result, fmt.Errorf("m68k LSR.W #%d,D%d: %w", decoded.Quick, decoded.Register, err)
@@ -590,6 +626,49 @@ func (c *CPU) Step() (StepResult, error) {
 	result.Cycles = c.state.Cycles - start
 	result.Phases = append(result.Phases, c.stepTrace...)
 	return result, nil
+}
+
+func (c *CPU) acceptedInterrupt() uint8 {
+	if c.level7Pending {
+		return 7
+	}
+	if c.interruptLevel > uint8(c.state.SR>>8&7) {
+		return c.interruptLevel
+	}
+	return 0
+}
+
+func (c *CPU) serviceInterrupt(level uint8) error {
+	if c.state.SR&0x2000 == 0 {
+		return fmt.Errorf("user-mode interrupt stack switching is not implemented")
+	}
+	oldSR, oldPC := c.state.SR, c.state.PC
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 12}); err != nil {
+		return err
+	}
+	if err := c.advance(Phase{Kind: PhaseInterruptAcknowledge, Cycles: 4, Address: uint32(level), Width: WidthByte, FC: FCCPU}); err != nil {
+		return err
+	}
+	if c.interruptAcknowledge != nil {
+		c.interruptAcknowledge(level)
+	}
+	if level == 7 {
+		c.level7Pending = false
+	}
+	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	if err := c.writeLong(c.state.A[7], oldPC, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.A[7] = (c.state.A[7] - 2) & addressMask
+	if err := c.writeWord(c.state.A[7], oldSR, FCSupervisorData); err != nil {
+		return err
+	}
+	c.state.SR = oldSR&0xf8ff | 0x2000 | uint16(level)<<8
+	target, err := c.readLong(uint32(24+level)*4, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	return c.refillPrefetch(target&addressMask, 0)
 }
 
 func (c *CPU) moveBytePredecrementToAddressIndirect(source, destination uint8) error {

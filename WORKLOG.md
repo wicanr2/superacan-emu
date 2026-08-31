@@ -228,3 +228,14 @@
   word stride、零填充及 VRAM 目的高位模式；所有 transaction 可由 machine observer 看見。
 - 合成回歸驗證兩 word copy 與單 word zero-fill；真實 Boom Zoo 1,300,000 指令 smoke
   的 CPU、VRAM 與 framebuffer 指紋不變，表示既有啟動路徑沒有被新 DMA 模型破壞。
+
+## 2026-09-01：UM6618 IRQ 與 68000 autovector
+
+- UM6618 新增 vblank IRQ7、可視線 raster IRQ4、可程式 line-on／line-off IRQ5 與最高
+  level 仲裁；acknowledge 採 HOLD_LINE 清除來源。
+- 68000 新增 instruction-boundary IPL 採樣、level 7 rising-edge latch、44-cycle autovector、
+  supervisor SR／PC stack frame、RTE，以及真實 handler 所需 `ADDQ.W #n,(xxx).L`。
+- 第一輪真實 smoke 在第 96,156 條指令進入 ROM IRQ7 handler，因 `$5279` 明確停止；
+  補齊 ADDQ.W／RTE 後可再次完成 1,300,000 條指令，實際 acknowledge IRQ7 58 次。
+- IRQ 接入後 VRAM 與 framebuffer SHA-256 不變；IRQ4／5 acknowledge 為 0，故目前只
+  標為合成驗證。user-mode USP／SSP 切換與一般 exception 仍未完成。

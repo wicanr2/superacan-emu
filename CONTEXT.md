@@ -27,13 +27,13 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | module | `github.com/wicanr2/superacan-emu`，Go 1.26 | 尚未加入 Ebitengine dependency |
 | 68000 phase API | scheduler-before-bus、24-bit address、FC、byte／word transaction | API 已測；尚未有整機 scheduler consumer |
 | 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
-| 68000 opcode | 真實 IPL＋Boom Zoo 已無錯執行 1,300,000 條指令，完成 sound boot 與多輪 video 初始化 | 官方 ISA／timing 表；未覆蓋完整 ISA、exception／IRQ |
+| 68000 opcode | 真實 IPL＋Boom Zoo 已無錯執行 1,300,000 條指令，完成 sound boot、多輪 video 初始化與 58 次 IRQ7；已有 autovector、RTE | 官方 ISA／timing 表；未覆蓋完整 ISA、一般 exception、user/supervisor stack 切換 |
 | W65C02 | 純 Go reset／堆疊／分支與 Boom Zoo boot 所需子集；已產生 `$0300=$FF` ack | 3:1 shared scheduler；尚未完整 ISA／IRQ |
 | media | word-swap、大小驗證、原始 SHA-256 manifest | BIOS／ROM 不入版控 |
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 65C02 間接位址／資料埠與暫存器檔 | PCM／timer／DMA 尚未執行 |
-| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、vblank status；sprite DMA bus master；第一版 tilemap／sprite／window／ROZ framebuffer | 真實 Boom Zoo 已非黑且 hash 可重現；IRQ、逐行 ROZ 與 oracle 畫面差分尚未完成 |
+| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；第一版 tilemap／sprite／window／ROZ framebuffer | 真實 Boom Zoo 已非黑且 hash 可重現；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行 ROZ 與 oracle 畫面差分尚未完成 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置 | 1,300,000 條 68k／1,524,044 條 65C02；雙 overlay 關閉 |
 | bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |
 | archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |
@@ -92,7 +92,8 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 下一個 vertical slice 已把 UM6618 register／palette／VRAM、scanline 與第一版 framebuffer
 接入，並讓卡帶自然離開 vblank poll。固定 Boom Zoo 路徑已有 61,437 個非黑像素；這是
 合成器生命跡象，不是畫面正確性宣告。現在實作 sprite／主機 DMA、IRQ4／5／7、複雜
-ROZ 逐行模式，並建立同 frame archived oracle 差分。
+ROZ 逐行模式，並建立同 frame archived oracle 差分。掃描線 IRQ4／5／7 與 68000
+autovector 已接通；固定 smoke 實際受理 58 次 IRQ7。
 UM6619 仍須由 register file 擴充為 PCM／timer／DMA，W65C02 仍須完成
 完整 ISA 與 IRQ。各晶片都以 archived C++ 與 MAME 作分級 oracle，而非直接翻譯。
 Ebitengine 前端不能先於 headless machine core 決定 scheduler。

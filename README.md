@@ -23,8 +23,9 @@ Go 主線目前已有 media manifest、整機 bus、UMC6650、phase timeline、h
 目前已用純 Go W65C02 完成 Boom Zoo sound driver boot ack；UM6618 register、palette、
 VRAM、scanline timing 與第一版 tilemap／sprite／window／ROZ framebuffer 已接入，卡帶
 可自然離開 vblank poll，並產生可重現的非黑畫面指紋。headless runner 可輸出有界 bus
-transaction、VRAM 與 framebuffer hash。尚未完成完整 CPU ISA、exception／IRQ、UM6618
-DMA／逐行 ROZ／畫面差分及 UMC6619 PCM。下列完整相容性仍是
+transaction、IRQ acknowledge 計數、VRAM 與 framebuffer hash。UM6618 IRQ7 已在真實
+路徑受理；尚未完成完整 CPU ISA／一般 exception、逐行 ROZ／畫面差分及 UMC6619 PCM。
+下列完整相容性仍是
 deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）

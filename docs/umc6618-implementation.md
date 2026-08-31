@@ -48,8 +48,16 @@
   的 VRAM／framebuffer hash 不變，表示此有界路徑沒有產生改變既有狀態的 DMA；不能據此
   宣稱所有 control mode 已由遊戲驗證。
 
+## 掃描線中斷
+
+- `$E90010` bit 7／4 分別允許 vblank IRQ7 與可視線 raster IRQ4；`$F0000A／0C`
+  bit 15 加低 8-bit 線號控制 IRQ5 line-on／line-off。
+- 68000 在指令邊界選擇最高 level，執行 autovector acknowledge 後以 HOLD_LINE 語意清除
+  對應來源。IRQ7 保留 rising-edge latch，即使 SR mask=7 仍可受理。
+- 固定 Boom Zoo 1,300,000 指令回歸實際 acknowledge IRQ7 58 次；IRQ4／5 為 0，因此
+  兩者目前只由合成掃描線測試證明，不能升格為該遊戲路徑的動態證據。
+
 ## 尚未完成
 
-- raster／line IRQ4／5、vblank IRQ7 到 68000 的受理與 acknowledge。
 - ROZ 複雜逐行模式、mid-frame register write、partial update 與 VRAM 上半部來源。
 - save state 與相同 frame renderer 差分；目前的 framebuffer hash 只證明固定 Go 路徑。

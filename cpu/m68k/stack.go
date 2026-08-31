@@ -1,5 +1,7 @@
 package m68k
 
+import "fmt"
+
 func (c *CPU) registerValue(index uint8) uint32 {
 	if index < 8 {
 		return c.state.D[index]
@@ -109,6 +111,23 @@ func (c *CPU) rts() error {
 		return err
 	}
 	c.state.A[7] = (c.state.A[7] + 4) & addressMask
+	return c.refillPrefetch(target&addressMask, 0)
+}
+
+func (c *CPU) rte() error {
+	if c.state.SR&0x2000 == 0 {
+		return fmt.Errorf("privilege violation exception is not implemented")
+	}
+	restoredSR, err := c.readWord(c.state.A[7], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	target, err := c.readLong(c.state.A[7]+2, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[7] = (c.state.A[7] + 6) & addressMask
+	c.state.SR = restoredSR
 	return c.refillPrefetch(target&addressMask, 0)
 }
 

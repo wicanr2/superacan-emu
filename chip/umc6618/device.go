@@ -21,6 +21,10 @@ type Device struct {
 	scanline        uint16
 	frame           uint64
 	vblankIRQ       bool
+	rasterIRQ       bool
+	lineIRQ         bool
+	lineOn          int16
+	lineOff         int16
 	spriteDMAStarts uint64
 	irqMask         uint8
 	lineCycles      uint16
@@ -29,7 +33,7 @@ type Device struct {
 	dmaWrite16      func(uint32, uint16)
 }
 
-func New() *Device { return &Device{} }
+func New() *Device { return &Device{lineOn: -1, lineOff: -1} }
 
 // SetDMAAccess connects the video DMA master to the 68000-visible bus. The
 // callbacks are synchronous so every copied word remains observable in order.
@@ -67,6 +71,10 @@ func (d *Device) WriteRegister(index, value uint16) {
 	switch index {
 	case 4:
 		d.videoFlags = value
+	case 5:
+		d.lineOn = decodeIRQLine(value)
+	case 6:
+		d.lineOff = decodeIRQLine(value)
 	case 0x0f:
 		if value&0x8000 != 0 {
 			d.spriteDMAStarts++
@@ -75,6 +83,13 @@ func (d *Device) WriteRegister(index, value uint16) {
 	case 0xf8:
 		d.pixelMode = value & 0x1f
 	}
+}
+
+func decodeIRQLine(value uint16) int16 {
+	if value&0x8000 == 0 {
+		return -1
+	}
+	return int16(value & 0xff)
 }
 
 func (d *Device) runSpriteDMA(control uint16) {
@@ -139,6 +154,31 @@ func (d *Device) TriggerVBlank(enabled bool) {
 	d.vblankIRQ = enabled
 }
 func (d *Device) VBlankPending() bool { return d.vblankIRQ }
+func (d *Device) RasterPending() bool { return d.rasterIRQ }
+func (d *Device) LinePending() bool   { return d.lineIRQ }
+func (d *Device) ClearIRQ(level uint8) {
+	switch level {
+	case 7:
+		d.vblankIRQ = false
+	case 5:
+		d.lineIRQ = false
+	case 4:
+		d.rasterIRQ = false
+	}
+}
+
+func (d *Device) HighestIRQLevel() uint8 {
+	if d.vblankIRQ {
+		return 7
+	}
+	if d.lineIRQ {
+		return 5
+	}
+	if d.rasterIRQ {
+		return 4
+	}
+	return 0
+}
 
 func (d *Device) SetIRQMask(mask uint8) { d.irqMask = mask }
 func (d *Device) IRQMask() uint8        { return d.irqMask }
@@ -155,6 +195,15 @@ func (d *Device) AdvanceM68KCycles(cycles uint8) {
 	for d.lineCycles >= budget {
 		d.lineCycles -= budget
 		d.scanline = (d.scanline + 1) % 262
+		if d.scanline < Height && d.irqMask&0x10 != 0 {
+			d.rasterIRQ = true
+		}
+		if d.lineOn >= 0 && int16(d.scanline) == d.lineOn {
+			d.lineIRQ = true
+		}
+		if d.lineOff >= 0 && int16(d.scanline) == d.lineOff {
+			d.lineIRQ = false
+		}
 		if d.scanline == 240 {
 			d.frame++
 			d.RenderFrame()

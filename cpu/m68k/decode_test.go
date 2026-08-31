@@ -52,6 +52,8 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0x4203, Decoded{Instruction: InstructionCLRByteData, Register: 3}},
 		{0x5206, Decoded{Instruction: InstructionADDQByteData, Register: 6, Quick: 1}},
 		{0x5239, Decoded{Instruction: InstructionADDQByteAbsoluteLong, Quick: 1}},
+		{0x5279, Decoded{Instruction: InstructionADDQWordAbsoluteLong, Quick: 1}},
+		{0x4e73, Decoded{Instruction: InstructionRTE}},
 		{0x0706, Decoded{Instruction: InstructionBTSTDataData, Register: 6, SourceRegister: 3}},
 		{0x4442, Decoded{Instruction: InstructionNEGWordData, Register: 2}},
 		{0xc5db, Decoded{Instruction: InstructionMULSWordPostincrement, Register: 2, SourceRegister: 3}},

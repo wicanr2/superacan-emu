@@ -8,16 +8,17 @@ import (
 // System wires the first production CPU, bus and shared timeline together.
 // Additional chips attach to Bus and Timeline without changing the CPU API.
 type System struct {
-	Bus               *Bus
-	Timeline          *Timeline
-	M68K              *m68k.CPU
-	M65C02            *m65c02.CPU
-	SoundBus          *SoundBus
-	SoundTimeline     *SoundTimeline
-	Instructions      uint64
-	SoundInstructions uint64
-	soundReset        bool
-	soundCredit       int64
+	Bus                 *Bus
+	Timeline            *Timeline
+	M68K                *m68k.CPU
+	M65C02              *m65c02.CPU
+	SoundBus            *SoundBus
+	SoundTimeline       *SoundTimeline
+	Instructions        uint64
+	SoundInstructions   uint64
+	IRQAcknowledgements [8]uint64
+	soundReset          bool
+	soundCredit         int64
 }
 
 func NewSystem(ipl, rom, key []byte) (*System, error) {
@@ -35,6 +36,10 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 		SoundBus: soundBus, SoundTimeline: soundTimeline,
 		soundReset: true,
 	}
+	system.M68K.SetInterruptAcknowledge(func(level uint8) {
+		system.IRQAcknowledgements[level&7]++
+		system.Bus.Video().ClearIRQ(level)
+	})
 	timeline.OnAdvance = system.advanceDevices
 	bus.setControlObserver(system.controlChanged)
 	return system, nil
@@ -47,6 +52,7 @@ func (s *System) SoundResetAsserted() bool { return s.soundReset }
 func (s *System) RunInstructions(count uint64) (m68k.StepResult, error) {
 	var result m68k.StepResult
 	for i := uint64(0); i < count; i++ {
+		s.M68K.SetInterruptLevel(s.Bus.Video().HighestIRQLevel())
 		var err error
 		result, err = s.M68K.Step()
 		if err != nil {

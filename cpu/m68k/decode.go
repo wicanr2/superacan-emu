@@ -75,6 +75,8 @@ const (
 	InstructionMOVEWordDataToIndexed
 	InstructionSUBQWordData
 	InstructionADDQWordData
+	InstructionADDQWordAbsoluteLong
+	InstructionRTE
 	InstructionLSRWordImmediate
 	InstructionADDIWordData
 	InstructionMOVEWordDataToPostincrement
@@ -340,6 +342,14 @@ func Decode(opcode uint16) Decoded {
 			quick = 8
 		}
 		return Decoded{Instruction: InstructionADDQWordData, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1ff == 0x5079:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionADDQWordAbsoluteLong, Quick: quick}
+	case opcode == 0x4e73:
+		return Decoded{Instruction: InstructionRTE}
 	case opcode&0xf1f8 == 0xe048:
 		quick := uint8(opcode >> 9 & 7)
 		if quick == 0 {

@@ -124,6 +124,47 @@ func TestNOPAdvancesPrefetchByOneInstruction(t *testing.T) {
 	}
 }
 
+func TestAutovectoredInterruptStacksStateAndRefillsQueue(t *testing.T) {
+	log := &eventLog{}
+	bus := &testBus{log: log, words: map[uint32]uint16{
+		0: 0, 2: 0x1000, 4: 0, 6: 0x0400,
+		0x0400: 0x4e71, 0x0402: 0x4e71,
+		0x0070: 0, 0x0072: 0x0800,
+		0x0800: 0x4e73, 0x0802: 0x4e71, 0x0804: 0x4e71,
+	}}
+	cpu := New(bus, log)
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x2000
+	acknowledged := uint8(0)
+	cpu.SetInterruptAcknowledge(func(level uint8) { acknowledged = level })
+	cpu.SetInterruptLevel(4)
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if result.InterruptLevel != 4 || acknowledged != 4 || result.Cycles != 44 {
+		t.Fatalf("result=%+v ack=%d", result, acknowledged)
+	}
+	if state.PC != 0x0800 || state.SR != 0x2400 || state.A[7] != 0x0ffa {
+		t.Fatalf("PC=$%06X SR=$%04X SP=$%06X", state.PC, state.SR, state.A[7])
+	}
+	if bus.words[0x0ffa] != 0x2000 || bus.words[0x0ffc] != 0 || bus.words[0x0ffe] != 0x0400 {
+		t.Fatalf("frame SR=$%04X PC=$%04X%04X", bus.words[0x0ffa], bus.words[0x0ffc], bus.words[0x0ffe])
+	}
+	cpu.SetInterruptLevel(0)
+	rte, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state = cpu.State()
+	if rte.Cycles != 20 || state.PC != 0x0400 || state.SR != 0x2000 || state.A[7] != 0x1000 {
+		t.Fatalf("RTE result=%+v PC=$%06X SR=$%04X SP=$%06X", rte, state.PC, state.SR, state.A[7])
+	}
+}
+
 func TestUnknownOpcodeFailsClosed(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{log: log, words: map[uint32]uint16{

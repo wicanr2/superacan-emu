@@ -126,3 +126,29 @@ func TestScanlineTimingUsesVideoWidthAndRaisesMaskedVBlank(t *testing.T) {
 		t.Fatal("320-wide line did not advance at 728 cycles")
 	}
 }
+
+func TestRasterAndProgrammableLineIRQs(t *testing.T) {
+	device := New()
+	device.SetIRQMask(0x10)
+	device.WriteRegister(5, 0x8002)
+	device.WriteRegister(6, 0x8003)
+	device.AdvanceM68KCycles(255)
+	device.AdvanceM68KCycles(255)
+	device.AdvanceM68KCycles(174)
+	if !device.RasterPending() || device.LinePending() || device.HighestIRQLevel() != 4 {
+		t.Fatalf("line 1 raster=%v line=%v level=%d", device.RasterPending(), device.LinePending(), device.HighestIRQLevel())
+	}
+	device.ClearIRQ(4)
+	device.AdvanceM68KCycles(255)
+	device.AdvanceM68KCycles(255)
+	device.AdvanceM68KCycles(174)
+	if !device.LinePending() || device.HighestIRQLevel() != 5 {
+		t.Fatalf("line 2 pending=%v level=%d", device.LinePending(), device.HighestIRQLevel())
+	}
+	device.AdvanceM68KCycles(255)
+	device.AdvanceM68KCycles(255)
+	device.AdvanceM68KCycles(174)
+	if device.LinePending() {
+		t.Fatal("line-off target did not clear IRQ5")
+	}
+}

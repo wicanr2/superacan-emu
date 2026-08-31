@@ -46,17 +46,18 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | checksum ISA | CLR、ADD/SUB/ADDX/ADDQ/SUBQ、CMPM、MULS、BTST、NEG、SWAP | 真實 UMC6650 與卡帶授權兩階段通過 |
 | control transfer | JMP/JSR absolute long、JMP (An)、MOVEA absolute word | 預取跨 high-overlay regression |
 | stack／subroutine | BSR、RTS、MOVEM.L predecrement／postincrement、PEA、立即數／An long push | ISA-spec；合成堆疊 round-trip 回歸 |
+| interrupt／return | level 1–7 autovector、44-cycle supervisor frame、RTE、IRQ acknowledge callback | 合成 phase／stack round-trip；Boom Zoo 實際受理 58 次 IRQ7 |
 | indexed／PC-relative | 68000 brief extension 的 Dn／An、word／long index；JSR／JMP／LEA／MOVE／MOVEA | ISA-spec；拒絕混入 68020 full extension／scale |
 | 真實卡帶路徑 | Boom Zoo 由 IPL `$400` 無錯執行 200,000 條，PC 到 `$FF80A0` | software-observed；不代表完整 ISA 或遊戲可玩 |
-| phase trace | `StepResult.Phases` | 只含目前已建模 phase，尚無 exception trace |
+| phase trace | `StepResult.Phases` | 含 interrupt acknowledge；一般 exception 尚未建模 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。
 
 ## 尚未完成
 
-- 未被目前路徑涵蓋的 JSR／effective-address 模式、exception、interrupt acknowledge 與
-  bus/address error。
+- 未被目前路徑涵蓋的 JSR／effective-address 模式、一般 exception、bus/address error，
+  以及 user-mode interrupt 的 USP／SSP 切換。
 - 一般化 effective-address decoder 與統一的 byte／word／long operand helpers；目前只為
   已觀察路徑組合定址模式，但所有 long read／write 都維持兩次有序 word transaction。
 - user／supervisor function code 動態選擇。
@@ -67,5 +68,5 @@ displacement 是後續 CPU 型號能力，本核心目前不得套用。
 - 與獨立公開 opcode vectors 及 archived oracle 的自動差分 harness。
 - DIVU register 成功路徑目前採 140-cycle worst-case；需依 MC68000 iterative timing
   演算法補齊 data-dependent cycle，不能把目前值標成精確 timing。
-- 卡帶入口 `$2B22 MOVEM.L` 已通過；目前 200,000 指令上限內沒有未知 opcode，完整
-  ISA、exception 與 IRQ 仍未完成。
+- 卡帶入口 `$2B22 MOVEM.L` 已通過；目前 1,300,000 指令上限內沒有未知 opcode，完整
+  ISA 與一般 exception 仍未完成。IRQ4／5 尚無真實軟體 acknowledge 證據。

@@ -438,6 +438,23 @@ func (c *CPU) addqWordData(register, quick uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) addqWordAbsoluteLong(quick uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.add16(value, uint16(quick))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) lsrWordImmediate(register, count uint8) error {
 	value := uint16(c.state.D[register])
 	var carry bool

@@ -44,7 +44,9 @@
   frame，不代表 archived oracle 畫面一致。
 - [x] 完成 UM6618 sprite DMA 同步 bus transaction：`count+1`、來源／目的 word stride、
   零填充與 VRAM 目的高位模式；合成測試驗證複製／填充，真實 smoke 無回歸。
-- [ ] 完成 UM6618 複雜 ROZ 逐行模式與掃描線 IRQ4／5／7；
+- [x] 接通 UM6618 掃描線 IRQ4／5／7 與 68000 autovector／acknowledge；Boom Zoo 固定
+  smoke 實際受理 58 次 IRQ7，IRQ4／5 目前只有合成線位測試。
+- [ ] 完成 UM6618 複雜 ROZ 逐行模式；
   再以相同 frame 的 archived oracle hash／截圖做差分並修正優先度與邊界行為。
 - [ ] 完成 W65C02 ISA、IRQ／NMI／WAI 與 I/O ack，將目前 instruction-total 3:1 排程
   收斂成可驗證的 cycle 邊界。
