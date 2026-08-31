@@ -126,6 +126,18 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveAImmediateLong(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVEA.L #imm,A%d: %w", decoded.Register, err)
 		}
+	case InstructionMOVEWordAbsoluteLongToData:
+		if err := c.moveWordAbsoluteLongToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (xxx).L,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEWordDataToAbsoluteLong:
+		if err := c.moveWordDataToAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W D%d,(xxx).L: %w", decoded.Register, err)
+		}
+	case InstructionANDIWordData:
+		if err := c.andiWordData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ANDI.W #imm,D%d: %w", decoded.Register, err)
+		}
 	case InstructionBSR:
 		return result, fmt.Errorf("m68k: unimplemented BSR opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	default:
@@ -136,6 +148,45 @@ func (c *CPU) Step() (StepResult, error) {
 	result.Cycles = c.state.Cycles - start
 	result.Phases = append(result.Phases, c.stepTrace...)
 	return result, nil
+}
+
+func (c *CPU) moveWordAbsoluteLongToData(register uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveWordDataToAbsoluteLong(register uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	if err := c.writeWord(address, uint16(c.state.D[register]), FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) andiWordData(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value := uint16(c.state.D[register]) & immediate
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return stream.finish()
 }
 
 func (c *CPU) moveAImmediateLong(register uint8) error {
@@ -181,6 +232,17 @@ func (c *CPU) setNZ32(value uint32) {
 		c.state.SR |= flagZero
 	}
 	if value&0x8000_0000 != 0 {
+		c.state.SR |= flagNegative
+	}
+}
+
+func (c *CPU) setNZ16(value uint16) {
+	// MOVE.W and ANDI.W affect N and Z, clear V and C, and preserve X.
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	if value == 0 {
+		c.state.SR |= flagZero
+	}
+	if value&0x8000 != 0 {
 		c.state.SR |= flagNegative
 	}
 }

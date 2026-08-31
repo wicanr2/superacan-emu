@@ -27,6 +27,18 @@ func (s *instructionStream) nextWord() (uint16, error) {
 	return result, nil
 }
 
+func (s *instructionStream) nextLong() (uint32, error) {
+	hi, err := s.nextWord()
+	if err != nil {
+		return 0, err
+	}
+	lo, err := s.nextWord()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(hi)<<16 | uint32(lo), nil
+}
+
 func (s *instructionStream) finish() error {
 	next, err := s.cpu.readWord(s.nextAddress, FCSupervisorProgram, PhaseInstructionFetch)
 	if err != nil {

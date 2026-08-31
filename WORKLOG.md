@@ -82,3 +82,16 @@
 - 契約：JSR 將 PC+4 寫入 A7-4，然後重填目標 instruction queue；總計 18 cycles，
   phase 為 internal 2、兩次 data write、兩次 instruction fetch。未知 addressing mode
   仍失敗即關閉，不以泛化 stub 放行。
+
+## 2026-08-31：IPL 第一個 UMC6650 poll 分支
+
+- 範圍：沿已證實 BIOS 路徑補上 `$41C MOVE.W $E90B3C.L,D0`、
+  `$422 ANDI.W #1,D0`、`$426 BEQ.W`，並實作未取分支需要的
+  `MOVE.W Dn,$E90B3C.L`，不向後擴張成未使用的完整 MOVE matrix。
+- 實作：instruction stream 新增 long extension helper；新增絕對長位址 word read／write、
+  16-bit condition-code 更新，以及每次資料存取的 supervisor-data phase。
+- 時序核對：NXP／Motorola User's Manual 給出兩種 MOVE 皆 16 cycles、ANDI.W register
+  為 8 cycles；固定 Moira `a4c273b08e07d82c73289ac032867c845969a0f2` 只用來確認
+  register-to-absolute-long MOVE 是「消耗兩個 extension → data write → final prefetch」。
+- 測試：以最小合成 IPL fixture 執行八條指令，從 `$400` 抵達 `$430`，驗證 A0/A1/A2、
+  zero branch、資料 phase 與包含 reset 的 132 cycles；fixture 不含完整 BIOS 或版權資料。

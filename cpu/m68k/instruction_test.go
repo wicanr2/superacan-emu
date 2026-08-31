@@ -210,3 +210,113 @@ func TestJSRAbsoluteWordPushesReturnAddressAndRefillsQueue(t *testing.T) {
 		}
 	}
 }
+
+func TestMOVEWordAbsoluteLongToData(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x3439, 0x0402: 0x00e9, 0x0404: 0x0b3c,
+		0x0406: 0x4e71, 0x0408: 0x7000,
+		0xe90b3c: 0x8001,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[2] = 0x1234_5678
+	cpu.state.SR |= flagExtend | flagZero | flagCarry | flagOverflow
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if state.D[2] != 0x1234_8001 {
+		t.Fatalf("D2=$%08X, want $12348001", state.D[2])
+	}
+	if got := state.SR & 0x1f; got != flagExtend|flagNegative {
+		t.Fatalf("CCR=$%02X, want X|N", got)
+	}
+	if result.Cycles != 16 || len(result.Phases) != 4 ||
+		result.Phases[2].Kind != PhaseDataRead || result.Phases[2].Address != 0xe90b3c {
+		t.Fatalf("MOVE.W read phases: %+v", result)
+	}
+}
+
+func TestMOVEWordDataToAbsoluteLong(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x33c3, 0x0402: 0x00e9, 0x0404: 0x0b3c,
+		0x0406: 0x4e71, 0x0408: 0x7000,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[3] = 0xabcd_1357
+	cpu.state.SR = 0x271f
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); state.SR != 0x271f {
+		t.Fatalf("MOVE.W changed SR: $%04X", state.SR)
+	}
+	want := []wordWrite{{address: 0xe90b3c, value: 0x1357}}
+	if !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("MOVE.W writes: got %+v want %+v", bus.writes, want)
+	}
+	if result.Cycles != 16 || len(result.Phases) != 4 || result.Phases[2].Kind != PhaseDataWrite {
+		t.Fatalf("MOVE.W write phases: %+v", result)
+	}
+}
+
+func TestANDIWordDataPreservesUpperWordAndExtend(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x0245, 0x0402: 0x000f, 0x0404: 0x4e71, 0x0406: 0x7000,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5] = 0xbeef_fff0
+	cpu.state.SR |= flagExtend | flagNegative | flagCarry | flagOverflow
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if state.D[5] != 0xbeef_0000 || state.SR&0x1f != flagExtend|flagZero {
+		t.Fatalf("ANDI state: D5=$%08X CCR=$%02X", state.D[5], state.SR&0x1f)
+	}
+	if result.Cycles != 8 || len(result.Phases) != 2 {
+		t.Fatalf("ANDI phases: %+v", result)
+	}
+}
+
+func TestSyntheticIPLReachesFirstPollBranch(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x4e71,
+		0x0402: 0x4eb8, 0x0404: 0x040a,
+		0x0406: 0x4e97, 0x0408: 0x4e75,
+		0x040a: 0x207c, 0x040c: 0x00eb, 0x040e: 0x0d03,
+		0x0410: 0x227c, 0x0412: 0x00eb, 0x0414: 0x0d01,
+		0x0416: 0x247c, 0x0418: 0x00fc, 0x041a: 0x0000,
+		0x041c: 0x3039, 0x041e: 0x00e9, 0x0420: 0x0b3c,
+		0x0422: 0x0240, 0x0424: 0x0001,
+		0x0426: 0x6700, 0x0428: 0x0008,
+		0x0430: 0x4e71, 0x0432: 0x4e71,
+		0xe90b3c: 0,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	for step := 0; step < 8; step++ {
+		if _, err := cpu.Step(); err != nil {
+			t.Fatalf("step %d: %v", step, err)
+		}
+	}
+	state := cpu.State()
+	if state.PC != 0x0430 || state.IRD != 0x4e71 {
+		t.Fatalf("poll branch queue: PC=$%06X IRD=$%04X", state.PC, state.IRD)
+	}
+	if state.A[0] != 0x00eb0d03 || state.A[1] != 0x00eb0d01 || state.A[2] != 0x00fc0000 {
+		t.Fatalf("IPL base registers: A0=$%08X A1=$%08X A2=$%08X", state.A[0], state.A[1], state.A[2])
+	}
+	if state.Cycles != 132 {
+		t.Fatalf("cycles=%d, want 132 including reset", state.Cycles)
+	}
+}

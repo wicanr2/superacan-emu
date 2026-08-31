@@ -13,6 +13,9 @@ const (
 	InstructionBcc
 	InstructionJSRAbsoluteWord
 	InstructionMOVEAImmediateLong
+	InstructionMOVEWordAbsoluteLongToData
+	InstructionMOVEWordDataToAbsoluteLong
+	InstructionANDIWordData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -35,6 +38,21 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{
 			Instruction: InstructionMOVEAImmediateLong,
 			Register:    uint8(opcode >> 9 & 7),
+		}
+	case opcode&0xf1ff == 0x3039:
+		return Decoded{
+			Instruction: InstructionMOVEWordAbsoluteLongToData,
+			Register:    uint8(opcode >> 9 & 7),
+		}
+	case opcode&0xfff8 == 0x33c0:
+		return Decoded{
+			Instruction: InstructionMOVEWordDataToAbsoluteLong,
+			Register:    uint8(opcode & 7),
+		}
+	case opcode&0xfff8 == 0x0240:
+		return Decoded{
+			Instruction: InstructionANDIWordData,
+			Register:    uint8(opcode & 7),
 		}
 	case opcode&0xf100 == 0x7000:
 		return Decoded{

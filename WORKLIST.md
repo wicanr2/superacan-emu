@@ -20,6 +20,9 @@
   `MOVEA.L #imm,An`；包含 18-cycle JSR、監督者堆疊 long-word 寫入與目標 queue refill。
 - [ ] 建立 operand size 與 68000 effective-address 基礎，再完成 BSR 與其餘 JSR／MOVEA
   addressing modes，讓 IPL 從 `$400` 持續前進到第一段 UMC6650 初始化。
+- [x] 完成 IPL `$41C–$42A` 的絕對長位址 word 讀寫、`ANDI.W #imm,Dn` 與第一個
+  `BEQ.W` 垂直切片；以不含商業 BIOS 的合成程式驗證 `$400 → $430`、暫存器基址、
+  phase trace 與 132-cycle reset-inclusive 契約。
 - [ ] Go 68000 跑通 Super A'Can IPL 第一段。
   完成條件：固定 BIOS hash、reset SSP／PC、phase trace 與 C++ oracle 對照，逐步抵達
   UMC6650 交握；缺 opcode 時明確停止，不用 stub NOP。
