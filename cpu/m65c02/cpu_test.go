@@ -181,6 +181,21 @@ func TestCMPZeroPage(t *testing.T) {
 	}
 }
 
+func TestCMPAbsolute(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001], machine.memory[0x8002] = 0xcd, 0x34, 0x12
+	machine.memory[0x1234] = 2
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 1, P: flagUnused | flagOverflow}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Cycles != 4 || cpu.state.PC != 0x8003 || cpu.state.A != 1 || cpu.state.P&flagCarry != 0 || cpu.state.P&flagZero != 0 || cpu.state.P&flagNegative == 0 || cpu.state.P&flagOverflow == 0 {
+		t.Fatalf("result=%+v state=%+v", result, cpu.state)
+	}
+}
+
 func TestAccumulatorRotateUsesCarry(t *testing.T) {
 	machine := &testMachine{}
 	machine.memory[0x8000] = 0x2a
@@ -234,6 +249,46 @@ func TestADCAbsoluteYPageCrossTiming(t *testing.T) {
 	}
 	if result.Cycles != 5 || cpu.state.PC != 0x8003 || cpu.state.A != 0x80 || cpu.state.P&flagNegative == 0 || cpu.state.P&flagOverflow == 0 || cpu.state.P&flagCarry != 0 {
 		t.Fatalf("result=%+v state=%+v", result, cpu.state)
+	}
+}
+
+func TestADCAbsolute(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001], machine.memory[0x8002] = 0x6d, 0x34, 0x12
+	machine.memory[0x1234] = 1
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 0x7f, P: flagUnused}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Cycles != 4 || cpu.state.PC != 0x8003 || cpu.state.A != 0x80 || cpu.state.P&flagNegative == 0 || cpu.state.P&flagOverflow == 0 || cpu.state.P&flagCarry != 0 {
+		t.Fatalf("result=%+v state=%+v", result, cpu.state)
+	}
+}
+
+func TestZeroPageXLogicalInstructionsWrap(t *testing.T) {
+	tests := []struct {
+		opcode uint8
+		want   uint8
+	}{
+		{0x35, 0x00},
+		{0x15, 0xff},
+		{0x55, 0xff},
+	}
+	for _, test := range tests {
+		machine := &testMachine{}
+		machine.memory[0x8000], machine.memory[0x8001] = test.opcode, 0xff
+		machine.memory[0x0001] = 0x0f
+		cpu := New(machine, machine)
+		cpu.state = State{PC: 0x8000, A: 0xf0, X: 2, P: flagUnused}
+		result, err := cpu.Step()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Cycles != 4 || cpu.state.PC != 0x8002 || cpu.state.A != test.want {
+			t.Fatalf("opcode=$%02X result=%+v state=%+v", test.opcode, result, cpu.state)
+		}
 	}
 }
 

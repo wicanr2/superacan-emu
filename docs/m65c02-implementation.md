@@ -23,6 +23,9 @@
   zero-page compare 後，聲音 CPU 繼續執行，整機阻塞重新回到 68000 路徑。
 - Speedy Dragon 後續聲音路徑動態命中 `ADC abs,Y`、`PHP`、`PLP`；indexed ADC
   包含 page-cross 額外週期，status stack 保留 Break／Unused 的軟體可見契約。
+- 再補 `CMP abs`、`ADC abs` 與 zero-page indexed `AND/ORA/EOR` family 後，Speedy
+  Dragon 可無錯完成 1,200 幀；聲音 CPU 累積 22,416,197 條指令，音訊非零樣本
+  542,772。
 
 ## 尚未完成
 

@@ -356,6 +356,19 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.compare(c.state.A, value)
 		}
+	case 0xcd: // CMP abs
+		c.state.PC++
+		var lo, hi, value uint8
+		lo, err = c.fetch()
+		if err == nil {
+			hi, err = c.fetch()
+		}
+		if err == nil {
+			value, err = c.read(uint16(hi)<<8 | uint16(lo))
+		}
+		if err == nil {
+			c.compare(c.state.A, value)
+		}
 	case 0x69: // ADC #imm
 		c.state.PC++
 		var value uint8
@@ -387,6 +400,19 @@ func (c *CPU) Step() (StepResult, error) {
 		}
 		if err == nil {
 			value, err = c.read(address)
+		}
+		if err == nil {
+			err = c.adc(value)
+		}
+	case 0x6d: // ADC abs
+		c.state.PC++
+		var lo, hi, value uint8
+		lo, err = c.fetch()
+		if err == nil {
+			hi, err = c.fetch()
+		}
+		if err == nil {
+			value, err = c.read(uint16(hi)<<8 | uint16(lo))
 		}
 		if err == nil {
 			err = c.adc(value)
@@ -437,6 +463,27 @@ func (c *CPU) Step() (StepResult, error) {
 			case 0x05:
 				c.state.A |= value
 			case 0x45:
+				c.state.A ^= value
+			}
+			c.setNZ(c.state.A)
+		}
+	case 0x35, 0x15, 0x55: // AND/ORA/EOR zp,X
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			value, err = c.read(uint16(zeroPage + c.state.X))
+		}
+		if err == nil {
+			switch opcode {
+			case 0x35:
+				c.state.A &= value
+			case 0x15:
+				c.state.A |= value
+			case 0x55:
 				c.state.A ^= value
 			}
 			c.setNZ(c.state.A)

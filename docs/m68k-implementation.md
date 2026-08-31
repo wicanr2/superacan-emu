@@ -61,6 +61,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | Speedy Dragon 位元資料路徑 | `LSL.W Dn,Dn`、`EOR.B Dn,Dn` | ISA-spec；register count 採低 6 bits，count=0 保留 X 並清 C；真實 ROM `$0031AC-$0031CC` 動態命中 |
 | Speedy Dragon 長時間執行路徑 | `LSR.B #n,Dn`、`OR.B Dn,Dn`、`ADDI.L #imm,(xxx).L`、`MOVE.L (xxx).L,(xxx).L` | ISA-spec；真實 ROM 已推進至 936 萬條指令、617 幀，DMA ch1 64 次、IRQ7 397 次 |
 | Speedy Dragon 長整數表格路徑 | `SUBI.L #imm,(xxx).L` | ISA-spec；36-cycle absolute-long RMW，真實 ROM `$05D052` 動態命中 |
+| Speedy Dragon 1,200 幀回歸 | 無未知 opcode 完成 18,515,145 條指令；DMA ch0/ch1 3/96 次、IRQ7/5/3 979/583/17 次 | software-observed；framebuffer 33,125 個非黑像素，SHA-256 `c49af07407d6de2f32894ac6fc6f646e9baf6bc0f560e7f61da19d6c42c07794`，視覺確認為可辨識的飛龍與道路場景 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。
