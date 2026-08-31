@@ -1158,6 +1158,46 @@ func (c *CPU) moveLongImmediateToAddressIndirect(destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) subqWordAbsoluteLong(quick uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.sub16(value, uint16(quick))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveLongDisplacementToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	sourceDisplacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	destinationDisplacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	sourceAddress := uint32(int32(c.state.A[source])+int32(int16(sourceDisplacement))) & addressMask
+	value, err := c.readLong(sourceAddress, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	destinationAddress := uint32(int32(c.state.A[destination])+int32(int16(destinationDisplacement))) & addressMask
+	c.setNZ32(value)
+	if err := c.writeLong(destinationAddress, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)

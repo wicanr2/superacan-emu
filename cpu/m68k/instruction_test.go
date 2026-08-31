@@ -2364,6 +2364,44 @@ func TestMOVELongImmediateToAddressIndirect(t *testing.T) {
 	}
 }
 
+func TestSUBQWordAbsoluteLongReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x5379, 0x0402: 0x0001, 0x0404: 0x2000, 0x0406: 0x4e71, 0x0408: 0x4e71,
+		0x012000: 0x8000,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012000, value: 0x7fff}}
+	if state := cpu.State(); result.Cycles != 20 || state.SR&0x1f != flagOverflow || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
+func TestMOVELongDisplacementToDisplacement(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x2d68, 0x0402: 4, 0x0404: 8, 0x0406: 0x4e71, 0x0408: 0x4e71,
+		0x011004: 0x89ab, 0x011006: 0xcdef,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x011000
+	cpu.state.A[6] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012008, value: 0x89ab}, {address: 0x01200a, value: 0xcdef}}
+	if state := cpu.State(); result.Cycles != 28 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{
