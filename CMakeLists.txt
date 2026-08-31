@@ -43,6 +43,7 @@ add_executable(superacan-emu
     src/cpu68k.cpp
     src/cpu65c02.cpp
     src/video/um6618.cpp
+    src/audio/um6619.cpp
 )
 
 target_include_directories(superacan-emu PRIVATE

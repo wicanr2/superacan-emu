@@ -50,6 +50,10 @@ public:
     // 68k 寫 $E9000A/B → 觸發 65C02 IRQ bit5（sound-driver.md §4.1 (a)）
     std::function<void()> onSoundIrqRequest;
 
+    // 68k 寫 $E80400-$E804FF（65C02 I/O 頁窗口）→ 轉發給 SoundCpu
+    // （MAME _68k_soundram_w 行為；目前用於 latch $0404/$0405）
+    std::function<void(uint16_t addr, uint8_t val)> onSoundIoWrite;
+
     // 供 65C02 wrapper 直接映射共享音效 RAM（$E80000 區與 65C02 空間同體，
     // docs/memory-map.md §5）
     uint8_t *soundRamData() { return soundRam_.data(); }

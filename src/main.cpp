@@ -1,8 +1,9 @@
-// superacan-emu runner（里程碑 2：UM6618 繪圖 + SDL2 視窗 / headless 驗證）
+// superacan-emu runner（里程碑 3+4：UM6619 音效合成 + 手把輸入）
 //
 // 用法：
 //   superacan-emu --bios <dir> --rom <file> [--trace N] [--instructions N]
 //                 [--headless] [--frames N] [--screenshot <file.bmp>]
+//                 [--wav <file.wav>] [--press <frame:BTN+BTN,...>]
 //
 // 時序（知識庫 docs/memory-map.md §1 (a) + MAME machine_config (b)）：
 //   68k = 10.738635 MHz；pixel clock = U13/10（256 模式，342 線寬）或
@@ -17,11 +18,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
+#include <deque>
 #include <fstream>
+#include <mutex>
 #include <string>
 #include <vector>
 
 extern uint32_t g_dbgPc;  // bus.cpp 的除錯 watchpoint 用
+extern uint64_t g_dbgFrame;  // bus.cpp；ACAN_TRACE65 日誌幀號
 
 #ifndef NO_SDL
 #include <SDL.h>
@@ -58,7 +63,10 @@ void usage(const char *argv0) {
         "  --instructions N    headless 且無 --frames 時，到卡帶入口後再跑的指令數（預設 5000）\n"
         "  --headless          不開 SDL2 視窗\n"
         "  --frames N          跑 N 幀後結束（預設：SDL 模式跑到關窗）\n"
-        "  --screenshot <f>    結束時把最後一幀寫成 24-bit BMP\n",
+        "  --screenshot <f>    結束時把最後一幀寫成 24-bit BMP\n"
+        "  --wav <f>           把全程音訊寫成 48 kHz 16-bit stereo WAV\n"
+        "  --press <spec>      headless 按鍵注入：frame:BTN+BTN,...（按住 10 幀）\n"
+        "                      BTN = A/B/X/Y/L/R/START/SELECT/UP/DOWN/LEFT/RIGHT\n",
         argv0);
 }
 
@@ -83,10 +91,113 @@ bool writeBmp(const std::string &path, const std::vector<uint32_t> &rgbx, int w,
     return bool(f);
 }
 
+// ---- 音訊管線：UM6619 native 44744.3125 Hz → 48000 Hz 線性插值 ----
+constexpr int AUDIO_RATE = 48000;
+
+struct AudioPipeline {
+    static constexpr double STEP = UM6619::NATIVE_RATE / AUDIO_RATE;  // native/output
+    double nextT = 1.0;                  // 下一個輸出樣本的 native 時間
+    int64_t idx = 0;                     // 已收到的 native 樣本數
+    int16_t ringL[4096]{}, ringR[4096]{};
+    std::deque<int16_t> queue;           // → SDL（interleaved S16）
+    std::vector<int16_t> wav;            // headless WAV 收集（interleaved S16）
+    std::mutex mtx;
+    bool toSdl = false, keepWav = false;
+
+    void push(int16_t l, int16_t r) {    // 由 UM6619 onSample 呼叫（native rate）
+        ringL[idx & 4095] = l; ringR[idx & 4095] = r; idx++;
+        while (nextT + 1.0 <= double(idx - 1)) {
+            const int64_t i0 = int64_t(nextT);
+            const double f = nextT - double(i0);
+            const int16_t ol = int16_t(ringL[i0 & 4095] + std::lround((ringL[(i0 + 1) & 4095] - ringL[i0 & 4095]) * f));
+            const int16_t orr = int16_t(ringR[i0 & 4095] + std::lround((ringR[(i0 + 1) & 4095] - ringR[i0 & 4095]) * f));
+            nextT += STEP;
+            if (keepWav) { wav.push_back(ol); wav.push_back(orr); }
+            if (toSdl) {
+                std::lock_guard<std::mutex> g(mtx);
+                if (queue.size() > size_t(AUDIO_RATE)) queue.clear();  // 消費跟不上就丟（防延遲累積）
+                queue.push_back(ol); queue.push_back(orr);
+            }
+        }
+    }
+
+    void sdlCallback(uint8_t *stream, int len) {  // SDL S16 stereo
+        std::lock_guard<std::mutex> g(mtx);
+        int16_t *out = reinterpret_cast<int16_t *>(stream);
+        const size_t want = size_t(len) / 2, have = std::min(want, queue.size());
+        for (size_t i = 0; i < have; i++) { out[i] = queue.front(); queue.pop_front(); }
+        for (size_t i = have; i < want; i++) out[i] = 0;  // underflow → 靜音
+    }
+};
+
+bool writeWav(const std::string &path, const std::vector<int16_t> &samples, int rate) {
+    std::ofstream f(path, std::ios::binary);
+    if (!f) return false;
+    const uint32_t dataSize = uint32_t(samples.size() * 2);
+    auto put32 = [&](uint32_t v) { f.put(char(v)); f.put(char(v >> 8)); f.put(char(v >> 16)); f.put(char(v >> 24)); };
+    auto put16 = [&](uint16_t v) { f.put(char(v)); f.put(char(v >> 8)); };
+    f.write("RIFF", 4); put32(36 + dataSize); f.write("WAVE", 4);
+    f.write("fmt ", 4); put32(16); put16(1); put16(2); put32(uint32_t(rate));
+    put32(uint32_t(rate) * 4); put16(4); put16(16);
+    f.write("data", 4); put32(dataSize);
+    for (int16_t s : samples) put16(uint16_t(s));
+    return bool(f);
+}
+
+// ---- 手把按鍵位元（知識庫 memory-map.md §7 (a/b)，16-bit active low）----
+constexpr uint16_t BTN_A = 0x8000, BTN_B = 0x4000, BTN_START = 0x2000, BTN_SELECT = 0x1000;
+constexpr uint16_t BTN_UP = 0x0800, BTN_DOWN = 0x0400, BTN_LEFT = 0x0200, BTN_RIGHT = 0x0100;
+constexpr uint16_t BTN_X = 0x0080, BTN_Y = 0x0040, BTN_L = 0x0020, BTN_R = 0x0010;
+
+uint16_t buttonBits(const std::string &name) {  // 單鍵名稱 → 位元；不認識回 0
+    if (name == "A") return BTN_A;
+    if (name == "B") return BTN_B;
+    if (name == "X") return BTN_X;
+    if (name == "Y") return BTN_Y;
+    if (name == "L") return BTN_L;
+    if (name == "R") return BTN_R;
+    if (name == "START") return BTN_START;
+    if (name == "SELECT") return BTN_SELECT;
+    if (name == "UP") return BTN_UP;
+    if (name == "DOWN") return BTN_DOWN;
+    if (name == "LEFT") return BTN_LEFT;
+    if (name == "RIGHT") return BTN_RIGHT;
+    return 0;
+}
+
+// --press 事件：frame:BTN+BTN（逗號分隔），按住 10 幀後放開
+struct PressEvent { long frame; uint16_t bits; };
+
+std::vector<PressEvent> parsePress(const std::string &spec) {
+    std::vector<PressEvent> out;
+    size_t pos = 0;
+    while (pos <= spec.size()) {
+        const size_t comma = spec.find(',', pos);
+        const std::string tok = spec.substr(pos, comma == std::string::npos ? comma : comma - pos);
+        const size_t colon = tok.find(':');
+        if (colon != std::string::npos) {
+            PressEvent ev{std::atol(tok.substr(0, colon).c_str()), 0};
+            size_t b = colon + 1;
+            while (b <= tok.size()) {
+                const size_t plus = tok.find('+', b);
+                const std::string name = tok.substr(b, plus == std::string::npos ? plus : plus - b);
+                ev.bits |= buttonBits(name);
+                if (plus == std::string::npos) break;
+                b = plus + 1;
+            }
+            if (ev.bits) out.push_back(ev);
+            else std::fprintf(stderr, "警告：--press 事件 '%s' 無有效按鍵，忽略\n", tok.c_str());
+        }
+        if (comma == std::string::npos) break;
+        pos = comma + 1;
+    }
+    return out;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
-    std::string biosDir, romPath, screenshotPath;
+    std::string biosDir, romPath, screenshotPath, wavPath, pressSpec;
     long traceCount = 0, postEntryInstrs = 5000, frameLimit = -1;
     bool headless = false;
     for (int i = 1; i < argc; i++) {
@@ -102,12 +213,14 @@ int main(int argc, char **argv) {
         else if (a == "--headless") headless = true;
         else if (a == "--frames") frameLimit = std::atol(next("--frames").c_str());
         else if (a == "--screenshot") screenshotPath = next("--screenshot");
+        else if (a == "--wav") wavPath = next("--wav");
+        else if (a == "--press") pressSpec = next("--press");
         else { usage(argv[0]); return 1; }
     }
     if (biosDir.empty() || romPath.empty()) { usage(argv[0]); return 1; }
 
 #ifndef NO_SDL
-    if (!headless && SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (!headless && SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::fprintf(stderr, "警告：SDL_Init 失敗（%s），改為 headless\n", SDL_GetError());
         headless = true;
     }
@@ -148,12 +261,25 @@ int main(int argc, char **argv) {
     bool soundIrq6 = false;   // 65C02→68k mailbox IRQ6（脈衝）
     soundCpu.onIrqTo68k = [&soundIrq6] { soundIrq6 = true; };
     bus.onSoundIrqRequest = [&soundCpu] { soundCpu.requestFrom68k(); };
+    bus.onSoundIoWrite = [&soundCpu](uint16_t a, uint8_t v) { soundCpu.writeFrom68k(a, v); };
 
     // UM6618 sprite DMA 需要回寫整個位址空間
     bus.video().busRead16 = [&bus](uint32_t a) { return bus.read16(a); };
     bus.video().busWrite16 = [&bus](uint32_t a, uint16_t v) { bus.write16(a, v); };
 
     Cpu68k cpu(bus);
+
+    // 音訊管線（UM6619 → 重取樣 → SDL / WAV）
+    AudioPipeline audio;
+    audio.keepWav = !wavPath.empty();
+    soundCpu.soundChip().onSample = [&audio](int16_t l, int16_t r) { audio.push(l, r); };
+
+    // 手把輸入（P1；16-bit active low，memory-map.md §7）
+    uint16_t padState = 0xFFFF;
+    bus.setPad(0, padState);
+    std::vector<PressEvent> pressEvents = parsePress(pressSpec);
+    for (const auto &ev : pressEvents)
+        std::printf("[input] 預約按鍵：frame %ld press $%04X（10 幀）\n", ev.frame, ev.bits);
 
     bus.onControlWrite = [&soundCpu](uint16_t oldV, uint16_t newV) {
         // 只 log bit0-3 變化（卡帶會頻繁翻其他位元，避免洗版）
@@ -175,15 +301,36 @@ int main(int argc, char **argv) {
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
     SDL_Texture *texture = nullptr;
+    SDL_AudioDeviceID audioDev = 0;
     if (!headless) {
         window = SDL_CreateWindow("superacan-emu", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                   UM6618::WIDTH * 3, UM6618::HEIGHT * 3, SDL_WINDOW_RESIZABLE);
         renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC) : nullptr;
+        if (!renderer && window)  // 無 accelerated（如 dummy driver）時退回 software
+            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
         texture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                                SDL_TEXTUREACCESS_STREAMING, UM6618::WIDTH, UM6618::HEIGHT) : nullptr;
         if (!texture) {
-            std::fprintf(stderr, "警告：SDL 視窗建立失敗，改為 headless\n");
+            std::fprintf(stderr, "警告：SDL 視窗建立失敗（%s），改為 headless\n", SDL_GetError());
             headless = true;
+        } else {
+            SDL_AudioSpec want{};
+            want.freq = AUDIO_RATE;
+            want.format = AUDIO_S16SYS;
+            want.channels = 2;
+            want.samples = 1024;
+            want.callback = [](void *ud, Uint8 *stream, int len) {
+                static_cast<AudioPipeline *>(ud)->sdlCallback(stream, len);
+            };
+            want.userdata = &audio;
+            audioDev = SDL_OpenAudioDevice(nullptr, 0, &want, nullptr, 0);
+            if (audioDev) {
+                audio.toSdl = true;
+                SDL_PauseAudioDevice(audioDev, 0);
+                std::printf("[audio] SDL2 音訊裝置已開啟（%d Hz stereo）\n", AUDIO_RATE);
+            } else {
+                std::fprintf(stderr, "警告：SDL 音訊開啟失敗（%s），無聲繼續\n", SDL_GetError());
+            }
         }
     }
 #endif
@@ -303,12 +450,23 @@ int main(int argc, char **argv) {
         if (vpos == 240) {
             bus.video().triggerVblank();
             bus.video().renderFrame();
+            g_dbgFrame = bus.video().frameNumber();
             soundCpu.pulseNmi();    // MAME：vblank 時 pulse 65C02 NMI
             if (std::getenv("ACAN_DEBUG"))
                 std::fprintf(stderr, "[dbg] frame=%llu pc=$%08X 65c02pc=$%04X\n",
                              (unsigned long long)bus.video().frameNumber(), cpu.getPC(), soundCpu.getPC());
 
             if (frameLimit > 0 && int64_t(bus.video().frameNumber()) >= frameLimit) quit = true;
+
+            // --press 注入：到幀按下、10 幀後放開
+            if (!pressEvents.empty()) {
+                const long f = long(bus.video().frameNumber());
+                for (const auto &ev : pressEvents) {
+                    if (f == ev.frame) padState &= ~ev.bits;
+                    if (f == ev.frame + 10) padState |= ev.bits;
+                }
+                bus.setPad(0, padState);
+            }
 
 #ifndef NO_SDL
             if (!headless) {
@@ -317,7 +475,35 @@ int main(int argc, char **argv) {
                 SDL_RenderCopy(renderer, texture, nullptr, nullptr);
                 SDL_RenderPresent(renderer);
                 SDL_Event ev;
-                while (SDL_PollEvent(&ev)) if (ev.type == SDL_QUIT) quit = true;
+                while (SDL_PollEvent(&ev)) {
+                    if (ev.type == SDL_QUIT) { quit = true; continue; }
+                    if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) {
+                        if (ev.key.repeat) continue;
+                        const bool down = ev.type == SDL_KEYDOWN;
+                        uint16_t bit = 0;
+                        // 方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R（Bcan.ini 預設風格），
+                        // Enter=Start、右 Shift=Select
+                        switch (ev.key.keysym.sym) {
+                        case SDLK_UP: bit = BTN_UP; break;
+                        case SDLK_DOWN: bit = BTN_DOWN; break;
+                        case SDLK_LEFT: bit = BTN_LEFT; break;
+                        case SDLK_RIGHT: bit = BTN_RIGHT; break;
+                        case SDLK_z: bit = BTN_A; break;
+                        case SDLK_x: bit = BTN_B; break;
+                        case SDLK_a: bit = BTN_X; break;
+                        case SDLK_s: bit = BTN_Y; break;
+                        case SDLK_q: bit = BTN_L; break;
+                        case SDLK_w: bit = BTN_R; break;
+                        case SDLK_RETURN: bit = BTN_START; break;
+                        case SDLK_RSHIFT: bit = BTN_SELECT; break;
+                        default: break;
+                        }
+                        if (bit) {
+                            if (down) padState &= ~bit; else padState |= bit;
+                            bus.setPad(0, padState);
+                        }
+                    }
+                }
             }
 #endif
         } else if (vpos < 240 && (bus.video().irqMask() & 0x10)) {
@@ -341,6 +527,15 @@ int main(int argc, char **argv) {
             std::fprintf(stderr, "錯誤：截圖寫入失敗 %s\n", screenshotPath.c_str());
     }
 
+    if (!wavPath.empty()) {
+        if (writeWav(wavPath, audio.wav, AUDIO_RATE))
+            std::printf("[done] 音訊已輸出：%s（%zu samples，%.1f 秒，UM6619 active=$%04X）\n",
+                        wavPath.c_str(), audio.wav.size() / 2,
+                        audio.wav.size() / 2 / double(AUDIO_RATE), soundCpu.soundChip().activeChannels());
+        else
+            std::fprintf(stderr, "錯誤：WAV 寫入失敗 %s\n", wavPath.c_str());
+    }
+
     if (const char *dump = std::getenv("ACAN_DUMP")) {  // 除錯：dump VRAM/palette/regs
         std::string p(dump);
         std::ofstream vf(p + ".vram", std::ios::binary);
@@ -357,6 +552,7 @@ int main(int argc, char **argv) {
     }
 
 #ifndef NO_SDL
+    if (audioDev) SDL_CloseAudioDevice(audioDev);
     if (!headless) {
         SDL_DestroyTexture(texture);
         SDL_DestroyRenderer(renderer);

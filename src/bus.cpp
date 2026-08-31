@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 uint32_t g_dbgPc = 0;  // 除錯：main 每條指令前更新
+uint64_t g_dbgFrame = 0;  // 除錯：main 每幀更新（ACAN_TRACE65 用）
 
 void SystemBus::loadRom(std::vector<uint8_t> rom) { rom_ = std::move(rom); }
 
@@ -101,7 +102,10 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
     if (addr >= 0xE80000 && addr < 0xE90000) {
         if (std::getenv("ACAN_WATCH") && addr >= 0xE80300 && addr < 0xE80310)
             std::fprintf(stderr, "[watch] $%08X <- $%02X (pc=$%08X)\n", addr, val, g_dbgPc);
-        soundRam_[addr & 0xFFFF] = val; return;
+        soundRam_[addr & 0xFFFF] = val;
+        // 65C02 I/O 頁（$0400-$04FF）轉發（MAME _68k_soundram_w 行為）
+        if ((addr & 0xFF00) == 0x0400 && onSoundIoWrite) onSoundIoWrite(uint16_t(addr & 0xFFFF), val);
+        return;
     }
     if (addr >= 0xE90000 && addr < 0xE91000) {
         if (addr == 0xE90B3C) { e90b3c_ = uint16_t((e90b3c_ & 0x00FF) | (val << 8)); return; }
@@ -130,6 +134,9 @@ void SystemBus::write8(uint32_t addr, uint8_t val) {
         }
         if (addr == 0xE9000A || addr == 0xE9000B) {
             // 68k→65C02 命令通知（IRQ bit5）
+            if (std::getenv("ACAN_TRACE65"))
+                std::fprintf(stderr, "[68k] f=%llu $E9000A <- $%02X (pc=$%08X)\n",
+                             (unsigned long long)g_dbgFrame, val, g_dbgPc);
             if (onSoundIrqRequest) onSoundIrqRequest();
             return;
         }
