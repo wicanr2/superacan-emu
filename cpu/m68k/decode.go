@@ -171,6 +171,8 @@ const (
 	InstructionCMPLongDataToData
 	InstructionMOVEALongDisplacement
 	InstructionMOVEByteAddressIndirectToData
+	InstructionLSLWordRegister
+	InstructionEORByteDataToData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -271,6 +273,10 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEALongDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x1010:
 		return Decoded{Instruction: InstructionMOVEByteAddressIndirectToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xe168:
+		return Decoded{Instruction: InstructionLSLWordRegister, Register: uint8(opcode & 7), SourceRegister: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0xb100:
+		return Decoded{Instruction: InstructionEORByteDataToData, Register: uint8(opcode & 7), SourceRegister: uint8(opcode >> 9 & 7)}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:

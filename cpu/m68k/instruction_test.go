@@ -1233,6 +1233,60 @@ func TestMOVEByteAddressIndirectToData(t *testing.T) {
 	}
 }
 
+func TestLSLWordRegisterCountAndFlags(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xef6d, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5], cpu.state.D[7] = 0xabcd_8001, 1
+	cpu.state.SR |= flagExtend | flagZero | flagOverflow
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 8 || state.D[5] != 0xabcd_0002 || state.D[7] != 1 || state.SR&0x1f != flagExtend|flagCarry {
+		t.Fatalf("cycles=%d D5=$%08X D7=$%08X SR=$%04X", result.Cycles, state.D[5], state.D[7], state.SR)
+	}
+}
+
+func TestLSLWordRegisterZeroCountPreservesExtendAndClearsCarry(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xef6d, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5], cpu.state.D[7] = 0x8000, 64
+	cpu.state.SR |= flagExtend | flagZero | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 6 || state.D[5] != 0x8000 || state.SR&0x1f != flagExtend|flagNegative {
+		t.Fatalf("cycles=%d D5=$%08X SR=$%04X", result.Cycles, state.D[5], state.SR)
+	}
+}
+
+func TestEORByteDataToData(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xbb06, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5], cpu.state.D[6] = 0xaaaa_00ff, 0xbbbb_007f
+	cpu.state.SR |= flagExtend | flagZero | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 4 || state.D[5] != 0xaaaa_00ff || state.D[6] != 0xbbbb_0080 || state.SR&0x1f != flagExtend|flagNegative {
+		t.Fatalf("cycles=%d D5=$%08X D6=$%08X SR=$%04X", result.Cycles, state.D[5], state.D[6], state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

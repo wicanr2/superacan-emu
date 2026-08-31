@@ -480,6 +480,28 @@ func (c *CPU) lslWordImmediate(register, count uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) lslWordRegister(register, countRegister uint8) error {
+	count := uint8(c.state.D[countRegister] & 63)
+	value := uint16(c.state.D[register])
+	var carry bool
+	for range count {
+		carry = value&0x8000 != 0
+		value <<= 1
+	}
+	c.state.D[register] = c.state.D[register]&0xffff0000 | uint32(value)
+	c.setNZ16(value)
+	if count != 0 {
+		c.state.SR &^= flagExtend
+		if carry {
+			c.state.SR |= flagCarry | flagExtend
+		}
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
 func (c *CPU) cmpiByteData(register uint8) error {
 	stream := c.newInstructionStream()
 	immediate, err := stream.nextWord()

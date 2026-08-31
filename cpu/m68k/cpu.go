@@ -369,6 +369,17 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveByteAddressIndirectToData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.B (A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionLSLWordRegister:
+		if err := c.lslWordRegister(decoded.Register, decoded.SourceRegister); err != nil {
+			return result, fmt.Errorf("m68k LSL.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionEORByteDataToData:
+		value := uint8(c.state.D[decoded.Register]) ^ uint8(c.state.D[decoded.SourceRegister])
+		c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffffff00 | uint32(value)
+		c.setNZ8(value)
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k EOR.B D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
