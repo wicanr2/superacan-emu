@@ -109,3 +109,18 @@
   post-increment write、32 次 noise word write，並以 1910 reset-inclusive cycles 離開迴圈。
 - DBcc：分別測試 condition true 12 cycles、decrement-and-branch 10 cycles、counter expired
   14 cycles；未將後續 CPU 型號的 loop mode 套入 MC68000。
+
+## 2026-08-31：Go 整機 bus 與真實 IPL 探測
+
+- media：新增逐 16-bit word byte-swap、嚴格大小檢查、原始輸入 SHA-256 與轉換 manifest；
+  UMC6650 key 維持線性 16 bytes。ROM／BIOS 內容不加入版控。
+- UMC6650：新增獨立 Go chip package，實作 7-bit 位址、`$20–$2F` 唯讀 key、
+  `$40–$5F` RAM 及 `$09/$0C` output register 儲存。
+- machine：新增 24-bit bus、低／高 IPL overlay 單向 latch、卡帶雙視圖、Work RAM mirror、
+  sound RAM、SRAM odd lane、`$E90B3C` 與 shared phase timeline；未知晶片 window 尚未假造。
+- runner：新增 `cmd/acan-headless`，要求外部 IPL/key/ROM，輸出輸入雜湊、PC、opcode、
+  instruction count 與 cycles；未知 opcode 失敗即關閉。
+- 真實驗證：IPL SHA-256 為 `2e4d88bec69b5e7e4803368c233ce0d20f6dd107c5af0cfcc0089d310c695d7c`。
+  第一輪停 `$46C CMP.B (A1),D0`，補實作後停 `$47C MOVE.B -(A2),(A1)`；再補實作後
+  已跨過 RAM restore 與 key 讀取迴圈；成功完成 772 條指令後，精確停於
+  `$4C2 CLR.W D4`、8652 cycles。

@@ -357,6 +357,67 @@ func TestCMPIWordFlags(t *testing.T) {
 	}
 }
 
+func TestCMPByteAddressIndirectToData(t *testing.T) {
+	log := &eventLog{}
+	bus := &testBus{
+		log: log,
+		words: map[uint32]uint16{
+			0: 0, 2: 0x1000, 4: 0, 6: 0x0400,
+			0x0400: 0xb411, 0x0402: 0x4e71, 0x0404: 0x7000,
+		},
+		bytes: map[uint32]uint8{0x2000: 0x80},
+	}
+	cpu := New(bus, log)
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[1] = 0x2000
+	cpu.state.D[2] = 0x1234_0080
+	cpu.state.SR |= flagExtend | flagNegative | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if state.D[2] != 0x1234_0080 || state.A[1] != 0x2000 || state.SR&0x1f != flagExtend|flagZero {
+		t.Fatalf("CMP.B state: D2=$%08X A1=$%08X CCR=$%02X", state.D[2], state.A[1], state.SR&0x1f)
+	}
+	if result.Cycles != 8 || len(result.Phases) != 2 || result.Phases[0].Kind != PhaseDataRead {
+		t.Fatalf("CMP.B phases: %+v", result)
+	}
+}
+
+func TestMOVEBytePredecrementToAddressIndirect(t *testing.T) {
+	log := &eventLog{}
+	bus := &testBus{
+		log: log,
+		words: map[uint32]uint16{
+			0: 0, 2: 0x1000, 4: 0, 6: 0x0400,
+			0x0400: 0x12a2, 0x0402: 0x4e71, 0x0404: 0x7000,
+		},
+		bytes: map[uint32]uint8{0x201f: 0xa5},
+	}
+	cpu := New(bus, log)
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[1] = 0x3000
+	cpu.state.A[2] = 0x2020
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); state.A[2] != 0x201f {
+		t.Fatalf("A2=$%08X", state.A[2])
+	}
+	if want := []byteWrite{{address: 0x3000, value: 0xa5}}; !reflect.DeepEqual(bus.byteWrites, want) {
+		t.Fatalf("writes: got %+v want %+v", bus.byteWrites, want)
+	}
+	if result.Cycles != 14 || len(result.Phases) != 4 || result.Phases[0].Kind != PhaseInternal {
+		t.Fatalf("phases: %+v", result)
+	}
+}
+
 func TestMOVEBytePostincrementUsesTwoBytesForA7(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

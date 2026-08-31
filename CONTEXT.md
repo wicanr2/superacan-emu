@@ -27,7 +27,11 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | module | `github.com/wicanr2/superacan-emu`，Go 1.26 | 尚未加入 Ebitengine dependency |
 | 68000 phase API | scheduler-before-bus、24-bit address、FC、byte／word transaction | API 已測；尚未有整機 scheduler consumer |
 | 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
-| 68000 opcode | NOP、MOVEQ、BRA、Bcc；16 種 condition | 官方 ISA／timing 表；BSR 只 decode、尚未執行 |
+| 68000 opcode | 已執行 reset 至真實 IPL `$4C2`；含 MOVE byte/word 子集、CMP/CMPI、DBcc、JSR、branch | 官方 ISA／timing 表；未覆蓋完整 ISA |
+| media | word-swap、大小驗證、原始 SHA-256 manifest | BIOS／ROM 不入版控 |
+| machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
+| UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
+| headless runner | 可載入外部 IPL/key/ROM 並有界執行 68000 | 真實 Boom Zoo BIOS 路徑停於首個未知 opcode `$4C2` |
 | archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |
 
 MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件，可執行性用來驗證文件
@@ -81,7 +85,7 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 
 ## 下一個交付閘門
 
-下一個 vertical slice 是 extension-word cursor、共用 operand size／effective-address
-基礎與 BSR／JSR／MOVEA，使固定 BIOS 從 `$400` NOP 前進到 UMC6650 初始化。之後逐步
-擴到完整 68000 ISA，通過獨立向量、Moira 差分與 Super A'Can IPL。Ebitengine 前端
-不能先於 headless machine core 決定 scheduler。
+下一個 vertical slice 從真實 IPL `$4C2 CLR.W D4` 繼續 checksum／key 驗證，逐個補齊
+實際遇到的 68000 opcode，直到 `$620` overlay 關閉並跳入卡帶入口。其後才將 archived
+C++ 已驗證的 UM6618／UM6619／65C02／DMA／IRQ 行為分晶片移植為獨立 Go 實作。
+Ebitengine 前端不能先於 headless machine core 決定 scheduler。

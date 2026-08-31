@@ -7,7 +7,7 @@ production 主線正改以純 Go 重寫 68000／65C02、UMC6650、UM6618、UM661
 
 Bcan 0.0.8b 是閉源 Windows 模擬器且沒有公開移植。本專案依據唯讀知識庫
 [superacan](https://github.com/wicanr2/superacan) 的 Bcan／BIOS 逆向證據，以及 MAME
-driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的 C++ 實作。
+driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的純 Go 實作。
 
 長期目標：以可追溯、可重現的晶片模型在 Linux 執行 Super A'Can 軟體，並在核心
 收斂後提供 macOS 版本。模擬器原始碼同時是硬體文件；相容性不能取代硬體證據。
@@ -18,7 +18,9 @@ driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的 C++ 實
 的 `archive/cpp/`，標為 deprecated reference implementation，作 Go 差分 oracle，
 不再新增功能。Go 68000 核心採獨立實作；Moira 只作 sample，不直接翻譯。
 
-Go 核心尚在開工階段；下列是 deprecated C++ oracle 已達到的相容性，不是 Go 版完成度：
+Go 主線目前已有 media manifest、整機 bus、UMC6650、phase timeline、headless runner，
+並以固定 IPL SHA-256 在真實 Boom Zoo 路徑執行至 BIOS `$4C2`。下列完整相容性仍是
+deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）
 - [x] UMC6650 lockout 晶片完整實作（埠角色以 IPL 反組譯為準，見
@@ -69,7 +71,7 @@ Go 核心尚在開工階段；下列是 deprecated C++ oracle 已達到的相容
 
 ## 建置（Go 主線）
 
-需求：Go 1.26。Ebitengine 尚未接入第一個 headless CPU vertical slice；加入前會固定
+需求：Go 1.26。Ebitengine 尚未接入目前 headless machine core；加入前會固定
 module 版本與跨平台工具鏈。
 
 本儲存庫的開發、建置與測試一律在專案專用 Docker 工具鏈內進行；下列是容器內
@@ -84,8 +86,18 @@ deprecated C++ oracle 的歷史建置方式見
 
 ## 執行
 
-Go machine runner 尚未接通；目前只交付可測的 68000 package 骨架。下列 CLI 屬於
-deprecated C++ oracle，移植到 Go 前不得當成現行介面承諾。
+Go headless runner 已能載入外部、逐 word byte-swap 的 IPL／ROM 及線性 UMC6650 key：
+
+```sh
+go run ./cmd/acan-headless \
+    --ipl /path/to/internal_68k.bin \
+    --key /path/to/umc6650.bin \
+    --rom "/path/to/Boom Zoo (Taiwan).bin" \
+    --instructions 10000
+```
+
+runner 會輸出 IPL／ROM SHA-256、PC、opcode 與 cycle；遇到尚未實作的 opcode 會明確
+失敗停止。以下較完整 CLI 仍屬 deprecated C++ oracle，移植前不得視為 Go 介面承諾。
 
 ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bcan 的
 `bios/supracan.zip`、`bios/umc6650.zip` 解壓後的檔案，以及卡帶 ROM。

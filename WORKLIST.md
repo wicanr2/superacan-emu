@@ -29,6 +29,10 @@
 - [ ] Go 68000 跑通 Super A'Can IPL 第一段。
   完成條件：固定 BIOS hash、reset SSP／PC、phase trace 與 C++ oracle 對照，逐步抵達
   UMC6650 交握；缺 opcode 時明確停止，不用 stub NOP。
+- [x] 建立 Go media／machine 第一層：word-swap 與 SHA-256 manifest、ROM／IPL overlay、
+  Work/sound RAM、SRAM lane、`$E90B3C`、UMC6650、shared timeline 與 headless runner。
+- [x] 以固定真實 IPL `2e4d88…c695d7c` 及 Boom Zoo 驗證 `$400 → $4C2`；目前明確停在
+  `CLR.W D4`，不是 bus、loader 或 lockout stub 造成的假進度。
 
 ## Deprecated C++ 收尾紀錄
 

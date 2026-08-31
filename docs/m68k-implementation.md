@@ -40,6 +40,9 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | CMPI.W #imm,Dn | subtraction N/Z/V/C、X 與 operand 保留 | ISA-spec；8 cycles |
 | DBcc | condition true 12、branch 10、counter expired 14 cycles | User's Manual execution-time table |
 | IPL RAM backup loop | 32 次 `$5F…$40` address-port/data-port/Work RAM transaction | BIOS bytes-derived 合成回歸 |
+| CMP.B (An),Dn | byte subtraction flags、operands 不變 | ISA-spec；8 cycles |
+| MOVE.B -(An),(An) | predecrement、byte read/write、MOVE flags | ISA-spec；14 cycles |
+| 真實 IPL | fixed SHA-256，自 `$400` 執行至 `$4C2` | 外部 BIOS/ROM；下一個缺口 `CLR.W D4` |
 | phase trace | `StepResult.Phases` | 只含目前已建模 phase，尚無 exception trace |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
@@ -51,8 +54,8 @@ displacement 是後續 CPU 型號能力，本核心目前不得套用。
 - 一般化 effective-address decoder、byte／word／long operand helpers；目前 long write 只在
   JSR 堆疊路徑以兩次有序 word transaction 建模。
 - user／supervisor function code 動態選擇。
-- 真實 BIOS manifest／word-swap loader 與固定 hash integration；目前 `$400–$430` 回歸使用
-  最小合成 opcode／資料 fixture，不把受保護 BIOS 加入版控。
+- 真實 BIOS／ROM 只由外部路徑載入，版控內仍只保留合成 fixture；headless 探測已驗證
+  IPL SHA-256 `2e4d88bec69b5e7e4803368c233ce0d20f6dd107c5af0cfcc0089d310c695d7c`。
 - Motorola reset phase 的更細 bus timing 審查；目前 40-cycle reset 是 sample-derived
   起始契約，文件中不得標成硬體已證實。
 - 與獨立公開 opcode vectors 及 archived oracle 的自動差分 harness。

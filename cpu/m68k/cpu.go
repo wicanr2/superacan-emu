@@ -166,6 +166,14 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
 		}
+	case InstructionCMPByteAddressIndirectToData:
+		if err := c.cmpByteAddressIndirectToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMP.B (A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEBytePredecrementToAddressIndirect:
+		if err := c.moveBytePredecrementToAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B -(A%d),(A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionBSR:
 		return result, fmt.Errorf("m68k: unimplemented BSR opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	default:
@@ -176,6 +184,35 @@ func (c *CPU) Step() (StepResult, error) {
 	result.Cycles = c.state.Cycles - start
 	result.Phases = append(result.Phases, c.stepTrace...)
 	return result, nil
+}
+
+func (c *CPU) moveBytePredecrementToAddressIndirect(source, destination uint8) error {
+	decrement := uint32(1)
+	if source == 7 {
+		decrement = 2
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	c.state.A[source] = (c.state.A[source] - decrement) & addressMask
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ8(value)
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) cmpByteAddressIndirectToData(source, destination uint8) error {
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setCompare8(uint8(c.state.D[destination]), value)
+	return c.prefetch()
 }
 
 func (c *CPU) moveWordImmediateToData(register uint8) error {
@@ -381,6 +418,23 @@ func (c *CPU) setCompare16(destination, source uint16) {
 		c.state.SR |= flagNegative
 	}
 	if (destination^source)&(destination^result)&0x8000 != 0 {
+		c.state.SR |= flagOverflow
+	}
+	if source > destination {
+		c.state.SR |= flagCarry
+	}
+}
+
+func (c *CPU) setCompare8(destination, source uint8) {
+	result := destination - source
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	if result == 0 {
+		c.state.SR |= flagZero
+	}
+	if result&0x80 != 0 {
+		c.state.SR |= flagNegative
+	}
+	if (destination^source)&(destination^result)&0x80 != 0 {
 		c.state.SR |= flagOverflow
 	}
 	if source > destination {

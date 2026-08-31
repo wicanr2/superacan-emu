@@ -23,6 +23,8 @@ const (
 	InstructionMOVEWordImmediateToAbsoluteLong
 	InstructionCMPIWordData
 	InstructionDBcc
+	InstructionCMPByteAddressIndirectToData
+	InstructionMOVEBytePredecrementToAddressIndirect
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -97,6 +99,18 @@ func Decode(opcode uint16) Decoded {
 			Instruction: InstructionDBcc,
 			Register:    uint8(opcode & 7),
 			Condition:   uint8(opcode >> 8 & 0x0f),
+		}
+	case opcode&0xf1f8 == 0xb010:
+		return Decoded{
+			Instruction:    InstructionCMPByteAddressIndirectToData,
+			Register:       uint8(opcode >> 9 & 7),
+			SourceRegister: uint8(opcode & 7),
+		}
+	case opcode&0xf1f8 == 0x10a0:
+		return Decoded{
+			Instruction:    InstructionMOVEBytePredecrementToAddressIndirect,
+			Register:       uint8(opcode >> 9 & 7),
+			SourceRegister: uint8(opcode & 7),
 		}
 	case opcode&0xf100 == 0x7000:
 		return Decoded{
