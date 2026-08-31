@@ -168,6 +168,20 @@ func (c *CPU) andiByteData(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) andiLongData(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	c.state.D[register] &= immediate
+	c.setNZ32(c.state.D[register])
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) cmpBytePostincrementToData(source, destination uint8) error {
 	value, err := c.readByte(c.state.A[source], FCSupervisorData)
 	if err != nil {
@@ -1048,6 +1062,25 @@ func (c *CPU) moveWordDataToDisplacement(source, destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveWordPostincrementToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] += 2
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	c.setNZ16(value)
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) moveLongDataToDisplacement(source, destination uint8) error {
 	stream := c.newInstructionStream()
 	displacement, err := stream.nextWord()
@@ -1084,6 +1117,20 @@ func (c *CPU) muluWordData(source, destination uint8) error {
 		return err
 	}
 	return c.prefetch()
+}
+
+func (c *CPU) muluWordImmediate(destination uint8) error {
+	stream := c.newInstructionStream()
+	multiplier, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = uint32(uint16(c.state.D[destination])) * uint32(multiplier)
+	c.setNZ32(c.state.D[destination])
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: uint8(34 + 2*bits.OnesCount16(multiplier))}); err != nil {
+		return err
+	}
+	return stream.finish()
 }
 
 func (c *CPU) divuWordData(source, destination uint8) error {

@@ -252,6 +252,40 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveByteImmediateToData(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.B #imm,D%d: %w", decoded.Register, err)
 		}
+	case InstructionANDILongData:
+		if err := c.andiLongData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ANDI.L #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVELongImmediateToData:
+		if err := c.moveLongImmediateToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionORLongDataToData:
+		value := c.state.D[decoded.Register] | c.state.D[decoded.SourceRegister]
+		c.state.D[decoded.Register] = value
+		c.setNZ32(value)
+		if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+			return result, fmt.Errorf("m68k OR.L D%d,D%d internal: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k OR.L D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMULUWordImmediate:
+		if err := c.muluWordImmediate(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MULU.W #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEWordPostincrementToAddressIndirect:
+		if err := c.moveWordPostincrementToAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (A%d)+,(A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordPostincrementToDisplacement:
+		if err := c.moveWordPostincrementToDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (A%d)+,(d16,A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordImmediateToAddressIndirect:
+		if err := c.moveWordImmediateToAddressIndirect(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W #imm,(A%d): %w", decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
@@ -801,6 +835,17 @@ func (c *CPU) moveByteImmediateToData(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveLongImmediateToData(register uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	c.state.D[register] = value
+	c.setNZ32(value)
+	return stream.finish()
+}
+
 func (c *CPU) moveWordDataToData(source, destination uint8) error {
 	value := uint16(c.state.D[source])
 	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
@@ -834,6 +879,19 @@ func (c *CPU) moveByteAddressIndirectToPostincrement(source, destination uint8) 
 	return c.prefetch()
 }
 
+func (c *CPU) moveWordPostincrementToAddressIndirect(source, destination uint8) error {
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] += 2
+	c.setNZ16(value)
+	if err := c.writeWord(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
 func (c *CPU) moveWordImmediateToAbsoluteLong() error {
 	stream := c.newInstructionStream()
 	value, err := stream.nextWord()
@@ -846,6 +904,19 @@ func (c *CPU) moveWordImmediateToAbsoluteLong() error {
 	}
 	c.setNZ16(value)
 	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveWordImmediateToAddressIndirect(register uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.setNZ16(value)
+	if err := c.writeWord(c.state.A[register], value, FCSupervisorData); err != nil {
 		return err
 	}
 	return stream.finish()

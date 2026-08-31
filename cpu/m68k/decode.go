@@ -145,6 +145,13 @@ const (
 	InstructionNOTWordData
 	InstructionANDWordDataToData
 	InstructionMOVEByteImmediateToData
+	InstructionANDILongData
+	InstructionMOVELongImmediateToData
+	InstructionORLongDataToData
+	InstructionMULUWordImmediate
+	InstructionMOVEWordPostincrementToAddressIndirect
+	InstructionMOVEWordPostincrementToDisplacement
+	InstructionMOVEWordImmediateToAddressIndirect
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -185,6 +192,20 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionANDWordDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1ff == 0x103c:
 		return Decoded{Instruction: InstructionMOVEByteImmediateToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xfff8 == 0x0280:
+		return Decoded{Instruction: InstructionANDILongData, Register: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x203c:
+		return Decoded{Instruction: InstructionMOVELongImmediateToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0x8080:
+		return Decoded{Instruction: InstructionORLongDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0xc0fc:
+		return Decoded{Instruction: InstructionMULUWordImmediate, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0x3098:
+		return Decoded{Instruction: InstructionMOVEWordPostincrementToAddressIndirect, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3158:
+		return Decoded{Instruction: InstructionMOVEWordPostincrementToDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x30bc:
+		return Decoded{Instruction: InstructionMOVEWordImmediateToAddressIndirect, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:
@@ -352,6 +373,12 @@ func Decode(opcode uint16) Decoded {
 	case opcode&0xf1f8 == 0x1018:
 		return Decoded{Instruction: InstructionMOVEBytePostincrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x5048:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionADDQAddress, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1f8 == 0x5088:
 		quick := uint8(opcode >> 9 & 7)
 		if quick == 0 {
 			quick = 8
