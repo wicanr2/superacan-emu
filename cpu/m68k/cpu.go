@@ -26,6 +26,7 @@ type StepResult struct {
 	PCAfter  uint32
 	Opcode   uint16
 	Cycles   uint64
+	Phases   []Phase
 }
 
 // CPU is an independent Motorola 68000 implementation.
@@ -33,6 +34,7 @@ type CPU struct {
 	bus       Bus
 	scheduler Scheduler
 	state     State
+	stepTrace []Phase
 }
 
 func New(bus Bus, scheduler Scheduler) *CPU {
@@ -93,19 +95,103 @@ func (c *CPU) Reset() error {
 func (c *CPU) Step() (StepResult, error) {
 	result := StepResult{PCBefore: c.state.PC, Opcode: c.state.IRD}
 	start := c.state.Cycles
+	c.stepTrace = make([]Phase, 0, 3)
+	defer func() { c.stepTrace = nil }()
 
-	switch c.state.IRD {
-	case 0x4e71: // NOP
+	decoded := Decode(c.state.IRD)
+	switch decoded.Instruction {
+	case InstructionNOP:
 		if err := c.prefetch(); err != nil {
 			return result, fmt.Errorf("m68k NOP prefetch: %w", err)
 		}
+	case InstructionMOVEQ:
+		c.state.D[decoded.Register] = uint32(int32(int8(decoded.Immediate8)))
+		c.setNZ32(c.state.D[decoded.Register])
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k MOVEQ prefetch: %w", err)
+		}
+	case InstructionBRA:
+		if err := c.branch(decoded.Immediate8); err != nil {
+			return result, fmt.Errorf("m68k BRA: %w", err)
+		}
+	case InstructionBcc:
+		if err := c.branchConditional(decoded); err != nil {
+			return result, fmt.Errorf("m68k Bcc: %w", err)
+		}
+	case InstructionBSR:
+		return result, fmt.Errorf("m68k: unimplemented BSR opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	default:
 		return result, fmt.Errorf("m68k: unimplemented opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	}
 
 	result.PCAfter = c.state.PC
 	result.Cycles = c.state.Cycles - start
+	result.Phases = append(result.Phases, c.stepTrace...)
 	return result, nil
+}
+
+func (c *CPU) setNZ32(value uint32) {
+	// MOVEQ affects N and Z, clears V and C, and leaves X unchanged.
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	if value == 0 {
+		c.state.SR |= flagZero
+	}
+	if value&0x8000_0000 != 0 {
+		c.state.SR |= flagNegative
+	}
+}
+
+func (c *CPU) branch(displacement8 uint8) error {
+	base := (c.state.PC + 2) & addressMask
+	var target uint32
+	if displacement8 == 0 {
+		target = uint32(int32(base)+int32(int16(c.state.IRC))) & addressMask
+	} else {
+		target = uint32(int32(base)+int32(int8(displacement8))) & addressMask
+	}
+	return c.refillPrefetch(target, 2)
+}
+
+func (c *CPU) branchConditional(decoded Decoded) error {
+	if conditionTrue(decoded.Condition, c.state.SR) {
+		return c.branch(decoded.Immediate8)
+	}
+
+	if decoded.Immediate8 == 0 {
+		// The prefetched word is the displacement. Fetch both words of the
+		// fall-through queue. M68000 Bcc.w not-taken timing is 12 cycles.
+		if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+			return err
+		}
+		return c.refillPrefetch((c.state.PC+4)&addressMask, 0)
+	}
+
+	// Byte displacement not taken: normal one-word prefetch plus four internal
+	// cycles, for the documented M68000 total of eight cycles.
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4}); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) refillPrefetch(target uint32, internalCycles uint8) error {
+	if internalCycles != 0 {
+		if err := c.advance(Phase{Kind: PhaseInternal, Cycles: internalCycles}); err != nil {
+			return err
+		}
+	}
+	first, err := c.readWord(target, FCSupervisorProgram, PhaseInstructionFetch)
+	if err != nil {
+		return err
+	}
+	second, err := c.readWord(target+2, FCSupervisorProgram, PhaseInstructionFetch)
+	if err != nil {
+		return err
+	}
+	c.state.PC = target
+	c.state.IRD = first
+	c.state.IRC = second
+	return nil
 }
 
 func (c *CPU) prefetch() error {
@@ -137,5 +223,8 @@ func (c *CPU) advance(phase Phase) error {
 		return err
 	}
 	c.state.Cycles += uint64(phase.Cycles)
+	if c.stepTrace != nil {
+		c.stepTrace = append(c.stepTrace, phase)
+	}
 	return nil
 }

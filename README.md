@@ -137,6 +137,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - [`WORKLOG.md`](WORKLOG.md)：逐輪工作歷程
 - [`docs/chip-emulation-principles.md`](docs/chip-emulation-principles.md)：CPU、bus phase、
   DMA、IRQ、scheduler、save state 與 Ebitengine 邊界通則
+- [`docs/m68k-implementation.md`](docs/m68k-implementation.md)：68000 ISA／timing 來源、
+  已實作 vertical slice 與證據限制
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：

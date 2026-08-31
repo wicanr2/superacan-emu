@@ -52,3 +52,17 @@
   Go 檔案仍由目前 UID/GID 擁有。
 - Git：C++ 歸檔與純 Go 68000 第一個 vertical slice 已提交為 `977b2eb`，並推送至
   `origin/master`。
+
+## 2026-08-31：68000 decoder、MOVEQ 與 branch
+
+- 來源：NXP／Motorola Programmer's Reference Manual 的 opcode／condition／branch
+  契約，以及 MC68000 User's Manual 表 8-9 的 Bcc／BRA cycle 與 read-count。
+- 實作：可稽核 decoder、16 condition、MOVEQ、BRA.b／BRA.w、Bcc.b／Bcc.w，以及每條
+  `Step` 的結構化 phase trace；BSR 只辨識並明確回報未實作。
+- 測試：condition exhaustive truth table、MOVEQ sign／flags／X preserve、正反向 byte／
+  word branch、taken／not-taken timing 與 prefetch refill。
+- 修正：首次測試的向後 branch fixture 讓 target prefetch 與原 opcode 位址重疊，造成
+  map 值覆蓋；移到不重疊 target 後以同一容器命令乾淨重跑。這是測試資料問題，不是
+  CPU branch 計算缺陷。
+- 驗證：Go 1.26.7 無網路容器內 `go test ./...`、`go test -race ./...`、`go vet ./...`
+  均通過；本輪容器使用 `--rm`，未留下專案容器。
