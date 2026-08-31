@@ -286,6 +286,34 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveWordImmediateToAddressIndirect(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.W #imm,(A%d): %w", decoded.Register, err)
 		}
+	case InstructionMOVEWordImmediateToDisplacement:
+		if err := c.moveWordImmediateToDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W #imm,(d16,A%d): %w", decoded.Register, err)
+		}
+	case InstructionMOVELongImmediateToDisplacement:
+		if err := c.moveLongImmediateToDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.L #imm,(d16,A%d): %w", decoded.Register, err)
+		}
+	case InstructionSUBQByteAbsoluteLong:
+		if err := c.subqByteAbsoluteLong(decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k SUBQ.B #%d,(xxx).L: %w", decoded.Quick, err)
+		}
+	case InstructionMOVEALongAbsoluteLong:
+		if err := c.moveALongAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L (xxx).L,A%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEByteDisplacementToAbsoluteLong:
+		if err := c.moveByteDisplacementToAbsoluteLong(decoded.SourceRegister); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (d16,A%d),(xxx).L: %w", decoded.SourceRegister, err)
+		}
+	case InstructionCMPILongAddressIndirect:
+		if err := c.cmpiLongAddressIndirect(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMPI.L #imm,(A%d): %w", decoded.Register, err)
+		}
+	case InstructionMOVEWordDisplacementToData:
+		if err := c.moveWordDisplacementToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (d16,A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
@@ -922,6 +950,24 @@ func (c *CPU) moveWordImmediateToAddressIndirect(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveWordImmediateToDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	c.setNZ16(value)
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) moveByteDataToAbsoluteLong(register uint8) error {
 	stream := c.newInstructionStream()
 	address, err := stream.nextLong()
@@ -966,6 +1012,20 @@ func (c *CPU) cmpiWordData(register uint8) error {
 		return err
 	}
 	c.setCompare16(uint16(c.state.D[register]), source)
+	return stream.finish()
+}
+
+func (c *CPU) cmpiLongAddressIndirect(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(c.state.A[register], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setCompare32(value, immediate)
 	return stream.finish()
 }
 

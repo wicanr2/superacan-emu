@@ -152,6 +152,13 @@ const (
 	InstructionMOVEWordPostincrementToAddressIndirect
 	InstructionMOVEWordPostincrementToDisplacement
 	InstructionMOVEWordImmediateToAddressIndirect
+	InstructionMOVEWordImmediateToDisplacement
+	InstructionMOVELongImmediateToDisplacement
+	InstructionSUBQByteAbsoluteLong
+	InstructionMOVEALongAbsoluteLong
+	InstructionMOVEByteDisplacementToAbsoluteLong
+	InstructionCMPILongAddressIndirect
+	InstructionMOVEWordDisplacementToData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -206,6 +213,24 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVEWordPostincrementToDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1ff == 0x30bc:
 		return Decoded{Instruction: InstructionMOVEWordImmediateToAddressIndirect, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1ff == 0x317c:
+		return Decoded{Instruction: InstructionMOVEWordImmediateToDisplacement, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1ff == 0x217c:
+		return Decoded{Instruction: InstructionMOVELongImmediateToDisplacement, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1ff == 0x5139:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionSUBQByteAbsoluteLong, Quick: quick}
+	case opcode&0xf1ff == 0x2079:
+		return Decoded{Instruction: InstructionMOVEALongAbsoluteLong, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xfff8 == 0x13e8:
+		return Decoded{Instruction: InstructionMOVEByteDisplacementToAbsoluteLong, SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x0c90:
+		return Decoded{Instruction: InstructionCMPILongAddressIndirect, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3028:
+		return Decoded{Instruction: InstructionMOVEWordDisplacementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:

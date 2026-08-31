@@ -54,6 +54,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | Speedy Dragon DMA 後續路徑 | `MOVE.W (An)+,Dn`、`MOVE #imm,SR`、`MOVE.L An/#imm,(xxx).L`、`ADDA.L #imm/Dn,An`、`ORI.W #imm,(xxx).L`、`MOVE.B Dn,(xxx).L`、`TST.B (An)` | ISA-spec 與 Moira phase sample；真實 ROM 動態命中，尚持續補齊後續指令 |
 | Speedy Dragon IRQ7 後續路徑 | `TST.B (xxx).L`、`EOR.W Dn,Dn`、`NOT.W Dn`、`AND.W Dn,Dn`、`MOVE.B #imm,Dn` | ISA-spec；真實 ROM 已由 307 萬推進至 328 萬條指令並受理 13 次 IRQ7 |
 | Speedy Dragon 圖形資料載入路徑 | `ANDI.L #imm,Dn`、`MOVE.L #imm,Dn`、`OR.L Dn,Dn`、`MULU.W #imm,Dn`、`ADDQ.L #n,An`、`MOVE.W (An)+,(Am)/(d16,Am)`、`MOVE.W #imm,(An)` | ISA-spec；真實 ROM 已推進至 336 萬條指令，受理 18 次 IRQ7 且 VRAM 非零達 8,961 bytes |
+| Speedy Dragon 圖形暫存器設定 | `MOVE.W/L #imm,(d16,An)`、`SUBQ.B #n,(xxx).L`、`MOVEA.L (xxx).L,An`、`MOVE.B (d16,An),(xxx).L`、`CMPI.L #imm,(An)`、`MOVE.W (d16,An),Dn` | ISA-spec；真實 ROM `$05EAxx-$05EBxx` 動態命中，VRAM 非零維持 8,961 bytes，framebuffer 尚黑 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。
