@@ -161,6 +161,8 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0x082e, Decoded{Instruction: InstructionBTSTImmediateDisplacement, Register: 6}},
 		{0x255b, Decoded{Instruction: InstructionMOVELongPostincrementToDisplacement, Register: 2, SourceRegister: 3}},
 		{0xdf6e, Decoded{Instruction: InstructionADDWordDataToDisplacement, Register: 6, SourceRegister: 7}},
+		{0x8152, Decoded{Instruction: InstructionORWordDataToAddressIndirect, Register: 2, SourceRegister: 0}},
+		{0x4228, Decoded{Instruction: InstructionCLRByteDisplacement, Register: 0}},
 		{0x95ce, Decoded{Instruction: InstructionSUBALongAddress, Register: 2, SourceRegister: 6}},
 		{0x3011, Decoded{Instruction: InstructionMOVEWordAddressIndirectToData, Register: 0, SourceRegister: 1}},
 		{0x341a, Decoded{Instruction: InstructionMOVEWordPostincrementToData, Register: 2, SourceRegister: 2}},

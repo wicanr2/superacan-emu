@@ -2206,6 +2206,45 @@ func TestADDWordDataToDisplacementReadModifyWrite(t *testing.T) {
 	}
 }
 
+func TestORWordDataToAddressIndirectReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x8152, 0x0402: 0x4e71, 0x0404: 0x4e71, 0x012000: 0x0001})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[2] = 0x012000
+	cpu.state.D[0] = 0x8000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012000, value: 0x8001}}
+	if state := cpu.State(); result.Cycles != 12 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
+func TestCLRByteDisplacementReadModifyWrite(t *testing.T) {
+	cpu, log, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x4228, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	cpu.state.SR |= flagExtend | flagNegative | flagOverflow | flagCarry
+	bus.bytes = map[uint32]uint8{0x012004: 0x80}
+	log.events = nil
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantWrites := []byteWrite{{address: 0x012004, value: 0}}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagExtend|flagZero || !reflect.DeepEqual(bus.byteWrites, wantWrites) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.byteWrites)
+	}
+	if got := log.events; !reflect.DeepEqual(got, []string{"advance:fetch", "read16", "advance:read", "read8", "advance:write", "write8", "advance:fetch", "read16"}) {
+		t.Fatalf("events=%v", got)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

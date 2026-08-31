@@ -1009,6 +1009,37 @@ func (c *CPU) addWordDataToDisplacement(source, destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) orWordDataToAddressIndirect(source, destination uint8) error {
+	address := c.state.A[destination]
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value |= uint16(c.state.D[source])
+	c.setNZ16(value)
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) clearByteDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	if _, err := c.readByte(address, FCSupervisorData); err != nil {
+		return err
+	}
+	c.setNZ8(0)
+	if err := c.writeByte(address, 0, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)
