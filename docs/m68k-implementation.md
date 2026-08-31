@@ -65,6 +65,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | 跨 ROM 長時間路徑 | `CLR.L (xxx).L`、`LSR.L #n,Dn`、`MOVEA.L (d8,An,Xn),Am`、`ANDI.W #imm,(xxx).L`、`TST.L (An)`、`MOVE.L (xxx).L,Dn`、`MOVE.L Dn,Dn`、`MOVE.L An,Dn` | Motorola ISA／Moira phase 模型；Boom Zoo 與 Formosa Duel 均推進逾 310 萬條指令、約 224／228 幀，下一個未知 opcode 分別為 `$200E`／`$2E01`，後兩者已補入並通過合成測試，待下一輪真實 ROM 回歸 |
 | 跨 ROM 初始化／圖形載入 | `MOVE.L An,(Am)/(d16,Am)`、`ADDQ.L #n,Dn`、`DIVU.W #imm,Dn`、`CLR.L (d16,An)`、`JSR (An)`、`ADD.W Dn,(An)+`、`MOVEA.W (xxx).L,An`、`MOVE.L Dn,(An)+`、`MOVE.W An,Dn` | Motorola ISA／Moira phase 模型；Boom Zoo 推進至 3,687,106 條／254 幀且 VRAM 非零 17,582 bytes，Formosa Duel 推進至 3,588,237 條／250 幀且 VRAM 非零 8,975 bytes；最後兩條已通過合成測試，待下一輪真實 ROM 回歸 |
 | 跨 ROM 指標／算術路徑 | `MOVEA.L (An),Am`、`MOVEA.W (An)+,Am`、`MOVEA.W (An),Am`、`ADDQ.W #n,(d16,An)`、`CMPI.W #imm,(d16,An)`、`ADD.W (xxx).L,Dn`、`OR.L (An),Dn`、`DIVU.W (xxx).L,Dn` | Motorola ISA／Moira phase 模型；Boom Zoo 已推進至 3,701,358 條／255 幀，Formosa Duel 至 3,601,242 條／250 幀並受理 57 次 IRQ5；最後兩條已通過合成測試，待下一輪真實 ROM 回歸 |
+| 跨 ROM 中期初始化 | `OR.L (d16,An),Dn`、`MOVE.W (An),(d16,Am)`、`SUB.W (d16,An),Dn`、`MOVEM.W <list>,-(An)`、`CMP.W (d16,An),Dn`、`MOVEA.W Dn,An` | Motorola ISA／Moira phase 模型；Boom Zoo 推進至 4,219,269 條／291 幀，VRAM 非零 23,558 bytes；Formosa Duel 推進至 9,700,346 條／641 幀，DMA ch1 48 次、IRQ5 839 次、VRAM 非零 20,594 bytes；最後兩條已通過合成測試，待下一輪真實 ROM 回歸 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。

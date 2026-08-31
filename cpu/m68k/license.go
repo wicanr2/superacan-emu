@@ -666,6 +666,99 @@ func (c *CPU) divuWordAbsoluteLong(destination uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) orLongDisplacementToData(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[source])+int32(int16(displacement))) & addressMask
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] |= value
+	c.setNZ32(c.state.D[destination])
+	return stream.finish()
+}
+
+func (c *CPU) moveWordAddressIndirectToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	c.setNZ16(value)
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) subWordDisplacementFromData(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[source])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	result := c.sub16(uint16(c.state.D[destination]), value)
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(result)
+	return stream.finish()
+}
+
+func (c *CPU) movemWordRegistersToPredecrement(addressRegister uint8) error {
+	stream := c.newInstructionStream()
+	mask, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	for bit := uint8(0); bit < 16; bit++ {
+		if mask&(uint16(1)<<bit) == 0 {
+			continue
+		}
+		register := uint8(15) - bit
+		c.state.A[addressRegister] = (c.state.A[addressRegister] - 2) & addressMask
+		value := c.registerValue(register)
+		if register == addressRegister+8 {
+			value = c.state.A[addressRegister]
+		}
+		if err := c.writeWord(c.state.A[addressRegister], uint16(value), FCSupervisorData); err != nil {
+			return err
+		}
+	}
+	return stream.finish()
+}
+
+func (c *CPU) cmpWordDisplacementToData(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[source])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.setCompare16(uint16(c.state.D[destination]), value)
+	return stream.finish()
+}
+
+func (c *CPU) moveAWordData(source, destination uint8) error {
+	c.state.A[destination] = uint32(int32(int16(c.state.D[source])))
+	return c.prefetch()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)
