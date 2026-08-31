@@ -8,6 +8,7 @@ const (
 	flagZero             uint8 = 1 << 1
 	flagInterruptDisable uint8 = 1 << 2
 	flagDecimal          uint8 = 1 << 3
+	flagBreak            uint8 = 1 << 4
 	flagUnused           uint8 = 1 << 5
 	flagOverflow         uint8 = 1 << 6
 	flagNegative         uint8 = 1 << 7
@@ -40,16 +41,20 @@ type State struct {
 }
 
 type StepResult struct {
-	PCBefore uint16
-	PCAfter  uint16
-	Opcode   uint8
-	Cycles   uint64
+	PCBefore  uint16
+	PCAfter   uint16
+	Opcode    uint8
+	Cycles    uint64
+	Interrupt bool
+	Waiting   bool
 }
 
 type CPU struct {
 	bus       Bus
 	scheduler Scheduler
 	state     State
+	irqLine   bool
+	waiting   bool
 }
 
 func New(bus Bus, scheduler Scheduler) *CPU {
@@ -61,11 +66,16 @@ func New(bus Bus, scheduler Scheduler) *CPU {
 
 func (c *CPU) State() State { return c.state }
 
+// SetIRQ drives the level-sensitive maskable interrupt input. The input is
+// sampled only at instruction boundaries, as on the physical processor.
+func (c *CPU) SetIRQ(asserted bool) { c.irqLine = asserted }
+
 // Reset models the seven-cycle reset entry and reads the little-endian vector
 // at $FFFC/$FFFD. The machine keeps reset asserted until the sound driver has
 // been uploaded and $E9001C bit 0 is released.
 func (c *CPU) Reset() error {
 	c.state = State{SP: 0xfd, P: flagInterruptDisable | flagUnused}
+	c.waiting = false
 	for range 5 {
 		if err := c.internal(); err != nil {
 			return err
@@ -86,6 +96,23 @@ func (c *CPU) Reset() error {
 func (c *CPU) Step() (StepResult, error) {
 	result := StepResult{PCBefore: c.state.PC}
 	start := c.state.Cycles
+	if c.waiting {
+		if !c.irqLine {
+			err := c.internal()
+			result.PCAfter = c.state.PC
+			result.Cycles = c.state.Cycles - start
+			result.Waiting = true
+			return result, err
+		}
+		c.waiting = false
+	}
+	if c.irqLine && c.state.P&flagInterruptDisable == 0 {
+		err := c.serviceIRQ()
+		result.PCAfter = c.state.PC
+		result.Cycles = c.state.Cycles - start
+		result.Interrupt = true
+		return result, err
+	}
 	opcode, err := c.read(c.state.PC)
 	if err != nil {
 		return result, err
@@ -194,7 +221,7 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.setNZ(c.state.A)
 		}
-	case 0xcc: // CPY abs
+	case 0xcc, 0xec: // CPY/CPX abs
 		c.state.PC++
 		var lo, hi, value uint8
 		lo, err = c.fetch()
@@ -205,7 +232,22 @@ func (c *CPU) Step() (StepResult, error) {
 			value, err = c.read(uint16(hi)<<8 | uint16(lo))
 		}
 		if err == nil {
-			c.compare(c.state.Y, value)
+			if opcode == 0xec {
+				c.compare(c.state.X, value)
+			} else {
+				c.compare(c.state.Y, value)
+			}
+		}
+	case 0xe0, 0xc0: // CPX/CPY #imm
+		c.state.PC++
+		var value uint8
+		value, err = c.fetch()
+		if err == nil {
+			if opcode == 0xe0 {
+				c.compare(c.state.X, value)
+			} else {
+				c.compare(c.state.Y, value)
+			}
 		}
 	case 0x29, 0x09, 0x49: // AND/ORA/EOR #imm
 		c.state.PC++
@@ -218,6 +260,24 @@ func (c *CPU) Step() (StepResult, error) {
 			case 0x09:
 				c.state.A |= value
 			case 0x49:
+				c.state.A ^= value
+			}
+			c.setNZ(c.state.A)
+		}
+	case 0x25, 0x05, 0x45: // AND/ORA/EOR zp
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			value, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			switch opcode {
+			case 0x25:
+				c.state.A &= value
+			case 0x05:
+				c.state.A |= value
+			case 0x45:
 				c.state.A ^= value
 			}
 			c.setNZ(c.state.A)
@@ -281,6 +341,23 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.state.PC = uint16(hi)<<8 | uint16(lo)
 		}
+	case 0x6c: // JMP (abs), with the 65C02 page-boundary correction
+		c.state.PC++
+		var pointerLo, pointerHi, targetLo, targetHi uint8
+		pointerLo, err = c.fetch()
+		if err == nil {
+			pointerHi, err = c.fetch()
+		}
+		pointer := uint16(pointerHi)<<8 | uint16(pointerLo)
+		if err == nil {
+			targetLo, err = c.read(pointer)
+		}
+		if err == nil {
+			targetHi, err = c.read(pointer + 1)
+		}
+		if err == nil {
+			c.state.PC = uint16(targetHi)<<8 | uint16(targetLo)
+		}
 	case 0x48: // PHA
 		c.state.PC++
 		err = c.internal()
@@ -339,6 +416,35 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.state.PC = (uint16(hi)<<8 | uint16(lo)) + 1
 		}
+	case 0x40: // RTI
+		c.state.PC++
+		err = c.internal()
+		var status, lo, hi uint8
+		if err == nil {
+			status, err = c.pull()
+		}
+		if err == nil {
+			lo, err = c.pull()
+		}
+		if err == nil {
+			hi, err = c.pull()
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			c.state.P = status | flagUnused
+			c.state.PC = uint16(hi)<<8 | uint16(lo)
+		}
+	case 0xcb: // WAI (65C02)
+		c.state.PC++
+		err = c.internal()
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			c.waiting = true
+		}
 	case 0x95: // STA zp,X
 		c.state.PC++
 		var zeroPage uint8
@@ -349,7 +455,7 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			err = c.write(uint16(zeroPage+c.state.X), c.state.A)
 		}
-	case 0x9d: // STA abs,X
+	case 0x9d, 0x99: // STA abs,X / STA abs,Y
 		c.state.PC++
 		var lo, hi uint8
 		lo, err = c.fetch()
@@ -360,7 +466,11 @@ func (c *CPU) Step() (StepResult, error) {
 			err = c.internal()
 		}
 		if err == nil {
-			err = c.write((uint16(hi)<<8|uint16(lo))+uint16(c.state.X), c.state.A)
+			index := c.state.X
+			if opcode == 0x99 {
+				index = c.state.Y
+			}
+			err = c.write((uint16(hi)<<8|uint16(lo))+uint16(index), c.state.A)
 		}
 	case 0x8d, 0x8e, 0x8c: // STA/STX/STY abs
 		c.state.PC++
@@ -412,6 +522,52 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			c.setNZ(value)
 		}
+	case 0xee, 0xce: // INC/DEC abs
+		c.state.PC++
+		var lo, hi, value uint8
+		lo, err = c.fetch()
+		if err == nil {
+			hi, err = c.fetch()
+		}
+		address := uint16(hi)<<8 | uint16(lo)
+		if err == nil {
+			value, err = c.read(address)
+		}
+		if opcode == 0xee {
+			value++
+		} else {
+			value--
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			err = c.write(address, value)
+		}
+		if err == nil {
+			c.setNZ(value)
+		}
+	case 0x46: // LSR zp
+		c.state.PC++
+		var zeroPage, value uint8
+		zeroPage, err = c.fetch()
+		if err == nil {
+			value, err = c.read(uint16(zeroPage))
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			c.state.P &^= flagCarry
+			if value&1 != 0 {
+				c.state.P |= flagCarry
+			}
+			value >>= 1
+			err = c.write(uint16(zeroPage), value)
+		}
+		if err == nil {
+			c.setNZ(value)
+		}
 	case 0xca: // DEX
 		c.state.PC++
 		c.state.X--
@@ -456,6 +612,36 @@ func (c *CPU) Step() (StepResult, error) {
 	result.PCAfter = c.state.PC
 	result.Cycles = c.state.Cycles - start
 	return result, err
+}
+
+func (c *CPU) serviceIRQ() error {
+	if err := c.internal(); err != nil {
+		return err
+	}
+	if err := c.internal(); err != nil {
+		return err
+	}
+	if err := c.push(uint8(c.state.PC >> 8)); err != nil {
+		return err
+	}
+	if err := c.push(uint8(c.state.PC)); err != nil {
+		return err
+	}
+	status := (c.state.P | flagUnused) &^ flagBreak
+	if err := c.push(status); err != nil {
+		return err
+	}
+	c.state.P = (c.state.P | flagInterruptDisable | flagUnused) &^ flagDecimal
+	lo, err := c.read(0xfffe)
+	if err != nil {
+		return err
+	}
+	hi, err := c.read(0xffff)
+	if err != nil {
+		return err
+	}
+	c.state.PC = uint16(hi)<<8 | uint16(lo)
+	return nil
 }
 
 func (c *CPU) branch(taken bool) error {

@@ -16,10 +16,21 @@ type SoundBus struct {
 }
 
 func newSoundBus(ram *[65536]byte) *SoundBus {
-	return &SoundBus{ram: ram, audio: umc6619.New()}
+	bus := &SoundBus{ram: ram, audio: umc6619.New()}
+	bus.audio.SetRAMReader(func(address uint16) uint8 { return ram[address] })
+	bus.audio.SetIRQHandler(func(mask uint8, asserted bool) {
+		if asserted {
+			bus.irqStatus |= mask
+		} else {
+			bus.irqStatus &^= mask
+		}
+	})
+	return bus
 }
 
 func (b *SoundBus) Audio() *umc6619.Device { return b.audio }
+func (b *SoundBus) IRQAsserted() bool      { return b.irqStatus&b.irqEnable != 0 }
+func (b *SoundBus) IRQStatus() uint8       { return b.irqStatus }
 
 func (b *SoundBus) Read8(address uint16) (uint8, error) {
 	if address < 0x0400 || address > 0x04ff {
@@ -60,12 +71,16 @@ func (b *SoundBus) Write8(address uint16, value uint8) error {
 }
 
 type SoundTimeline struct {
-	Cycles uint64
-	Last   m65c02.Cycle
+	Cycles    uint64
+	Last      m65c02.Cycle
+	OnAdvance func(cycles uint64)
 }
 
 func (t *SoundTimeline) Advance(cycle m65c02.Cycle) error {
 	t.Cycles++
 	t.Last = cycle
+	if t.OnAdvance != nil {
+		t.OnAdvance(1)
+	}
 	return nil
 }

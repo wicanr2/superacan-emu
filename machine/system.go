@@ -66,6 +66,7 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 		system.Bus.Video().ClearIRQ(level)
 	})
 	timeline.OnAdvance = system.advanceDevices
+	soundTimeline.OnAdvance = system.SoundBus.Audio().Advance
 	bus.setControlObserver(system.controlChanged)
 	return system, nil
 }
@@ -94,6 +95,7 @@ func (s *System) controlChanged(oldValue, newValue uint16) error {
 	if !wasReset && isReset {
 		s.soundReset = true
 		s.soundCredit = 0
+		s.SoundBus.Audio().Reset()
 		return nil
 	}
 	if wasReset && !isReset {
@@ -108,6 +110,7 @@ func (s *System) advanceDevices(m68kCycles uint8) error {
 	if !s.soundReset {
 		s.soundCredit += int64(m68kCycles)
 		for s.soundCredit >= 6 {
+			s.M65C02.SetIRQ(s.SoundBus.IRQAsserted())
 			result, err := s.M65C02.Step()
 			if err != nil {
 				return err

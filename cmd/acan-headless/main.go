@@ -1,12 +1,15 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
+	"github.com/wicanr2/superacan-emu/chip/umc6619"
 	"github.com/wicanr2/superacan-emu/cpu/m68k"
 	"github.com/wicanr2/superacan-emu/machine"
 	"github.com/wicanr2/superacan-emu/media"
@@ -37,6 +40,17 @@ func main() {
 	if err != nil {
 		fail(err.Error())
 	}
+	audioHash := sha256.New()
+	var audioNonzero uint64
+	system.SoundBus.Audio().SetSampleSink(func(sample umc6619.Sample) {
+		var encoded [4]byte
+		binary.LittleEndian.PutUint16(encoded[0:2], uint16(sample.Left))
+		binary.LittleEndian.PutUint16(encoded[2:4], uint16(sample.Right))
+		_, _ = audioHash.Write(encoded[:])
+		if sample.Left != 0 || sample.Right != 0 {
+			audioNonzero++
+		}
+	})
 	type observedTransaction struct {
 		machine.Transaction
 		Instruction uint64
@@ -89,11 +103,11 @@ func main() {
 	soundState := system.M65C02.State()
 	vramSHA := system.Bus.Video().VRAMSHA256()
 	framebufferSHA := system.Bus.Video().FramebufferSHA256()
-	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X irq_ack=7:%d,5:%d,4:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
+	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X irq_ack=7:%d,5:%d,4:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
 		hex.EncodeToString(ipl.RawSHA256[:]), hex.EncodeToString(rom.RawSHA256[:]),
 		system.Instructions, state.PC, result.Opcode, state.Cycles,
 		system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled(),
-		system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundResetAsserted(),
+		system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundBus.Audio().SampleCount(), audioNonzero, audioHash.Sum(nil), system.SoundBus.IRQStatus(), system.SoundResetAsserted(),
 		system.Bus.Video().Frame(), system.Bus.Video().Scanline(), system.Bus.Video().VideoFlags(),
 		system.IRQAcknowledgements[7], system.IRQAcknowledgements[5], system.IRQAcknowledgements[4],
 		system.Bus.Video().NonzeroVRAMBytes(), hex.EncodeToString(vramSHA[:]),
