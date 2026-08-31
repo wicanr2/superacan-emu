@@ -95,3 +95,31 @@ func TestObserverReportsOneCompleteTransactionPerAccess(t *testing.T) {
 		}
 	}
 }
+
+func TestUMC6618WindowsAndWordWriteAreDeviceTransactions(t *testing.T) {
+	b := testMachineBus(t)
+	if err := b.Write16(0xf00008, 0x0188); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := b.Read16(0xf00008); got != 0x0188 || b.Video().VideoFlags() != 0x0188 {
+		t.Fatalf("video flags=$%04X device=$%04X", got, b.Video().VideoFlags())
+	}
+	if err := b.Write16(0xf0020e, 0x7c1f); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Write16(0xf44400, 0x1234); err != nil {
+		t.Fatal(err)
+	}
+	if palette, _ := b.Read16(0xf0020e); palette != 0x7c1f {
+		t.Fatalf("palette=$%04X", palette)
+	}
+	if vram, _ := b.Read16(0xf44400); vram != 0x1234 {
+		t.Fatalf("VRAM=$%04X", vram)
+	}
+	if err := b.Write16(0xf0001e, 0x8000); err != nil {
+		t.Fatal(err)
+	}
+	if b.Video().SpriteDMAStarts() != 1 {
+		t.Fatalf("word write triggered sprite DMA %d times", b.Video().SpriteDMAStarts())
+	}
+}

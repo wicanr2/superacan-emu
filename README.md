@@ -20,9 +20,10 @@ driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的純 Go �
 
 Go 主線目前已有 media manifest、整機 bus、UMC6650、phase timeline、headless runner，
 並以固定 IPL SHA-256 完成真實 Boom Zoo IPL、UMC6650、卡帶授權與 overlay 轉交；
-目前已用純 Go W65C02 完成 Boom Zoo sound driver boot ack，並開始寫入 `$F44400` VRAM；
-headless runner 可依位址範圍輸出有界 bus transaction。尚未完成完整 CPU ISA、
-exception／IRQ、UM6618 renderer 與 UMC6619 PCM。下列完整相容性仍是
+目前已用純 Go W65C02 完成 Boom Zoo sound driver boot ack；UM6618 register、palette、
+VRAM 與 scanline timing 已接入，卡帶可自然離開 vblank poll。headless runner 可輸出
+有界 bus transaction 與 VRAM hash。尚未完成完整 CPU ISA、exception／IRQ、UM6618
+renderer 與 UMC6619 PCM。下列完整相容性仍是
 deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）
@@ -160,6 +161,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
   已實作 vertical slice 與證據限制
 - [`docs/m65c02-implementation.md`](docs/m65c02-implementation.md)：W65C02 reset、3:1
   排程、sound boot 路徑與尚未完成的 ISA／IRQ
+- [`docs/umc6618-implementation.md`](docs/umc6618-implementation.md)：視訊 register、
+  palette、VRAM、scanline 與真實卡帶交易證據
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：

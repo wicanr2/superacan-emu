@@ -35,7 +35,7 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 		SoundBus: soundBus, SoundTimeline: soundTimeline,
 		soundReset: true,
 	}
-	timeline.OnAdvance = system.advanceSound
+	timeline.OnAdvance = system.advanceDevices
 	bus.setControlObserver(system.controlChanged)
 	return system, nil
 }
@@ -73,18 +73,18 @@ func (s *System) controlChanged(oldValue, newValue uint16) error {
 	return nil
 }
 
-func (s *System) advanceSound(m68kCycles uint8) error {
-	if s.soundReset {
-		return nil
-	}
-	s.soundCredit += int64(m68kCycles)
-	for s.soundCredit >= 6 {
-		result, err := s.M65C02.Step()
-		if err != nil {
-			return err
+func (s *System) advanceDevices(m68kCycles uint8) error {
+	if !s.soundReset {
+		s.soundCredit += int64(m68kCycles)
+		for s.soundCredit >= 6 {
+			result, err := s.M65C02.Step()
+			if err != nil {
+				return err
+			}
+			s.SoundInstructions++
+			s.soundCredit -= int64(result.Cycles) * 3
 		}
-		s.SoundInstructions++
-		s.soundCredit -= int64(result.Cycles) * 3
 	}
+	s.Bus.Video().AdvanceM68KCycles(m68kCycles)
 	return nil
 }

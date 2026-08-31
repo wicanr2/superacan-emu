@@ -112,6 +112,20 @@ const (
 	InstructionCLRBytePostincrement
 	InstructionMOVELongImmediateToPostincrement
 	InstructionCLRWordPostincrement
+	InstructionSUBILongData
+	InstructionTSTWordAbsoluteLong
+	InstructionMOVELongDataToAbsoluteLong
+	InstructionMOVEWordDataToDisplacement
+	InstructionMOVELongDataToDisplacement
+	InstructionEXTLongData
+	InstructionSUBWordDataFromData
+	InstructionMULUWordData
+	InstructionDIVUWordData
+	InstructionMOVEWordDataToPredecrement
+	InstructionLSLLongImmediate
+	InstructionMOVELongDataToPredecrement
+	InstructionCLRWordAddressIndirect
+	InstructionCLRLongPredecrement
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -416,6 +430,38 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVELongImmediateToPostincrement, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xfff8 == 0x4258:
 		return Decoded{Instruction: InstructionCLRWordPostincrement, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x0480:
+		return Decoded{Instruction: InstructionSUBILongData, Register: uint8(opcode & 7)}
+	case opcode == 0x4a79:
+		return Decoded{Instruction: InstructionTSTWordAbsoluteLong}
+	case opcode&0xfff8 == 0x23c0:
+		return Decoded{Instruction: InstructionMOVELongDataToAbsoluteLong, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3140:
+		return Decoded{Instruction: InstructionMOVEWordDataToDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x2140:
+		return Decoded{Instruction: InstructionMOVELongDataToDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x48c0:
+		return Decoded{Instruction: InstructionEXTLongData, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x9040:
+		return Decoded{Instruction: InstructionSUBWordDataFromData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xc0c0:
+		return Decoded{Instruction: InstructionMULUWordData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x80c0:
+		return Decoded{Instruction: InstructionDIVUWordData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3100:
+		return Decoded{Instruction: InstructionMOVEWordDataToPredecrement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xe188:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionLSLLongImmediate, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1f8 == 0x2100:
+		return Decoded{Instruction: InstructionMOVELongDataToPredecrement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4250:
+		return Decoded{Instruction: InstructionCLRWordAddressIndirect, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x42a0:
+		return Decoded{Instruction: InstructionCLRLongPredecrement, Register: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x0040:
 		return Decoded{Instruction: InstructionORIWordData, Register: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3010:

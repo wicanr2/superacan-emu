@@ -62,11 +62,14 @@ func main() {
 	result, err := system.RunInstructions(*steps)
 	state := system.M68K.State()
 	soundState := system.M65C02.State()
-	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_reset=%t\n",
+	vramSHA := system.Bus.Video().VRAMSHA256()
+	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X vram_nonzero=%d vram_sha256=%s\n",
 		hex.EncodeToString(ipl.RawSHA256[:]), hex.EncodeToString(rom.RawSHA256[:]),
 		system.Instructions, state.PC, result.Opcode, state.Cycles,
 		system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled(),
-		system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundResetAsserted())
+		system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundResetAsserted(),
+		system.Bus.Video().Frame(), system.Bus.Video().Scanline(), system.Bus.Video().VideoFlags(),
+		system.Bus.Video().NonzeroVRAMBytes(), hex.EncodeToString(vramSHA[:]))
 	for _, record := range observed {
 		direction := "R"
 		if record.Write {

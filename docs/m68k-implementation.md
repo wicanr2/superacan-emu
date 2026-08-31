@@ -65,5 +65,7 @@ displacement 是後續 CPU 型號能力，本核心目前不得套用。
 - Motorola reset phase 的更細 bus timing 審查；目前 40-cycle reset 是 sample-derived
   起始契約，文件中不得標成硬體已證實。
 - 與獨立公開 opcode vectors 及 archived oracle 的自動差分 harness。
+- DIVU register 成功路徑目前採 140-cycle worst-case；需依 MC68000 iterative timing
+  演算法補齊 data-dependent cycle，不能把目前值標成精確 timing。
 - 卡帶入口 `$2B22 MOVEM.L` 已通過；目前 200,000 指令上限內沒有未知 opcode，完整
   ISA、exception 與 IRQ 仍未完成。

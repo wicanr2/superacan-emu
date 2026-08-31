@@ -182,3 +182,20 @@
   word writes，證明已進入視訊資料初始化。
 - 目前前進至 462,153 條 68000 指令附近；W65C02 已執行約 311,000 條。這只證明 boot
   路徑，尚不代表完整 65C02、IRQ、UM6618 renderer 或 UMC6619 音訊完成。
+
+## 2026-08-31：UM6618 儲存窗口與 scanline 時間線
+
+- 新增獨立 `chip/umc6618`：256 word registers、256 色 palette、128 KiB VRAM；bus 的
+  word read/write 直接呼叫 device 一次，byte access 才做明確 read-modify-write。
+- 回歸：register／palette／VRAM readback、vblank status read-ack、pixel-mode mask、
+  `$F0001E` 單次 word trigger，以及 684／728 cycles-per-line 與第 240 線 vblank。
+- 真實資料：首次穩定 VRAM 狀態有 5,587 個非零 byte、SHA-256 `53bf5e…81d2`；palette
+  與 sprite／ROZ／window／video flags registers 均由真實卡帶寫入。
+- Timeline 接入 scanline 後，`$FFDBB0` 的 `$F00000` poll 依時間自然離開；後續 VRAM
+  非零資料增加至 7,344 bytes。未用 PC、ROM hash 或讀取次數特判 vblank。
+- 68000 同步補上初始化路徑需要的 TST、SUBI.L、EXT.L、MULU／DIVU、displacement／
+  predecrement MOVE 與 long shift。DIVU 成功 timing 暫採 140-cycle worst-case，已在文件
+  標為待收斂，不冒稱精確。
+- 最終真實 smoke 無未知 opcode 完成 1,300,000 條 68000 指令與 1,524,044 條 65C02
+  指令；video frame=88、scanline=69、video flags=`$120E`，VRAM SHA-256
+  `b0b2d6d8a8a77e71928ef88c0980f57493b0e3279634a0956753b0887c80f255`。

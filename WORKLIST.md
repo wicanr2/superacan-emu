@@ -37,8 +37,10 @@
 - [x] 從 Boom Zoo `$2B22 MOVEM.L` 擴充卡帶啟動 ISA，直到第一個 UM6618／UM6619／
   sound RAM 初始化交易。已完成 sound driver 上傳、65C02 `$0300=$FF` boot ack，並觀察
   `$F44400` 起 VRAM 寫入；核心沒有遊戲專屬 opcode stub。
-- [ ] 將 UM6618 register／palette／VRAM 接入 Go bus，保證 word write 單次生效；再依
-  真實路徑實作 sprite DMA、掃描線與 IRQ4／5／7。
+- [x] 將 UM6618 register／palette／VRAM 接入 Go bus，保證 word write 單次生效；以
+  真實 VRAM hash、palette／register trace 與自然離開 vblank poll 驗證。
+- [ ] 實作 UM6618 sprite DMA、tilemap／sprite／window／ROZ framebuffer、掃描線
+  IRQ4／5／7；先完成 Boom Zoo 第一張非黑 frame，再做 archived oracle hash／截圖差分。
 - [ ] 完成 W65C02 ISA、IRQ／NMI／WAI 與 I/O ack，將目前 instruction-total 3:1 排程
   收斂成可驗證的 cycle 邊界。
 - [ ] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ6／IRQ7 來源。

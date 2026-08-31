@@ -57,3 +57,17 @@ func (c *CPU) sub16(destination, source uint16) uint16 {
 	}
 	return result
 }
+
+func (c *CPU) sub32(destination, source uint32) uint32 {
+	result := destination - source
+	c.setNZ32(result)
+	if (destination^source)&(destination^result)&0x8000_0000 != 0 {
+		c.state.SR |= flagOverflow
+	}
+	if source > destination {
+		c.state.SR |= flagCarry | flagExtend
+	} else {
+		c.state.SR &^= flagExtend
+	}
+	return result
+}
