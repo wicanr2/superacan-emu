@@ -7,7 +7,7 @@ MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎
 
 長期目標：在 Linux 上重製 Bcan 的模擬能力（影像/音效/視窗後續以 SDL2 加入）。
 
-## 目前進度（里程碑 2）
+## 目前進度（里程碑 4）
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）
 - [x] UMC6650 lockout 晶片完整實作（埠角色以 IPL 反組譯為準，見
@@ -19,10 +19,20 @@ MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎
       65C02 mailbox（IRQ6），HOLD_LINE 語意以 Moira `willInterrupt` 模擬
 - [x] 主機 DMA 2 通道（byte/word/0xA800 填充/間接模式）
 - [x] 65C02（CLK `6502Mk2`）實際執行：I/O `$0400-$04FF`、命令 mailbox、
-      boot ack、HALT/釋放（重新上傳驅動）；UM6619 暫存器 stub（無聲）
-- [x] SDL2 視窗輸出 + headless 驗證模式（`--frames`/`--screenshot`）
-- [x] 遊戲畫面驗證：Boom Zoo、Monopoly、Speedy Dragon（見 `docs/verify-video.md`）
-- [ ] 音效（UM6619 合成）、ROZ 層、手把輸入、save state
+      boot ack、HALT/釋放（重新上傳驅動；reset 拉住至向量讀取完成）
+- [x] **UM6619 音效合成**：16 通道 PCM 取樣（period/音量/key/長度/起始位址）、
+      DMA 雙緩衝（IRQ bit6）、內建 timer（IRQ bit7，音樂 tempo）；
+      原生 44744 Hz → 線性插值 48000 Hz；SDL2 音訊輸出 + `--wav` headless 錄音
+      （`src/audio/um6619.*`，見 `docs/verify-audio-input.md`）
+- [x] 65C02 IRQ 來源模型：level-held + 專屬 ack（`$0411` 純狀態）；latch
+      `$0404/$0405`（空=`$CD`、68k 寫入觸發 IRQ）
+- [x] 手把輸入：SDL 鍵盤（方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R、Enter=Start、
+      右 Shift=Select；P1）+ headless `--press frame:BTN,...` 注入；
+      65C02 shift register 掃描與 68k direct mode 兩路皆通
+- [x] SDL2 視窗輸出 + headless 驗證模式（`--frames`/`--screenshot`/`--wav`/`--press`）
+- [x] 遊戲驗證：Boom Zoo、Monopoly（畫面+音樂+按鍵反應）、Speedy Dragon
+      （**第二套音樂驅動已修復**，預設模式可跑；見 `docs/verify-audio-input.md`）
+- [ ] ROZ 層、雙人輸入、save state、latch 3-byte 封包語意
 
 ## 建置
 
@@ -54,6 +64,12 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 ./build/superacan-emu --bios /tmp/acan_bios \
     --rom "/path/to/Boom Zoo (Taiwan).bin" \
     --headless --frames 6000 --screenshot /tmp/out.bmp
+
+# 錄音 + 按鍵注入（里程碑 3/4）
+./build/superacan-emu --bios /tmp/acan_bios \
+    --rom "/path/to/Monopoly - Adventure in Africa (Taiwan).bin" \
+    --headless --frames 4300 --wav /tmp/out.wav \
+    --press 3700:START --screenshot /tmp/after.bmp
 ```
 
 - `--bios <dir>`：內含 `internal_68k.bin`（4KB IPL）、`umc6650.bin`（16B 金鑰）；
@@ -63,8 +79,13 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - `--trace N`：以 Moira 反組譯器 log 前 N 條指令
 - `--instructions N`：headless 且無 `--frames` 時，到卡帶入口後再執行的指令數
 - `--headless` / `--frames N` / `--screenshot <file.bmp>`
+- `--wav <file.wav>`：全程音訊錄成 48 kHz 16-bit stereo WAV
+- `--press <spec>`：headless 按鍵注入 `frame:BTN+BTN,...`（按住 10 幀）；
+  BTN = A/B/X/Y/L/R/START/SELECT/UP/DOWN/LEFT/RIGHT
+- 視窗模式鍵盤：方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R、Enter=Start、右 Shift=Select
 - 除錯環境變數：`ACAN_DEBUG`、`ACAN_DMA`、`ACAN_WATCH`、`ACAN_TRACE65`、
-  `ACAN_LAYERMASK`、`ACAN_DUMP=<prefix>`（見 `docs/verify-video.md`）
+  `ACAN_DBG65`（65C02 暫存器定期 dump）、`ACAN_LAYERMASK`、
+  `ACAN_DUMP=<prefix>`（見 `docs/verify-video.md`）
 
 預期：通過 UMC6650 交握與授權比對後進入卡帶，vblank IRQ 驅動遊戲主迴圈，
 畫面經 SDL2 顯示（Boom Zoo 可見標題「爆爆動物園」）。
@@ -80,6 +101,9 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 MAME `supracan.cpp`（BSD-3-Clause，Angelo Salese / Ryan Holtz 等）：UM6618
 渲染、DMA、中斷行為以其為參考**重新實作**（`src/video/um6618.cpp`、
 `src/bus.cpp` 標頭註明出處），未複製程式碼。
+MAME `umc6619_sound.cpp`（BSD-3-Clause，Ryan Holtz / superctr）：UM6619
+PCM 合成模型（通道/period/音量/key/DMA/timer 暫存器語意與混音流程）以其為
+參考**重新實作**（`src/audio/um6619.*` 標頭註明出處），未複製程式碼。
 
 ## 版權注意
 
