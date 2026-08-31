@@ -21,6 +21,8 @@
   `$0300=$FF`；68000 第 395,493 條指令的 `CMPI.B` 首次讀取即看到 ack。
 - Speedy Dragon 執行至 616 幀後動態命中 `$FA05` 的 `CMP zp`；新增 3-cycle
   zero-page compare 後，聲音 CPU 繼續執行，整機阻塞重新回到 68000 路徑。
+- Speedy Dragon 後續聲音路徑動態命中 `ADC abs,Y`、`PHP`、`PLP`；indexed ADC
+  包含 page-cross 額外週期，status stack 保留 Break／Unused 的軟體可見契約。
 
 ## 尚未完成
 

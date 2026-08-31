@@ -373,6 +373,24 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			err = c.adc(value)
 		}
+	case 0x79: // ADC abs,Y
+		c.state.PC++
+		var lo, hi, value uint8
+		lo, err = c.fetch()
+		if err == nil {
+			hi, err = c.fetch()
+		}
+		base := uint16(hi)<<8 | uint16(lo)
+		address := base + uint16(c.state.Y)
+		if err == nil && base&0xff00 != address&0xff00 {
+			err = c.internal()
+		}
+		if err == nil {
+			value, err = c.read(address)
+		}
+		if err == nil {
+			err = c.adc(value)
+		}
 	case 0xe9: // SBC #imm
 		c.state.PC++
 		var value uint8
@@ -531,6 +549,12 @@ func (c *CPU) Step() (StepResult, error) {
 		if err == nil {
 			err = c.push(c.state.A)
 		}
+	case 0x08: // PHP
+		c.state.PC++
+		err = c.internal()
+		if err == nil {
+			err = c.push(c.state.P | flagBreak | flagUnused)
+		}
 	case 0xda: // PHX (65C02)
 		c.state.PC++
 		err = c.internal()
@@ -563,6 +587,19 @@ func (c *CPU) Step() (StepResult, error) {
 				c.state.Y = value
 			}
 			c.setNZ(value)
+		}
+	case 0x28: // PLP
+		c.state.PC++
+		err = c.internal()
+		var status uint8
+		if err == nil {
+			status, err = c.pull()
+		}
+		if err == nil {
+			err = c.internal()
+		}
+		if err == nil {
+			c.state.P = status | flagUnused
 		}
 	case 0x60: // RTS
 		c.state.PC++

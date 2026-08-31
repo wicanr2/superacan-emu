@@ -177,6 +177,7 @@ const (
 	InstructionORByteDataToData
 	InstructionADDILongAbsoluteLong
 	InstructionMOVELongAbsoluteLongToAbsoluteLong
+	InstructionSUBILongAbsoluteLong
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -293,6 +294,8 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionADDILongAbsoluteLong}
 	case opcode == 0x23f9:
 		return Decoded{Instruction: InstructionMOVELongAbsoluteLongToAbsoluteLong}
+	case opcode == 0x04b9:
+		return Decoded{Instruction: InstructionSUBILongAbsoluteLong}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:

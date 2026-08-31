@@ -222,6 +222,50 @@ func TestADCImmediateBinaryAndDecimal(t *testing.T) {
 	}
 }
 
+func TestADCAbsoluteYPageCrossTiming(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x8001], machine.memory[0x8002] = 0x79, 0xff, 0x20
+	machine.memory[0x2100] = 1
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, A: 0x7f, Y: 1, P: flagUnused}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Cycles != 5 || cpu.state.PC != 0x8003 || cpu.state.A != 0x80 || cpu.state.P&flagNegative == 0 || cpu.state.P&flagOverflow == 0 || cpu.state.P&flagCarry != 0 {
+		t.Fatalf("result=%+v state=%+v", result, cpu.state)
+	}
+}
+
+func TestPHPPushesBreakAndUnusedWithoutMutatingStatus(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000] = 0x08
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, SP: 0xfd, P: flagCarry}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Cycles != 3 || cpu.state.PC != 0x8001 || cpu.state.SP != 0xfc || cpu.state.P != flagCarry || machine.memory[0x01fd] != flagCarry|flagBreak|flagUnused {
+		t.Fatalf("result=%+v state=%+v stack=$%02X", result, cpu.state, machine.memory[0x01fd])
+	}
+}
+
+func TestPLPPullsStatusAndForcesUnusedBit(t *testing.T) {
+	machine := &testMachine{}
+	machine.memory[0x8000], machine.memory[0x01fd] = 0x28, flagCarry|flagDecimal
+	cpu := New(machine, machine)
+	cpu.state = State{PC: 0x8000, SP: 0xfc, P: flagNegative}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := uint8(flagCarry | flagDecimal | flagUnused)
+	if result.Cycles != 4 || cpu.state.PC != 0x8001 || cpu.state.SP != 0xfd || cpu.state.P != want {
+		t.Fatalf("result=%+v state=%+v wantP=$%02X", result, cpu.state, want)
+	}
+}
+
 func TestSBCImmediateBinaryAndDecimal(t *testing.T) {
 	machine := &testMachine{}
 	machine.memory[0x8000], machine.memory[0x8001] = 0xe9, 0x01

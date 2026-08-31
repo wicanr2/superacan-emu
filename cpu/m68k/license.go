@@ -202,6 +202,27 @@ func (c *CPU) addiLongAbsoluteLong() error {
 	return stream.finish()
 }
 
+func (c *CPU) subiLongAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	value = c.sub32(value, immediate)
+	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) addxByteData(source, destination uint8) error {
 	left, right := uint8(c.state.D[destination]), uint8(c.state.D[source])
 	extend := uint16(0)

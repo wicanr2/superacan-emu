@@ -1369,6 +1369,29 @@ func TestMOVELongAbsoluteLongToAbsoluteLong(t *testing.T) {
 	}
 }
 
+func TestSUBILongAbsoluteLongReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x04b9, 0x0402: 0x0000, 0x0404: 0x0001,
+		0x0406: 0x0001, 0x0408: 0x2000, 0x040a: 0x4e71, 0x040c: 0x4e71,
+		0x012000: 0x8000, 0x012002: 0x0000,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR |= flagExtend | flagNegative | flagZero | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 36 || state.PC != 0x040a || state.SR&0x1f != flagOverflow {
+		t.Fatalf("cycles=%d PC=$%06X SR=$%04X", result.Cycles, state.PC, state.SR)
+	}
+	want := []wordWrite{{address: 0x012000, value: 0x7fff}, {address: 0x012002, value: 0xffff}}
+	if !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("writes=%+v, want %+v", bus.writes, want)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

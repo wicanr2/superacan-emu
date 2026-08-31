@@ -399,6 +399,10 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveLongAbsoluteLongToAbsoluteLong(); err != nil {
 			return result, fmt.Errorf("m68k MOVE.L (xxx).L,(xxx).L: %w", err)
 		}
+	case InstructionSUBILongAbsoluteLong:
+		if err := c.subiLongAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k SUBI.L #imm,(xxx).L: %w", err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
