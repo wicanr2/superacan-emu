@@ -167,6 +167,10 @@ const (
 	InstructionCMPByteAbsoluteLongToData
 	InstructionCMPWordAbsoluteLongToData
 	InstructionCMPWordDataToData
+	InstructionADDWordDataToData
+	InstructionCMPLongDataToData
+	InstructionMOVEALongDisplacement
+	InstructionMOVEByteAddressIndirectToData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -259,6 +263,14 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionCMPWordAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xf1f8 == 0xb040:
 		return Decoded{Instruction: InstructionCMPWordDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xd040:
+		return Decoded{Instruction: InstructionADDWordDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xb080:
+		return Decoded{Instruction: InstructionCMPLongDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x2068:
+		return Decoded{Instruction: InstructionMOVEALongDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x1010:
+		return Decoded{Instruction: InstructionMOVEByteAddressIndirectToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:

@@ -342,6 +342,16 @@ func (c *CPU) moveWordAddressIndirectToData(source, destination uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) moveByteAddressIndirectToData(source, destination uint8) error {
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] = c.state.D[destination]&0xffffff00 | uint32(value)
+	c.setNZ8(value)
+	return c.prefetch()
+}
+
 func (c *CPU) moveWordPostincrementToData(source, destination uint8) error {
 	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
 	if err != nil {
@@ -387,6 +397,21 @@ func (c *CPU) moveALongAbsoluteLong(destination uint8) error {
 	if err != nil {
 		return err
 	}
+	value, err := c.readLong(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = value
+	return stream.finish()
+}
+
+func (c *CPU) moveALongDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[source])+int32(int16(displacement))) & addressMask
 	value, err := c.readLong(address, FCSupervisorData)
 	if err != nil {
 		return err

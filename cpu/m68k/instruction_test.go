@@ -1157,6 +1157,82 @@ func TestCMPWordDataToDataPreservesOperandsAndExtend(t *testing.T) {
 	}
 }
 
+func TestADDWordDataToData(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xdc43, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[3], cpu.state.D[6] = 1, 0xabcd_7fff
+	cpu.state.SR |= flagZero | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 4 || state.D[3] != 1 || state.D[6] != 0xabcd_8000 || state.SR&0x1f != flagNegative|flagOverflow {
+		t.Fatalf("cycles=%d D3=$%08X D6=$%08X SR=$%04X", result.Cycles, state.D[3], state.D[6], state.SR)
+	}
+}
+
+func TestCMPLongDataToDataPreservesOperandsAndExtend(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xbc85, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5], cpu.state.D[6] = 2, 1
+	cpu.state.SR |= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if result.Cycles != 6 || state.D[5] != 2 || state.D[6] != 1 || state.SR&0x1f != flagExtend|flagNegative|flagCarry {
+		t.Fatalf("cycles=%d D5=$%08X D6=$%08X SR=$%04X", result.Cycles, state.D[5], state.D[6], state.SR)
+	}
+}
+
+func TestMOVEALongDisplacementPreservesFlags(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x2a68, 0x0402: 0xfffe, 0x0404: 0x4e71, 0x0406: 0x4e71,
+		0x012000: 0x89ab, 0x012002: 0xcdef,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012002
+	cpu.state.SR |= flagExtend | flagNegative | flagZero | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 16 || state.A[5] != 0x89ab_cdef || state.A[0] != 0x012002 || state.SR&0x1f != 0x1f {
+		t.Fatalf("cycles=%d A5=$%08X A0=$%06X SR=$%04X", result.Cycles, state.A[5], state.A[0], state.SR)
+	}
+}
+
+func TestMOVEByteAddressIndirectToData(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x1415, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[5] = 0x012001
+	cpu.state.D[2] = 0x1234_5678
+	bus.bytes = map[uint32]uint8{0x012001: 0x80}
+	cpu.state.SR |= flagExtend | flagZero | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 8 || state.D[2] != 0x1234_5680 || state.A[5] != 0x012001 || state.SR&0x1f != flagExtend|flagNegative {
+		t.Fatalf("cycles=%d D2=$%08X A5=$%06X SR=$%04X", result.Cycles, state.D[2], state.A[5], state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

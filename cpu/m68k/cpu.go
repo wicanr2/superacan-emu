@@ -347,6 +347,28 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.prefetch(); err != nil {
 			return result, fmt.Errorf("m68k CMP.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionADDWordDataToData:
+		value := c.add16(uint16(c.state.D[decoded.Register]), uint16(c.state.D[decoded.SourceRegister]))
+		c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffff0000 | uint32(value)
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k ADD.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionCMPLongDataToData:
+		c.setCompare32(c.state.D[decoded.Register], c.state.D[decoded.SourceRegister])
+		if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+			return result, fmt.Errorf("m68k CMP.L D%d,D%d internal: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+		if err := c.prefetch(); err != nil {
+			return result, fmt.Errorf("m68k CMP.L D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEALongDisplacement:
+		if err := c.moveALongDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L (d16,A%d),A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEByteAddressIndirectToData:
+		if err := c.moveByteAddressIndirectToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
