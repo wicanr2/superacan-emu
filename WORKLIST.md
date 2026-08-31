@@ -16,8 +16,10 @@
   完成條件：每個差異可分類為 Go bug、sample 差異或硬體 unknown，不以 Moira 自動定案。
 - [x] 建立第一組 opcode decoder、16 種 condition code、MOVEQ、BRA.b／BRA.w 與
   Bcc.b／Bcc.w phase trace。完成證據見 `docs/m68k-implementation.md`。
-- [ ] 實作 extension-word cursor、operand size 與 68000 effective-address 基礎，再完成
-  BSR／JSR／MOVEA，讓 IPL 能從 `$400` 的 NOP 前進到第一段 UMC6650 初始化。
+- [x] 實作共用 extension-word cursor，以及 IPL 起始路徑所需的 `JSR (xxx).W` 與
+  `MOVEA.L #imm,An`；包含 18-cycle JSR、監督者堆疊 long-word 寫入與目標 queue refill。
+- [ ] 建立 operand size 與 68000 effective-address 基礎，再完成 BSR 與其餘 JSR／MOVEA
+  addressing modes，讓 IPL 從 `$400` 持續前進到第一段 UMC6650 初始化。
 - [ ] Go 68000 跑通 Super A'Can IPL 第一段。
   完成條件：固定 BIOS hash、reset SSP／PC、phase trace 與 C++ oracle 對照，逐步抵達
   UMC6650 交握；缺 opcode 時明確停止，不用 stub NOP。

@@ -8,6 +8,9 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		want   Decoded
 	}{
 		{0x4e71, Decoded{Instruction: InstructionNOP}},
+		{0x4eb8, Decoded{Instruction: InstructionJSRAbsoluteWord}},
+		{0x207c, Decoded{Instruction: InstructionMOVEAImmediateLong, Register: 0}},
+		{0x2e7c, Decoded{Instruction: InstructionMOVEAImmediateLong, Register: 7}},
 		{0x7000, Decoded{Instruction: InstructionMOVEQ, Register: 0, Immediate8: 0}},
 		{0x76ff, Decoded{Instruction: InstructionMOVEQ, Register: 3, Immediate8: 0xff}},
 		{0x6002, Decoded{Instruction: InstructionBRA, Immediate8: 2}},

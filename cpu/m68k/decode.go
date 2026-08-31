@@ -11,6 +11,8 @@ const (
 	InstructionBRA
 	InstructionBSR
 	InstructionBcc
+	InstructionJSRAbsoluteWord
+	InstructionMOVEAImmediateLong
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -27,6 +29,13 @@ func Decode(opcode uint16) Decoded {
 	switch {
 	case opcode == 0x4e71:
 		return Decoded{Instruction: InstructionNOP}
+	case opcode == 0x4eb8:
+		return Decoded{Instruction: InstructionJSRAbsoluteWord}
+	case opcode&0xf1ff == 0x207c:
+		return Decoded{
+			Instruction: InstructionMOVEAImmediateLong,
+			Register:    uint8(opcode >> 9 & 7),
+		}
 	case opcode&0xf100 == 0x7000:
 		return Decoded{
 			Instruction: InstructionMOVEQ,

@@ -1,14 +1,18 @@
 package m68k
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
-func newInstructionCPU(words map[uint32]uint16) (*CPU, *eventLog) {
+func newInstructionCPU(words map[uint32]uint16) (*CPU, *eventLog, *testBus) {
 	log := &eventLog{}
 	base := map[uint32]uint16{0: 0, 2: 0x1000, 4: 0, 6: 0x0400}
 	for address, value := range words {
 		base[address] = value
 	}
-	return New(&testBus{log: log, words: base}, log), log
+	bus := &testBus{log: log, words: base}
+	return New(bus, log), log, bus
 }
 
 func TestMOVEQDataAndFlags(t *testing.T) {
@@ -25,7 +29,7 @@ func TestMOVEQDataAndFlags(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cpu, _ := newInstructionCPU(map[uint32]uint16{
+			cpu, _, _ := newInstructionCPU(map[uint32]uint16{
 				0x0400: test.opcode, 0x0402: 0x4e71, 0x0404: 0x4e71,
 			})
 			if err := cpu.Reset(); err != nil {
@@ -64,7 +68,7 @@ func TestBRAByteAndWordRefillPrefetch(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cpu, _ := newInstructionCPU(map[uint32]uint16{
+			cpu, _, _ := newInstructionCPU(map[uint32]uint16{
 				0x0400: test.opcode, 0x0402: test.ext,
 				test.target: 0x4e71, test.target + 2: 0x7000,
 			})
@@ -108,7 +112,7 @@ func TestBccTakenAndNotTakenTiming(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cpu, _ := newInstructionCPU(map[uint32]uint16{
+			cpu, _, _ := newInstructionCPU(map[uint32]uint16{
 				0x0400: test.opcode, 0x0402: test.ext,
 				0x0404: 0x4e71, 0x0406: 0x7000,
 				0x0408: 0x4e71, 0x040a: 0x7000,
@@ -143,5 +147,66 @@ func TestBccTakenAndNotTakenTiming(t *testing.T) {
 				t.Fatalf("word fall-through phase addresses: %+v", result.Phases)
 			}
 		})
+	}
+}
+
+func TestMOVEAImmediateLongConsumesExtensionsAndPreservesCCR(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x247c, 0x0402: 0x00fc, 0x0404: 0x1234,
+		0x0406: 0x4e71, 0x0408: 0x7000,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x271f
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if state.A[2] != 0x00fc_1234 || state.SR != 0x271f {
+		t.Fatalf("MOVEA state: A2=$%08X SR=$%04X", state.A[2], state.SR)
+	}
+	if state.PC != 0x0406 || state.IRD != 0x4e71 || state.IRC != 0x7000 {
+		t.Fatalf("MOVEA queue: PC=$%06X IRD=$%04X IRC=$%04X", state.PC, state.IRD, state.IRC)
+	}
+	if result.Cycles != 12 || len(result.Phases) != 3 {
+		t.Fatalf("MOVEA phases: %+v", result)
+	}
+	for i, address := range []uint32{0x0404, 0x0406, 0x0408} {
+		if phase := result.Phases[i]; phase.Kind != PhaseInstructionFetch || phase.Address != address {
+			t.Fatalf("MOVEA phase %d: %+v", i, phase)
+		}
+	}
+}
+
+func TestJSRAbsoluteWordPushesReturnAddressAndRefillsQueue(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x4eb8, 0x0402: 0x040a,
+		0x040a: 0x207c, 0x040c: 0x00eb,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if state.A[7] != 0x0ffc || state.PC != 0x040a || state.IRD != 0x207c || state.IRC != 0x00eb {
+		t.Fatalf("JSR state: A7=$%08X PC=$%06X IRD=$%04X IRC=$%04X", state.A[7], state.PC, state.IRD, state.IRC)
+	}
+	wantWrites := []wordWrite{{address: 0x0ffc, value: 0}, {address: 0x0ffe, value: 0x0404}}
+	if !reflect.DeepEqual(bus.writes, wantWrites) {
+		t.Fatalf("JSR stack writes: got %+v want %+v", bus.writes, wantWrites)
+	}
+	if result.Cycles != 18 || len(result.Phases) != 5 {
+		t.Fatalf("JSR phases: %+v", result)
+	}
+	wantKinds := []PhaseKind{PhaseInternal, PhaseDataWrite, PhaseDataWrite, PhaseInstructionFetch, PhaseInstructionFetch}
+	for i, kind := range wantKinds {
+		if result.Phases[i].Kind != kind {
+			t.Fatalf("JSR phase %d: %+v", i, result.Phases[i])
+		}
 	}
 }

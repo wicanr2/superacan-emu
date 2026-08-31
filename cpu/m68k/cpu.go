@@ -118,6 +118,14 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.branchConditional(decoded); err != nil {
 			return result, fmt.Errorf("m68k Bcc: %w", err)
 		}
+	case InstructionJSRAbsoluteWord:
+		if err := c.jsrAbsoluteWord(); err != nil {
+			return result, fmt.Errorf("m68k JSR (xxx).W: %w", err)
+		}
+	case InstructionMOVEAImmediateLong:
+		if err := c.moveAImmediateLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L #imm,A%d: %w", decoded.Register, err)
+		}
 	case InstructionBSR:
 		return result, fmt.Errorf("m68k: unimplemented BSR opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	default:
@@ -128,6 +136,42 @@ func (c *CPU) Step() (StepResult, error) {
 	result.Cycles = c.state.Cycles - start
 	result.Phases = append(result.Phases, c.stepTrace...)
 	return result, nil
+}
+
+func (c *CPU) moveAImmediateLong(register uint8) error {
+	stream := c.newInstructionStream()
+	hi, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	lo, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.state.A[register] = uint32(hi)<<16 | uint32(lo)
+	return stream.finish()
+}
+
+func (c *CPU) jsrAbsoluteWord() error {
+	// Absolute-short addresses are sign-extended to 32 bits, then constrained
+	// by the MC68000's 24-bit physical address bus.
+	target := uint32(int32(int16(c.state.IRC))) & addressMask
+	returnAddress := (c.state.PC + 4) & addressMask
+
+	// Moira's 68000 handler computes the effective address, performs its
+	// absolute-word two-cycle delay, pushes the return PC, then refills the
+	// destination queue. This also matches Motorola's 18-cycle (2R/2W) total.
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	if err := c.writeWord(c.state.A[7], uint16(returnAddress>>16), FCSupervisorData); err != nil {
+		return err
+	}
+	if err := c.writeWord(c.state.A[7]+2, uint16(returnAddress), FCSupervisorData); err != nil {
+		return err
+	}
+	return c.refillPrefetch(target, 0)
 }
 
 func (c *CPU) setNZ32(value uint32) {
@@ -216,6 +260,21 @@ func (c *CPU) readWord(address uint32, fc FunctionCode, kind PhaseKind) (uint16,
 		return 0, err
 	}
 	return c.bus.Read16(address)
+}
+
+func (c *CPU) writeWord(address uint32, value uint16, fc FunctionCode) error {
+	address &= addressMask
+	if address&1 != 0 {
+		return fmt.Errorf("odd word address $%06X", address)
+	}
+	phase := Phase{
+		Kind: PhaseDataWrite, Cycles: 4, Address: address,
+		Width: WidthWord, Write: true, Value: uint32(value), FC: fc,
+	}
+	if err := c.advance(phase); err != nil {
+		return err
+	}
+	return c.bus.Write16(address, value)
 }
 
 func (c *CPU) advance(phase Phase) error {

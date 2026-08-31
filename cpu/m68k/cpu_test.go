@@ -14,8 +14,14 @@ func (l *eventLog) Advance(p Phase) error {
 }
 
 type testBus struct {
-	log   *eventLog
-	words map[uint32]uint16
+	log    *eventLog
+	words  map[uint32]uint16
+	writes []wordWrite
+}
+
+type wordWrite struct {
+	address uint32
+	value   uint16
 }
 
 func (b *testBus) Read8(address uint32) (uint8, error) { return 0, nil }
@@ -23,8 +29,12 @@ func (b *testBus) Read16(address uint32) (uint16, error) {
 	b.log.events = append(b.log.events, "read16")
 	return b.words[address], nil
 }
-func (b *testBus) Write8(address uint32, value uint8) error   { return nil }
-func (b *testBus) Write16(address uint32, value uint16) error { return nil }
+func (b *testBus) Write8(address uint32, value uint8) error { return nil }
+func (b *testBus) Write16(address uint32, value uint16) error {
+	b.log.events = append(b.log.events, "write16")
+	b.writes = append(b.writes, wordWrite{address: address, value: value})
+	return nil
+}
 
 func phaseName(kind PhaseKind) string {
 	switch kind {
@@ -34,6 +44,8 @@ func phaseName(kind PhaseKind) string {
 		return "fetch"
 	case PhaseDataRead:
 		return "read"
+	case PhaseDataWrite:
+		return "write"
 	default:
 		return "other"
 	}
