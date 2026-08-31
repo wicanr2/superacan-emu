@@ -57,6 +57,31 @@ func TestTilePixelPackedModes(t *testing.T) {
 	}
 }
 
+func TestROZPerLineParameterTables(t *testing.T) {
+	device := New()
+	device.WriteRegister(0xc0, 0x2000)
+	device.WriteRegister(0xcc, 0x0100)
+	device.WriteRegister(0xcd, 0x0200)
+	device.WriteRegister(0xcf, 0x0300)
+	if _, _, _, enabled := device.rozLineParameters(3, 0x100, 0x1000, 0x2000); enabled {
+		t.Fatal("zero incxx table entry did not suppress line")
+	}
+	device.WriteVRAM16((0x0200+3)*2, 2)
+	device.WriteVRAM16((0x0400+6)*2, 0x0001)
+	device.WriteVRAM16((0x0400+7)*2, 0x0200)
+	device.WriteVRAM16((0x0600+6)*2, 0xffff)
+	device.WriteVRAM16((0x0600+7)*2, 0xff00)
+	a, x, y, enabled := device.rozLineParameters(3, 0x100, 0x1000, 0x2000)
+	if !enabled || a != 0x102 || x != 0x0001_1200 || y != 0x0000_1f00 {
+		t.Fatalf("enabled=%v A=$%X X=$%08X Y=$%08X", enabled, a, x, y)
+	}
+	device.WriteRegister(0xc0, 0x2200)
+	a, x, y, enabled = device.rozLineParameters(3, 0x100, 0x1000, 0x2000)
+	if !enabled || a != 0x100 || x != 0x1000 || y != 0x2000 {
+		t.Fatal("mode bit 9 did not disable per-line tables")
+	}
+}
+
 func TestIRQStatusReadAndSingleSpriteDMATrigger(t *testing.T) {
 	device := New()
 	device.SetScanline(240)

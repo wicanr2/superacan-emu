@@ -46,8 +46,9 @@
   零填充與 VRAM 目的高位模式；合成測試驗證複製／填充，真實 smoke 無回歸。
 - [x] 接通 UM6618 掃描線 IRQ4／5／7 與 68000 autovector／acknowledge；Boom Zoo 固定
   smoke 實際受理 58 次 IRQ7，IRQ4／5 目前只有合成線位測試。
-- [ ] 完成 UM6618 複雜 ROZ 逐行模式；
-  再以相同 frame 的 archived oracle hash／截圖做差分並修正優先度與邊界行為。
+- [x] 依 MAME-derived 契約實作 UM6618 ROZ 三張逐行表：incxx、scrollx、scrolly 與
+  zero-line suppression；Boom Zoo frame 88 hash 確實改變。硬體正確性仍待 oracle。
+- [ ] 以相同 frame 的 archived oracle hash／截圖做差分並修正優先度與邊界行為。
 - [ ] 完成 W65C02 ISA、IRQ／NMI／WAI 與 I/O ack，將目前 instruction-total 3:1 排程
   收斂成可驗證的 cycle 邊界。
 - [ ] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ6／IRQ7 來源。

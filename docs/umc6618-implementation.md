@@ -37,6 +37,18 @@
   `89ce08232bcfc61c396b514a981057b69ae7cf19733a4c3a247a051fc64684ee`。
 - 此 hash 只作 Go 路徑的決定性回歸。尚未取得相同硬體狀態的 archived C++／實機畫面
   對照，因此不能標為像素正確或硬體已證實。
+- 2026-09-01 勘誤：接入三張 ROZ 逐行表後，同一 frame 的非黑像素仍為 61,437，hash
+  改為 `14449f1ba85c25a01b0466fa2b8b735b4dcef571c44a808faf75ac37f894a232`。
+  這證明舊 hash 略過了會影響該狀態的表資料；保留舊值只作變更來源追溯。
+
+### ROZ 逐行表（MAME-derived）
+
+- 當 mode bit 9 為 0 且 priority nibble 非 0，每條輸出線讀 `$198` 的 incxx delta；值為
+  0 時整行不畫，非 0 時以 signed 16-bit 加到 coefficient A。
+- `$19A`／`$19E` 各提供每行 32-bit scrollx／scrolly delta，與全域 24.8 scroll 相加；
+  表位址 register 依 `<<2` byte address 契約換成 VRAM word index。
+- 合成測試覆蓋 zero-line suppression、三表位址、signed/wrapping 加法與 mode bit 9 bypass。
+  此分支源於 MAME 自標 HACK 的行為，尚未經實機證實。
 
 ## Sprite DMA
 
@@ -59,5 +71,6 @@
 
 ## 尚未完成
 
-- ROZ 複雜逐行模式、mid-frame register write、partial update 與 VRAM 上半部來源。
+- ROZ 逐行模式的實機／同狀態 oracle 驗證、mid-frame register write、partial update 與
+  VRAM 上半部來源。
 - save state 與相同 frame renderer 差分；目前的 framebuffer hash 只證明固定 Go 路徑。

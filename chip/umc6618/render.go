@@ -311,11 +311,15 @@ func (d *Device) drawROZ(priority int, indexed []uint16, priorities []uint8) {
 	coefficientA, coefficientB := int32(int16(d.registers[0xc6])), int32(int16(d.registers[0xc7]))
 	coefficientC, coefficientD := int32(int16(d.registers[0xc8])), int32(int16(d.registers[0xc9]))
 	for y := range Height {
-		cx := int32(scrollX) + int32(y)*coefficientB
-		cy := int32(scrollY) + int32(y)*coefficientD
+		lineA, lineScrollX, lineScrollY, enabled := d.rozLineParameters(y, coefficientA, scrollX, scrollY)
+		if !enabled {
+			continue
+		}
+		cx := int32(lineScrollX) + int32(y)*coefficientB
+		cy := int32(lineScrollY) + int32(y)*coefficientD
 		for x := range Width {
 			sourceX, sourceY := cx>>8, cy>>8
-			cx += coefficientA
+			cx += lineA
 			cy += coefficientC
 			if !wrap && (sourceX < 0 || sourceX >= int32(xs*8) || sourceY < 0 || sourceY >= int32(ys*8)) {
 				continue
@@ -328,6 +332,24 @@ func (d *Device) drawROZ(priority int, indexed []uint16, priorities []uint8) {
 			}
 		}
 	}
+}
+
+func (d *Device) rozLineParameters(y int, coefficientA int32, scrollX, scrollY uint32) (int32, uint32, uint32, bool) {
+	mode := d.registers[0xc0]
+	if mode&0x0200 != 0 || mode&0xf000 == 0 {
+		return coefficientA, scrollX, scrollY, true
+	}
+	table0 := (uint32(d.registers[0xcc]) << 1) + uint32(y)
+	deltaA := d.vramWord(table0)
+	if deltaA == 0 {
+		return 0, 0, 0, false
+	}
+	tableX := (uint32(d.registers[0xcd]) << 1) + uint32(y*2)
+	tableY := (uint32(d.registers[0xcf]) << 1) + uint32(y*2)
+	deltaX := uint32(d.vramWord(tableX))<<16 | uint32(d.vramWord(tableX+1))
+	deltaY := uint32(d.vramWord(tableY))<<16 | uint32(d.vramWord(tableY+1))
+	lineA := int32(int16(uint16(coefficientA) + deltaA))
+	return lineA, scrollX + deltaX, scrollY + deltaY, true
 }
 
 func (d *Device) drawWindow(window, priority int, indexed []uint16, priorities []uint8) {

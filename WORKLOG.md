@@ -239,3 +239,13 @@
   補齊 ADDQ.W／RTE 後可再次完成 1,300,000 條指令，實際 acknowledge IRQ7 58 次。
 - IRQ 接入後 VRAM 與 framebuffer SHA-256 不變；IRQ4／5 acknowledge 為 0，故目前只
   標為合成驗證。user-mode USP／SSP 切換與一般 exception 仍未完成。
+
+## 2026-09-01：ROZ 逐行參數表
+
+- 依 MAME-derived HACK 契約加入 `$198／$19A／$19E` 三表，逐行調整 incxx、scrollx、
+  scrolly，並實作 incxx table 值 0 時整行不畫及 mode bit 9 bypass。
+- 合成測試驗證 register 到 word index 的 `<<2` byte-address 換算、16／32-bit wrapping
+  加法與 line suppression。
+- Boom Zoo 固定 frame 88 非黑像素仍為 61,437，但 framebuffer SHA-256 從 `89ce…`
+  改為 `14449f1ba85c25a01b0466fa2b8b735b4dcef571c44a808faf75ac37f894a232`；這推翻
+  「該固定狀態不受逐行表影響」的舊推測。硬體正確性仍待同狀態 oracle 差分。
