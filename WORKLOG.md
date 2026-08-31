@@ -17,3 +17,4 @@
   不取代 `WORKLIST.md` 的跨遊戲決定性矩陣。
 - Docker 清理：本輪 `docker run --rm` 容器均已移除；另有既存的
   `openbor-linux-build:local` 容器 `upbeat_rosalind` 正在執行，判定不屬本專案，未碰觸。
+- Git：里程碑 5 與文件基線已提交為 `8037a33`，並推送至 `origin/master`。
