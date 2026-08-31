@@ -111,6 +111,9 @@ func (s *System) highestIRQLevel() uint8 {
 	if s.soundIRQ6 && level < 6 {
 		return 6
 	}
+	if s.Bus.FRC().Pending() && level < 3 {
+		return 3
+	}
 	return level
 }
 
@@ -118,6 +121,8 @@ func (s *System) acknowledgeIRQ(level uint8) {
 	s.IRQAcknowledgements[level&7]++
 	if level == 6 {
 		s.soundIRQ6 = false
+	} else if level == 3 {
+		s.Bus.FRC().Acknowledge()
 	} else {
 		s.Bus.Video().ClearIRQ(level)
 	}
@@ -155,6 +160,7 @@ func (s *System) advanceDevices(m68kCycles uint8) error {
 		}
 	}
 	frame := s.Bus.Video().Frame()
+	s.Bus.FRC().AdvanceM68KCycles(uint64(m68kCycles))
 	s.Bus.Video().AdvanceM68KCycles(m68kCycles)
 	if s.Bus.Video().Frame() != frame {
 		s.M65C02.PulseNMI()

@@ -149,3 +149,22 @@ func TestControllerDirectModeAndSoundIOWindow(t *testing.T) {
 		t.Fatalf("command source=$%02X", sound.IRQStatus())
 	}
 }
+
+func TestFRCWordTransactionsConfigureDeviceOnce(t *testing.T) {
+	b := testMachineBus(t)
+	if err := b.Write16(0xe90016, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Write16(0xe90014, 0xa201); err != nil {
+		t.Fatal(err)
+	}
+	if control, _ := b.Read16(0xe90014); control != 0xa201 {
+		t.Fatalf("control=$%04X", control)
+	}
+	if frequency, _ := b.Read16(0xe90016); frequency != 2 {
+		t.Fatalf("frequency=$%04X", frequency)
+	}
+	if b.FRC().RemainingCycles() != 1024*0x010002 {
+		t.Fatalf("remaining=%d", b.FRC().RemainingCycles())
+	}
+}

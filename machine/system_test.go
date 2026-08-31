@@ -184,3 +184,27 @@ func TestSoundMailboxIRQ6HasPriorityAndAcknowledges(t *testing.T) {
 		t.Fatalf("IRQ6 pending=%v acknowledgements=%d", system.soundIRQ6, system.IRQAcknowledgements[6])
 	}
 }
+
+func TestFRCIRQ3UsesSharedTimelineAndHoldAcknowledge(t *testing.T) {
+	system, err := NewSystem(make([]byte, IPLSize), []byte{0, 0}, make([]byte, 16))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = system.Bus.Write16(0xe90016, 1)
+	_ = system.Bus.Write16(0xe90014, 0xa201)
+	want := int64(1024 * 0x010001)
+	if err := system.Timeline.Advance(m68k.Phase{Kind: m68k.PhaseInternal, Cycles: 4}); err != nil {
+		t.Fatal(err)
+	}
+	if system.Bus.FRC().RemainingCycles() != want-4 {
+		t.Fatalf("shared timeline remaining=%d", system.Bus.FRC().RemainingCycles())
+	}
+	system.Bus.FRC().AdvanceM68KCycles(uint64(want - 4))
+	if !system.Bus.FRC().Pending() || system.highestIRQLevel() != 3 {
+		t.Fatalf("pending=%v level=%d", system.Bus.FRC().Pending(), system.highestIRQLevel())
+	}
+	system.acknowledgeIRQ(3)
+	if system.Bus.FRC().Pending() || system.Bus.FRC().RemainingCycles() != want || system.IRQAcknowledgements[3] != 1 {
+		t.Fatalf("pending=%v remaining=%d ack=%d", system.Bus.FRC().Pending(), system.Bus.FRC().RemainingCycles(), system.IRQAcknowledgements[3])
+	}
+}
