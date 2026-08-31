@@ -33,7 +33,7 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 65C02 間接位址／資料埠與暫存器檔 | PCM／timer／DMA 尚未執行 |
-| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、vblank status；第一版 tilemap／sprite／window／ROZ framebuffer | 真實 Boom Zoo 已非黑且 hash 可重現；DMA、IRQ、逐行 ROZ 與 oracle 畫面差分尚未完成 |
+| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、vblank status；sprite DMA bus master；第一版 tilemap／sprite／window／ROZ framebuffer | 真實 Boom Zoo 已非黑且 hash 可重現；IRQ、逐行 ROZ 與 oracle 畫面差分尚未完成 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置 | 1,300,000 條 68k／1,524,044 條 65C02；雙 overlay 關閉 |
 | bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |
 | archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |

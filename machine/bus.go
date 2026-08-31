@@ -43,6 +43,10 @@ func NewBus(ipl, rom, key []byte) (*Bus, error) {
 	}
 	b := &Bus{rom: append([]byte(nil), rom...), lockout: umc6650.New(key), video: umc6618.New()}
 	copy(b.ipl[:], ipl)
+	b.video.SetDMAAccess(
+		func(address uint32) uint16 { value, _ := b.Read16(address); return value },
+		func(address uint32, value uint16) { _ = b.Write16(address, value) },
+	)
 	return b, nil
 }
 

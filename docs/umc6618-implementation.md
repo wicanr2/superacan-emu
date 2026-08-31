@@ -38,9 +38,18 @@
 - 此 hash 只作 Go 路徑的決定性回歸。尚未取得相同硬體狀態的 archived C++／實機畫面
   對照，因此不能標為像素正確或硬體已證實。
 
+## Sprite DMA
+
+- register `$08–$0F` 保存 count、32-bit destination／source、word stride 與 control；
+  control bit 15 觸發同步 `count+1` 筆 16-bit bus transaction。
+- control bit 8 執行零填充，bit 13／14 將目的位址置入 `$F40000` VRAM window。每筆
+  read／write 都走 machine bus callback，因此 observer 可按實際順序看見 DMA 交易。
+- 合成測試涵蓋兩 word copy、來源／目的 stride 與零填充。Boom Zoo 1,300,000 指令 smoke
+  的 VRAM／framebuffer hash 不變，表示此有界路徑沒有產生改變既有狀態的 DMA；不能據此
+  宣稱所有 control mode 已由遊戲驗證。
+
 ## 尚未完成
 
-- sprite DMA transaction state machine；目前只辨識控制 register 的 start edge，尚未複製。
 - raster／line IRQ4／5、vblank IRQ7 到 68000 的受理與 acknowledge。
 - ROZ 複雜逐行模式、mid-frame register write、partial update 與 VRAM 上半部來源。
 - save state 與相同 frame renderer 差分；目前的 framebuffer hash 只證明固定 Go 路徑。

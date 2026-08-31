@@ -25,9 +25,17 @@ type Device struct {
 	irqMask         uint8
 	lineCycles      uint16
 	framebuffer     [Width * Height]uint32
+	dmaRead16       func(uint32) uint16
+	dmaWrite16      func(uint32, uint16)
 }
 
 func New() *Device { return &Device{} }
+
+// SetDMAAccess connects the video DMA master to the 68000-visible bus. The
+// callbacks are synchronous so every copied word remains observable in order.
+func (d *Device) SetDMAAccess(read16 func(uint32) uint16, write16 func(uint32, uint16)) {
+	d.dmaRead16, d.dmaWrite16 = read16, write16
+}
 
 func (d *Device) ReadRegister(index uint16) uint16 {
 	index &= 0xff
@@ -62,10 +70,34 @@ func (d *Device) WriteRegister(index, value uint16) {
 	case 0x0f:
 		if value&0x8000 != 0 {
 			d.spriteDMAStarts++
+			d.runSpriteDMA(value)
 		}
 	case 0xf8:
 		d.pixelMode = value & 0x1f
 	}
+}
+
+func (d *Device) runSpriteDMA(control uint16) {
+	if d.dmaWrite16 == nil || control&0x0100 == 0 && d.dmaRead16 == nil {
+		return
+	}
+	count := uint32(d.registers[0x08]) + 1
+	destination := uint32(d.registers[0x09])<<16 | uint32(d.registers[0x0a])
+	source := uint32(d.registers[0x0c])<<16 | uint32(d.registers[0x0d])
+	if control&0x6000 != 0 {
+		destination |= 0x00f4_0000
+	}
+	for range count {
+		value := uint16(0)
+		if control&0x0100 == 0 {
+			value = d.dmaRead16(source & 0x00ff_ffff)
+			source += uint32(d.registers[0x0e]) * 2
+		}
+		d.dmaWrite16(destination&0x00ff_ffff, value)
+		destination += uint32(d.registers[0x0b]) * 2
+	}
+	d.registers[0x09], d.registers[0x0a] = uint16(destination>>16), uint16(destination)
+	d.registers[0x0c], d.registers[0x0d] = uint16(source>>16), uint16(source)
 }
 
 func (d *Device) Register(index uint16) uint16 { return d.registers[index&0xff] }

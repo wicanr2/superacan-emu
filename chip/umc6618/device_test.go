@@ -73,6 +73,29 @@ func TestIRQStatusReadAndSingleSpriteDMATrigger(t *testing.T) {
 	}
 }
 
+func TestSpriteDMACopyAndZeroFill(t *testing.T) {
+	device := New()
+	memory := map[uint32]uint16{0x1000: 0x1234, 0x1002: 0xabcd}
+	device.SetDMAAccess(func(address uint32) uint16 { return memory[address] }, func(address uint32, value uint16) { memory[address] = value })
+	device.WriteRegister(0x08, 1)
+	device.WriteRegister(0x09, 0)
+	device.WriteRegister(0x0a, 0x2000)
+	device.WriteRegister(0x0b, 1)
+	device.WriteRegister(0x0c, 0)
+	device.WriteRegister(0x0d, 0x1000)
+	device.WriteRegister(0x0e, 1)
+	device.WriteRegister(0x0f, 0x8000)
+	if memory[0x2000] != 0x1234 || memory[0x2002] != 0xabcd {
+		t.Fatalf("copy=$%04X,$%04X", memory[0x2000], memory[0x2002])
+	}
+	device.WriteRegister(0x08, 0)
+	device.WriteRegister(0x0a, 0x3000)
+	device.WriteRegister(0x0f, 0x8100)
+	if memory[0x3000] != 0 {
+		t.Fatalf("fill=$%04X", memory[0x3000])
+	}
+}
+
 func TestScanlineTimingUsesVideoWidthAndRaisesMaskedVBlank(t *testing.T) {
 	device := New()
 	device.SetIRQMask(0x80)

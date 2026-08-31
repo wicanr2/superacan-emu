@@ -217,3 +217,10 @@
   `89ce08232bcfc61c396b514a981057b69ae7cf19733a4c3a247a051fc64684ee`。
 - 此結果只證明 Go 合成路徑可重現且非黑；sprite DMA、逐行 ROZ、IRQ 與相同 frame
   archived oracle 差分尚未完成，未宣稱像素正確。
+
+## 2026-09-01：UM6618 sprite DMA bus master
+
+- 將 `$F00010–$F0001E` 建模為同步 16-bit bus master，實作 `count+1`、來源／目的
+  word stride、零填充及 VRAM 目的高位模式；所有 transaction 可由 machine observer 看見。
+- 合成回歸驗證兩 word copy 與單 word zero-fill；真實 Boom Zoo 1,300,000 指令 smoke
+  的 CPU、VRAM 與 framebuffer 指紋不變，表示既有啟動路徑沒有被新 DMA 模型破壞。
