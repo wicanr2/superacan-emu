@@ -539,6 +539,133 @@ func (c *CPU) moveWordAddressToData(source, destination uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) moveALongAddressIndirect(source, destination uint8) error {
+	value, err := c.readLong(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = value
+	return c.prefetch()
+}
+
+func (c *CPU) moveAWordPostincrement(source, destination uint8) error {
+	address := c.state.A[source]
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[source] = (address + 2) & addressMask
+	c.state.A[destination] = uint32(int32(int16(value)))
+	return c.prefetch()
+}
+
+func (c *CPU) addqWordDisplacement(register, quick uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.add16(value, uint16(quick))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveAWordAddressIndirect(source, destination uint8) error {
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.state.A[destination] = uint32(int32(int16(value)))
+	return c.prefetch()
+}
+
+func (c *CPU) cmpiWordDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.setCompare16(value, immediate)
+	return stream.finish()
+}
+
+func (c *CPU) addWordAbsoluteLongToData(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	result := c.add16(uint16(c.state.D[destination]), value)
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(result)
+	return stream.finish()
+}
+
+func (c *CPU) orLongAddressIndirectToData(source, destination uint8) error {
+	value, err := c.readLong(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[destination] |= value
+	c.setNZ32(c.state.D[destination])
+	return c.prefetch()
+}
+
+func (c *CPU) divuWordAbsoluteLong(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	divisor, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	if divisor == 0 {
+		return fmt.Errorf("divide-by-zero exception is not implemented")
+	}
+	dividend := c.state.D[destination]
+	quotient := dividend / uint32(divisor)
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	internal := uint8(136)
+	if quotient > 0xffff {
+		c.state.SR |= flagOverflow
+		internal = 6
+	} else {
+		remainder := dividend % uint32(divisor)
+		c.state.D[destination] = remainder<<16 | quotient
+		if uint16(quotient) == 0 {
+			c.state.SR |= flagZero
+		}
+		if quotient&0x8000 != 0 {
+			c.state.SR |= flagNegative
+		}
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: internal}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)

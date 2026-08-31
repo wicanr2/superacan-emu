@@ -196,6 +196,14 @@ const (
 	InstructionMOVEAWordAbsoluteLong
 	InstructionMOVELongDataToPostincrement
 	InstructionMOVEWordAddressToData
+	InstructionMOVEALongAddressIndirect
+	InstructionMOVEAWordPostincrement
+	InstructionADDQWordDisplacement
+	InstructionMOVEAWordAddressIndirect
+	InstructionCMPIWordDisplacement
+	InstructionADDWordAbsoluteLongToData
+	InstructionORLongAddressIndirectToData
+	InstructionDIVUWordAbsoluteLong
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -256,6 +264,26 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionMOVELongDataToPostincrement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3008:
 		return Decoded{Instruction: InstructionMOVEWordAddressToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x2050:
+		return Decoded{Instruction: InstructionMOVEALongAddressIndirect, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3058:
+		return Decoded{Instruction: InstructionMOVEAWordPostincrement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x5068:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionADDQWordDisplacement, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1f8 == 0x3050:
+		return Decoded{Instruction: InstructionMOVEAWordAddressIndirect, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x0c68:
+		return Decoded{Instruction: InstructionCMPIWordDisplacement, Register: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0xd079:
+		return Decoded{Instruction: InstructionADDWordAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0x8090:
+		return Decoded{Instruction: InstructionORLongAddressIndirectToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x80f9:
+		return Decoded{Instruction: InstructionDIVUWordAbsoluteLong, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xfff8 == 0x4a40:
 		return Decoded{Instruction: InstructionTSTWordData, Register: uint8(opcode & 7)}
 	case opcode == 0x4a39:

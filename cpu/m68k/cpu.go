@@ -270,6 +270,38 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveWordAddressToData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVE.W A%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionMOVEALongAddressIndirect:
+		if err := c.moveALongAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L (A%d),A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEAWordPostincrement:
+		if err := c.moveAWordPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.W (A%d)+,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionADDQWordDisplacement:
+		if err := c.addqWordDisplacement(decoded.Register, decoded.Quick); err != nil {
+			return result, fmt.Errorf("m68k ADDQ.W #%d,(d16,A%d): %w", decoded.Quick, decoded.Register, err)
+		}
+	case InstructionMOVEAWordAddressIndirect:
+		if err := c.moveAWordAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.W (A%d),A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionCMPIWordDisplacement:
+		if err := c.cmpiWordDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMPI.W #imm,(d16,A%d): %w", decoded.Register, err)
+		}
+	case InstructionADDWordAbsoluteLongToData:
+		if err := c.addWordAbsoluteLongToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADD.W (xxx).L,D%d: %w", decoded.Register, err)
+		}
+	case InstructionORLongAddressIndirectToData:
+		if err := c.orLongAddressIndirectToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k OR.L (A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionDIVUWordAbsoluteLong:
+		if err := c.divuWordAbsoluteLong(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k DIVU.W (xxx).L,D%d: %w", decoded.Register, err)
+		}
 	case InstructionSUBALongAddress:
 		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
