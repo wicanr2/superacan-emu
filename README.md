@@ -2,7 +2,7 @@
 
 Super A'Can（敦煌科技 Funtech，1995，台灣自製 16 位元遊戲機）模擬器的
 **Linux 重製**。Bcan 0.0.8b 為閉源 Windows 程式且無公開移植；本專案以知識庫
-[taiwan_history/acan](https://github.com/)（`docs/` 內的 (a) 級逆向結論）＋
+[taiwan_history/acan](https://github.com/wicanr2/superacan)（`docs/` 內的 (a) 級逆向結論）＋
 MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎重新實作。
 
 長期目標：在 Linux 上重製 Bcan 的模擬能力（影像/音效/視窗後續以 SDL2 加入）。
@@ -33,6 +33,22 @@ MAME driver（BSD-3-Clause，僅作規格參考、未複製程式碼）為基礎
 - [x] 遊戲驗證：Boom Zoo、Monopoly（畫面+音樂+按鍵反應）、Speedy Dragon
       （**第二套音樂驅動已修復**，預設模式可跑；見 `docs/verify-audio-input.md`）
 - [ ] ROZ 層、雙人輸入、save state、latch 3-byte 封包語意
+
+## 遊戲截圖（開發驗證用途）
+
+> 截圖為各遊戲之版權畫面，僅供模擬器開發驗證，不作其他用途。
+
+| Boom Zoo 標題 | Boom Zoo 角色選擇（按鍵驗證） |
+|---|---|
+| ![Boom Zoo 標題](docs/screenshots/boomzoo-title-f6000.png) | ![Boom Zoo 角色選擇](docs/screenshots/boomzoo-charselect-after-start.png) |
+
+| Monopoly 標題 | Monopoly 玩家人數選擇（按鍵驗證） |
+|---|---|
+| ![Monopoly 標題](docs/screenshots/monopoly-title-f3600.png) | ![Monopoly 人數選擇](docs/screenshots/monopoly-playersel-after-start.png) |
+
+| Speedy Dragon 開頭場景 | A'Can 開機 logo |
+|---|---|
+| ![Speedy Dragon](docs/screenshots/speedydragon-intro-f1200.png) | ![A'Can logo](docs/screenshots/monopoly-logo-f120.png) |
 
 ## 建置
 
