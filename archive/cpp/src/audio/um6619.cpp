@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // UM6619 音效晶片實作。行為依 MAME umc6619_sound.cpp（BSD-3-Clause，
 // Ryan Holtz / superctr）重新實作，未複製程式碼；暫存器語意對照知識庫
 // docs/sound-driver.md §5 (a)。

@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // superacan-emu runner（里程碑 3+4：UM6619 音效合成 + 手把輸入）
 //
 // 用法：

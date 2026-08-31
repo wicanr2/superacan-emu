@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // 68k CPU：Moira 包裝
 // Moira（MIT，Dirk W. Hoffmann）；時脈 10.738635 MHz（master tick /10，
 // 知識庫 docs/memory-map.md §1 (a) 定案）。

@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // UM6619 音效晶片（PCM/取樣式合成，16 通道）
 // 時脈 3.579545 MHz（與 65C02 同，知識庫 docs/memory-map.md §1 (a)）。
 //

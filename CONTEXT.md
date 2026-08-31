@@ -17,6 +17,19 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 雙 CPU 與觸發型 register 的時間順序可觀察。完整通則見
 [`docs/chip-emulation-principles.md`](docs/chip-emulation-principles.md)。
 
+同一方法適用所有其他晶片：65C02、UMC6650、UM6618、UM6619、DMA 與輸入都須純 Go
+獨立實作，以舊 C++、MAME、Bcan 與實機作分級 oracle，不直接翻譯來源程式。
+
+### Go 主線目前實作
+
+| 元件 | 狀態 | 證據邊界 |
+|---|---|---|
+| module | `github.com/wicanr2/superacan-emu`，Go 1.26 | 尚未加入 Ebitengine dependency |
+| 68000 phase API | scheduler-before-bus、24-bit address、FC、byte／word transaction | API 已測；尚未有整機 scheduler consumer |
+| 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
+| 68000 opcode | NOP vertical slice；未知 opcode 失敗即關閉 | 尚未宣稱完整 ISA |
+| archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |
+
 MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件，可執行性用來驗證文件
 是否足夠準確。MAME 也把位址空間建模為具有資料寬度、位址寬度、端序與 address shift
 的 bus，並將 share、bank、region 與 view 分開；除錯報告則要求固定版本、精確系統／
@@ -68,7 +81,7 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 
 ## 下一個交付閘門
 
-先把 C++ 完整移入 `archive/cpp/` 並證明 archived oracle 仍可重建，再建立純 Go module
-與 headless Motorola 68000 package。第一個 vertical slice 是 reset vector、prefetch、
-最小 opcode 集合與 phase trace；之後逐步擴到完整 68000 ISA，通過獨立向量、Moira
-差分與 Super A'Can IPL。Ebitengine 前端不能先於 headless machine core 決定 scheduler。
+下一個 vertical slice 是 opcode decoder、共用 operand size／addressing-mode 與第一組
+MOVE／branch 指令，同時建立結構化 phase trace。之後逐步擴到完整 68000 ISA，通過
+獨立向量、Moira 差分與 Super A'Can IPL。Ebitengine 前端不能先於 headless machine
+core 決定 scheduler。

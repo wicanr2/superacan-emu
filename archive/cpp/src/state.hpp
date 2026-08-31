@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // Save state 序列化助手（見 docs/ 內各驗證文件；格式自訂，不相容 Bcan ACANRTS）
 //
 // 檔案格式（皆 little-endian）：

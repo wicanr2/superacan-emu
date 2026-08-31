@@ -31,3 +31,22 @@
   但不把 Moira 行為升格為 Super A'Can 硬體證據。
 - 驗證：文件相對連結與 `git diff --check` 通過；本輪唯讀調查／文件檢查容器皆以
   `docker run --rm` 結束，沒有留下本專案容器。
+
+## 2026-08-31：純 Go 68000 第一個 vertical slice
+
+- 範圍確認：所有其他晶片也採純 Go 獨立實作與 phase scheduler 通則；舊 C++、MAME、
+  Bcan 與實機只作分級 oracle。
+- 歸檔：將 CMake 與 `src/` 移至 `archive/cpp/`，每個檔案及 archive README 都標明
+  deprecated；根目錄改由 Go module 接管。
+- Go 68000：新增 bus／scheduler／phase 契約、register 與兩級 prefetch state、reset
+  vector vertical slice、NOP 與 unknown-opcode fail-closed 行為。
+- 測試：新增 reset vector、40-cycle 起始契約、scheduler-before-bus 順序、NOP prefetch
+  與 unknown opcode 不改狀態測試。
+- 驗證：`golang:1.26.7-bookworm` 無網路容器內 `go test ./...` 與
+  `go test -race ./...` 均通過；第一次使用 login shell 清掉 image PATH，分類為驗證
+  命令問題，改用非 login shell 後以同一 image 乾淨重跑。
+- Archive 驗證：`openbor-linux-build:local` 無網路容器以 GCC 13.3、CMake 3.28.3、
+  SDL2 2.30.0，從 `archive/cpp/` 新 source root 與唯讀固定 Moira／CLK source 完成
+  Release 重建。
+- Docker 清理：上述工作均使用 `docker run --rm`；沒有留下本專案容器，所有可寫
+  Go 檔案仍由目前 UID/GID 擁有。

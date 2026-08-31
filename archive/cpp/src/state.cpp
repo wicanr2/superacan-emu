@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // Save state 檔案讀寫（格式見 state.hpp）
 #include "state.hpp"
 

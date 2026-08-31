@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // 副 CPU：WDC 65C02（CLK 核心，Thomas Harte，MIT）
 // 時脈 3.579545 MHz（68k/3，docs/memory-map.md §1 (a)）。
 //

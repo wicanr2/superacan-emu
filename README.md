@@ -67,26 +67,25 @@ Go 核心尚在開工階段；下列是 deprecated C++ oracle 已達到的相容
 |---|---|
 | ![Speedy Dragon](docs/screenshots/speedydragon-intro-f1200.png) | ![A'Can logo](docs/screenshots/monopoly-logo-f120.png) |
 
-## 建置
+## 建置（Go 主線）
 
-需求：CMake ≥ 3.20、C++20 編譯器（GCC 13 驗證過）、git、網路
-（首次 configure 以 FetchContent 下載第三方 CPU 核心）。
+需求：Go 1.26。Ebitengine 尚未接入第一個 headless CPU vertical slice；加入前會固定
+module 版本與跨平台工具鏈。
 
 本儲存庫的開發、建置與測試一律在專案專用 Docker 工具鏈內進行；下列是容器內
-命令，不應直接在主機執行。目前里程碑 5 正在補齊固定版本的可重現 image。
-
-SDL2：優先用系統套件（`libsdl2-dev`）。本機無 sudo 時的替代：
-`apt-get download libsdl2-dev` 後把 headers 解到
-`third_party/sdl2-local/include/SDL2/`（含 `x86_64-linux-gnu/SDL2/_real_SDL_config.h`），
-並放一個指到系統 runtime 的 `libSDL2.so` symlink（此目錄已 gitignore）；
-再不行 CMake 會 FetchContent 自建 SDL 2.30.0（需 X11 dev headers）。
+命令，不應直接在主機執行。目前正在建立專案專用的固定 Go image。
 
 ```sh
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+go test ./...
 ```
 
+deprecated C++ oracle 的歷史建置方式見
+[`archive/cpp/README.md`](archive/cpp/README.md)，不是目前產品入口。
+
 ## 執行
+
+Go machine runner 尚未接通；目前只交付可測的 68000 package 骨架。下列 CLI 屬於
+deprecated C++ oracle，移植到 Go 前不得當成現行介面承諾。
 
 ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bcan 的
 `bios/supracan.zip`、`bios/umc6650.zip` 解壓後的檔案，以及卡帶 ROM。
@@ -138,11 +137,14 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - [`WORKLOG.md`](WORKLOG.md)：逐輪工作歷程
 - [`docs/chip-emulation-principles.md`](docs/chip-emulation-principles.md)：CPU、bus phase、
   DMA、IRQ、scheduler、save state 與 Ebitengine 邊界通則
+- [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：
   各里程碑的可重現證據與限制
 
-## 第三方元件與版本（固定）
+## Deprecated C++ oracle 的第三方元件（固定）
+
+下列元件只存在於 `archive/cpp/`，純 Go production 不連結或包裝它們。
 
 | 元件 | 用途 | 版本（commit） | 授權 |
 |---|---|---|---|

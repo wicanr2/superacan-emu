@@ -1,6 +1,8 @@
 # 建置輸出
 build/
 out/
+coverage.out
+/superacan-emu
 
 # 版權檔：ROM / BIOS 一律不入庫
 *.bin

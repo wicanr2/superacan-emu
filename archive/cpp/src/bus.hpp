@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // 68000 位址空間匯流排
 // 規格出處：知識庫 docs/memory-map.md §2（全表 (a) 級確認）
 //

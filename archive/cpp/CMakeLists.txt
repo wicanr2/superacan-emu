@@ -1,3 +1,4 @@
+# Deprecated C++ reference implementation; production development is pure Go.
 cmake_minimum_required(VERSION 3.20)
 project(superacan-emu CXX)
 

@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // UM6618 繪圖晶片 — 實作
 // 渲染行為依 MAME src/mame/umc/supracan.cpp（BSD-3-Clause）重新實作；
 // 暫存器布局見知識庫 docs/memory-map.md §3。

@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 #include "bus.hpp"
 
 #include <algorithm>

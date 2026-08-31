@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // UMC6650 lockout/安全晶片
 // 規格出處：知識庫 docs/bios-68k.md §3、docs/memory-map.md §8（(a) 級定案）
 //   $EB0D03（寫）= 內部位址埠（7-bit）

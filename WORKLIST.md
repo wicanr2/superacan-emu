@@ -4,12 +4,12 @@
 
 ## 進行中：純 Go 轉向
 
-- [ ] 把目前 C++／CMake／SDL2 實作移至 `archive/cpp/`，在 archive README 標明
+- [x] 把目前 C++／CMake／SDL2 實作移至 `archive/cpp/`，在 archive README 標明
   deprecated、最後 production commit `d923486`、證據限制與唯讀 oracle 用途。
   完成條件：Docker 內仍可重建 archived binary，原有驗證文件與第三方 notice 可回查。
-- [ ] 建立純 Go module、package 邊界與 headless test runner；production path 禁止 cgo。
+- [x] 建立純 Go module、package 邊界與 headless test runner；production path 禁止 cgo。
   完成條件：`go test ./...` 在無網路固定 image 內通過，machine core 不 import Ebitengine。
-- [ ] 建立獨立 Go Motorola 68000 核心骨架。
+- [x] 建立獨立 Go Motorola 68000 核心骨架。
   完成條件：公開 bus／phase／IRQ API、register 與 prefetch state、`Step` result、reset
   vector vertical slice；設計符合 `docs/chip-emulation-principles.md`。
 - [ ] 建立 opcode／addressing-mode／exception 測試階梯與 Moira 差分 harness。

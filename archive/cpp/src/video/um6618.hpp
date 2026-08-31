@@ -1,3 +1,4 @@
+// Deprecated C++ oracle；production 改由純 Go 獨立實作。
 // UM6618 繪圖晶片（背景/動畫處理器）
 // 規格出處：知識庫 docs/memory-map.md §3（(b)，MAME src/mame/umc/supracan.cpp），
 // 渲染演算法依 MAME driver（BSD-3-Clause，(c) 2026 Angelo Salese / Ryan Holtz 等）
