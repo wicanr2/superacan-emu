@@ -357,6 +357,25 @@ func TestCMPIWordFlags(t *testing.T) {
 	}
 }
 
+func TestCMPIWordAbsoluteLongReadsOperandAndPreservesExtend(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x0c79, 0x0402: 0x0040, 0x0404: 0x0001, 0x0406: 0x2000,
+		0x0408: 0x4e71, 0x040a: 0x4e71, 0x012000: 0x003f,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR |= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if result.Cycles != 20 || state.PC != 0x0408 || state.SR&0x1f != flagExtend|flagNegative|flagCarry {
+		t.Fatalf("cycles=%d PC=$%06X SR=$%04X", result.Cycles, state.PC, state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

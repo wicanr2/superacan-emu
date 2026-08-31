@@ -190,6 +190,10 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.cmpiWordData(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k CMPI.W #imm,D%d: %w", decoded.Register, err)
 		}
+	case InstructionCMPIWordAbsoluteLong:
+		if err := c.cmpiWordAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k CMPI.W #imm,(xxx).L: %w", err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
@@ -768,6 +772,24 @@ func (c *CPU) cmpiWordData(register uint8) error {
 		return err
 	}
 	c.setCompare16(uint16(c.state.D[register]), source)
+	return stream.finish()
+}
+
+func (c *CPU) cmpiWordAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.setCompare16(value, immediate)
 	return stream.finish()
 }
 

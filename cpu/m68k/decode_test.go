@@ -28,6 +28,7 @@ func TestDecodeFirstVerticalSlice(t *testing.T) {
 		{0x33fc, Decoded{Instruction: InstructionMOVEWordImmediateToAbsoluteLong}},
 		{0x0c40, Decoded{Instruction: InstructionCMPIWordData, Register: 0}},
 		{0x0c47, Decoded{Instruction: InstructionCMPIWordData, Register: 7}},
+		{0x0c79, Decoded{Instruction: InstructionCMPIWordAbsoluteLong}},
 		{0x50c8, Decoded{Instruction: InstructionDBcc, Register: 0, Condition: 0}},
 		{0x5fcf, Decoded{Instruction: InstructionDBcc, Register: 7, Condition: 15}},
 		{0xb011, Decoded{Instruction: InstructionCMPByteAddressIndirectToData, Register: 0, SourceRegister: 1}},

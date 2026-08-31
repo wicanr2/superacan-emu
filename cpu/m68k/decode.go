@@ -22,6 +22,7 @@ const (
 	InstructionMOVEByteAddressIndirectToPostincrement
 	InstructionMOVEWordImmediateToAbsoluteLong
 	InstructionCMPIWordData
+	InstructionCMPIWordAbsoluteLong
 	InstructionDBcc
 	InstructionCMPByteAddressIndirectToData
 	InstructionMOVEBytePredecrementToAddressIndirect
@@ -198,6 +199,8 @@ func Decode(opcode uint16) Decoded {
 			Instruction: InstructionCMPIWordData,
 			Register:    uint8(opcode & 7),
 		}
+	case opcode == 0x0c79:
+		return Decoded{Instruction: InstructionCMPIWordAbsoluteLong}
 	case opcode&0xf0f8 == 0x50c8:
 		return Decoded{
 			Instruction: InstructionDBcc,

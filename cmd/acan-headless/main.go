@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wicanr2/superacan-emu/chip/umc6618"
+	"github.com/wicanr2/superacan-emu/cpu/m68k"
 	"github.com/wicanr2/superacan-emu/machine"
 	"github.com/wicanr2/superacan-emu/media"
+	"github.com/wicanr2/superacan-emu/presentation"
 )
 
 func main() {
@@ -15,6 +18,10 @@ func main() {
 	keyPath := flag.String("key", "", "path to 16-byte umc6650.bin")
 	romPath := flag.String("rom", "", "path to word-swapped cartridge ROM")
 	steps := flag.Uint64("instructions", 1, "number of 68000 instructions to execute")
+	frames := flag.Uint64("frames", 0, "run this many completed hardware frames instead of --instructions")
+	screenshot := flag.String("screenshot", "", "write the final framebuffer as PNG")
+	layerMask := flag.Uint("layer-mask", uint(umc6618.AllLayers), "diagnostic render mask: tilemaps=1/2/4 sprite=8 ROZ=16 windows=32")
+	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
 	watch := flag.String("watch", "", "comma-separated hexadecimal bus addresses/ranges")
 	watchLimit := flag.Uint64("watch-limit", 64, "maximum matching bus transactions to retain")
 	flag.Parse()
@@ -59,8 +66,26 @@ func main() {
 	if err := system.Reset(); err != nil {
 		fail(fmt.Sprintf("reset: %v", err))
 	}
-	result, err := system.RunInstructions(*steps)
+	var result m68k.StepResult
+	if *frames == 0 {
+		result, err = system.RunInstructions(*steps)
+	} else {
+		for range *frames {
+			if _, err = system.RunFrame(2_000_000); err != nil {
+				break
+			}
+		}
+		result.Opcode = system.M68K.State().IRD
+	}
 	state := system.M68K.State()
+	if *disableROZLineTables {
+		video := system.Bus.Video()
+		video.WriteRegister(0xc0, video.Register(0xc0)|0x0200)
+		video.RenderFrame()
+	}
+	if uint8(*layerMask) != umc6618.AllLayers {
+		system.Bus.Video().RenderFrameLayers(uint8(*layerMask))
+	}
 	soundState := system.M65C02.State()
 	vramSHA := system.Bus.Video().VRAMSHA256()
 	framebufferSHA := system.Bus.Video().FramebufferSHA256()
@@ -88,6 +113,20 @@ func main() {
 	}
 	if err != nil {
 		fail(err.Error())
+	}
+	if *screenshot != "" {
+		output, createErr := os.Create(*screenshot)
+		if createErr != nil {
+			fail(fmt.Sprintf("create screenshot: %v", createErr))
+		}
+		encodeErr := presentation.EncodePNG(output, umc6618.Width, umc6618.Height, system.Bus.Video().Framebuffer())
+		closeErr := output.Close()
+		if encodeErr != nil {
+			fail(fmt.Sprintf("encode screenshot: %v", encodeErr))
+		}
+		if closeErr != nil {
+			fail(fmt.Sprintf("close screenshot: %v", closeErr))
+		}
 	}
 }
 

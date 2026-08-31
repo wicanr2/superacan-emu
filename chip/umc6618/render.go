@@ -10,6 +10,16 @@ const (
 	Height = 240
 )
 
+const (
+	LayerTilemap0 uint8 = 1 << iota
+	LayerTilemap1
+	LayerTilemap2
+	LayerSprites
+	LayerROZ
+	LayerWindows
+	AllLayers = LayerTilemap0 | LayerTilemap1 | LayerTilemap2 | LayerSprites | LayerROZ | LayerWindows
+)
+
 var spriteYSize = [16]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 22, 24, 26}
 
 func (d *Device) vramWord(index uint32) uint16 {
@@ -389,6 +399,12 @@ func (d *Device) drawWindow(window, priority int, indexed []uint16, priorities [
 // RenderFrame derives RGB pixels from the current device state. It does not
 // advance time and may therefore be called by headless tests or a frontend.
 func (d *Device) RenderFrame() {
+	d.RenderFrameLayers(AllLayers)
+}
+
+// RenderFrameLayers is a diagnostic renderer. A mask isolates chip layers
+// without changing registers, VRAM, timing, or the normal all-layer path.
+func (d *Device) RenderFrameLayers(layerMask uint8) {
 	indexed := make([]uint16, Width*Height)
 	priorities := make([]uint8, Width*Height)
 	sprites := make([]uint16, Width*Height)
@@ -396,24 +412,26 @@ func (d *Device) RenderFrame() {
 	for i := range priorities {
 		priorities[i] = 0xff
 	}
-	d.drawSprites(sprites, priorities, masks)
+	if layerMask&LayerSprites != 0 {
+		d.drawSprites(sprites, priorities, masks)
+	}
 	for priority := 7; priority >= 0; priority-- {
 		for layer := range 3 {
-			if d.videoFlags&(0x80>>layer) != 0 && int(d.registers[0x80+layer*0x10]>>13&7) == priority {
+			if layerMask&(LayerTilemap0<<layer) != 0 && d.videoFlags&(0x80>>layer) != 0 && int(d.registers[0x80+layer*0x10]>>13&7) == priority {
 				d.drawTilemap(layer, priority, indexed, priorities)
 			}
 		}
-		if d.videoFlags&4 != 0 && int(d.registers[0xc0]>>13&7) == priority {
+		if layerMask&LayerROZ != 0 && d.videoFlags&4 != 0 && int(d.registers[0xc0]>>13&7) == priority {
 			d.drawROZ(priority, indexed, priorities)
 		}
-		if d.videoFlags&2 != 0 {
+		if layerMask&LayerWindows != 0 && d.videoFlags&2 != 0 {
 			d.drawWindow(0, priority, indexed, priorities)
 		}
-		if d.videoFlags&2 != 0 && d.registers[0xec] != 0 {
+		if layerMask&LayerWindows != 0 && d.videoFlags&2 != 0 && d.registers[0xec] != 0 {
 			d.drawWindow(1, priority, indexed, priorities)
 		}
 	}
-	if d.videoFlags&8 != 0 {
+	if layerMask&LayerSprites != 0 && d.videoFlags&8 != 0 {
 		for i, pixel := range sprites {
 			if pixel != 0 && priorities[i]&0x0f <= priorities[i]>>4 {
 				indexed[i] = pixel

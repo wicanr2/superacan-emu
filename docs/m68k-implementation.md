@@ -38,6 +38,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | MOVE.B (An),(An)+ | byte read/write、A7 byte alignment 特例、post-increment | ISA-spec；12 cycles |
 | MOVE.W #imm,(xxx).L | 三個 extension words、data write、final prefetch | ISA-spec；20 cycles |
 | CMPI.W #imm,Dn | subtraction N/Z/V/C、X 與 operand 保留 | ISA-spec；8 cycles |
+| CMPI.W #imm,(xxx).L | extension cursor、絕對長位址 word read、比較 flags | ISA-spec；20 cycles；Monopoly `$002416` 動態命中 |
 | DBcc | condition true 12、branch 10、counter expired 14 cycles | User's Manual execution-time table |
 | IPL RAM backup loop | 32 次 `$5F…$40` address-port/data-port/Work RAM transaction | BIOS bytes-derived 合成回歸 |
 | CMP.B (An),Dn | byte subtraction flags、operands 不變 | ISA-spec；8 cycles |
