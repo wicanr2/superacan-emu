@@ -25,6 +25,42 @@ const (
 	InstructionDBcc
 	InstructionCMPByteAddressIndirectToData
 	InstructionMOVEBytePredecrementToAddressIndirect
+	InstructionCLRWordData
+	InstructionCLRWordAbsoluteLong
+	InstructionCLRByteAbsoluteLong
+	InstructionADDBytePredecrementToData
+	InstructionSUBBytePostincrementFromData
+	InstructionADDWordPredecrementToData
+	InstructionSUBWordPostincrementFromData
+	InstructionCMPIWordPredecrement
+	InstructionSUBQLongAddress
+	InstructionCMPBytePredecrementToData
+	InstructionMOVEByteImmediateToAbsoluteLong
+	InstructionCMPMWord
+	InstructionMOVEAAddressToAddress
+	InstructionADDAWordImmediate
+	InstructionSWAP
+	InstructionCLRLongData
+	InstructionCLRByteData
+	InstructionADDQByteData
+	InstructionADDQByteAbsoluteLong
+	InstructionBTSTDataData
+	InstructionNEGWordData
+	InstructionMULSWordPostincrement
+	InstructionSUBQByteData
+	InstructionADDLongDataToData
+	InstructionADDXByteData
+	InstructionANDIByteData
+	InstructionCMPBytePostincrementToData
+	InstructionCMPLongPostincrementToData
+	InstructionMOVEWordImmediateToPredecrement
+	InstructionJMPAbsoluteLong
+	InstructionORIWordData
+	InstructionMOVEWordAddressIndirectToData
+	InstructionMOVEWordDataToAddressIndirect
+	InstructionMOVEAAbsoluteWord
+	InstructionJMPAddressIndirect
+	InstructionJSRAbsoluteLong
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -34,6 +70,7 @@ type Decoded struct {
 	SourceRegister uint8
 	Condition      uint8
 	Immediate8     uint8
+	Quick          uint8
 }
 
 // Decode currently covers the first vertical slice only. Every unmatched
@@ -112,6 +149,98 @@ func Decode(opcode uint16) Decoded {
 			Register:       uint8(opcode >> 9 & 7),
 			SourceRegister: uint8(opcode & 7),
 		}
+	case opcode&0xfff8 == 0x4240:
+		return Decoded{Instruction: InstructionCLRWordData, Register: uint8(opcode & 7)}
+	case opcode == 0x4279:
+		return Decoded{Instruction: InstructionCLRWordAbsoluteLong}
+	case opcode == 0x4239:
+		return Decoded{Instruction: InstructionCLRByteAbsoluteLong}
+	case opcode&0xf1f8 == 0xd020:
+		return Decoded{Instruction: InstructionADDBytePredecrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x9018:
+		return Decoded{Instruction: InstructionSUBBytePostincrementFromData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xd060:
+		return Decoded{Instruction: InstructionADDWordPredecrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x9058:
+		return Decoded{Instruction: InstructionSUBWordPostincrementFromData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x0c60:
+		return Decoded{Instruction: InstructionCMPIWordPredecrement, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x5188:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionSUBQLongAddress, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1f8 == 0xb020:
+		return Decoded{Instruction: InstructionCMPBytePredecrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode == 0x13fc:
+		return Decoded{Instruction: InstructionMOVEByteImmediateToAbsoluteLong}
+	case opcode&0xf1f8 == 0xb148:
+		return Decoded{
+			Instruction:    InstructionCMPMWord,
+			Register:       uint8(opcode >> 9 & 7),
+			SourceRegister: uint8(opcode & 7),
+		}
+	case opcode&0xf1f8 == 0x2048:
+		return Decoded{Instruction: InstructionMOVEAAddressToAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0xd0fc:
+		return Decoded{Instruction: InstructionADDAWordImmediate, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xfff8 == 0x4840:
+		return Decoded{Instruction: InstructionSWAP, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4280:
+		return Decoded{Instruction: InstructionCLRLongData, Register: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4200:
+		return Decoded{Instruction: InstructionCLRByteData, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x5000:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionADDQByteData, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1ff == 0x5039:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionADDQByteAbsoluteLong, Quick: quick}
+	case opcode&0xf1f8 == 0x0100:
+		return Decoded{Instruction: InstructionBTSTDataData, Register: uint8(opcode & 7), SourceRegister: uint8(opcode >> 9 & 7)}
+	case opcode&0xfff8 == 0x4440:
+		return Decoded{Instruction: InstructionNEGWordData, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xc1d8:
+		return Decoded{Instruction: InstructionMULSWordPostincrement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x5100:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionSUBQByteData, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1f8 == 0xd080:
+		return Decoded{Instruction: InstructionADDLongDataToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xd100:
+		return Decoded{Instruction: InstructionADDXByteData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x0200:
+		return Decoded{Instruction: InstructionANDIByteData, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xb018:
+		return Decoded{Instruction: InstructionCMPBytePostincrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xb098:
+		return Decoded{Instruction: InstructionCMPLongPostincrementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x313c:
+		return Decoded{Instruction: InstructionMOVEWordImmediateToPredecrement, Register: uint8(opcode >> 9 & 7)}
+	case opcode == 0x4ef9:
+		return Decoded{Instruction: InstructionJMPAbsoluteLong}
+	case opcode == 0x4eb9:
+		return Decoded{Instruction: InstructionJSRAbsoluteLong}
+	case opcode&0xfff8 == 0x0040:
+		return Decoded{Instruction: InstructionORIWordData, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3010:
+		return Decoded{Instruction: InstructionMOVEWordAddressIndirectToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x3080:
+		return Decoded{Instruction: InstructionMOVEWordDataToAddressIndirect, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x2078:
+		return Decoded{Instruction: InstructionMOVEAAbsoluteWord, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xfff8 == 0x4ed0:
+		return Decoded{Instruction: InstructionJMPAddressIndirect, Register: uint8(opcode & 7)}
 	case opcode&0xf100 == 0x7000:
 		return Decoded{
 			Instruction: InstructionMOVEQ,

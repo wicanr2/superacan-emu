@@ -124,3 +124,17 @@
   第一輪停 `$46C CMP.B (A1),D0`，補實作後停 `$47C MOVE.B -(A2),(A1)`；再補實作後
   已跨過 RAM restore 與 key 讀取迴圈；成功完成 772 條指令後，精確停於
   `$4C2 CLR.W D4`、8652 cycles。
+
+## 2026-08-31：完整 IPL、卡帶授權與 overlay 轉交
+
+- checksum ISA：新增 CLR byte/word/long、ADD/SUB byte/word/long、ADDX、ADDQ/SUBQ、
+  ANDI/ORI、CMP/CMPI/CMPM、BTST、NEG、SWAP，以及 predecrement/postincrement 變體。
+- MULS：依 MC68000 Booth transition 規則建模 `42 + 2n` 的 `(An)+` 總週期，乘數為
+  16-bit signed、結果為 32-bit，並測試資料相依 timing。
+- 卡帶授權：真實 Boom Zoo 已通過 `$570` 的 64-word CMPM loop 與 `$578–$5F0`
+  巢狀 MULS checksum；沒有略過比較、硬編結果或遊戲特判。
+- 轉交：新增 stack immediate MOVE、absolute／indirect JMP、absolute-long JSR、ORI、
+  `(An)` word MOVE 與 absolute-word MOVEA。新增合成 regression，證明 `$61E` 關 high
+  overlay 後，已預取的 `$620 JMP (A0)` 仍執行並從卡帶向量進入 `$400`。
+- 真實結果：成功完成 87,204 條指令、797,418 cycles；low/high overlay 均為 off，
+  執行卡帶 `$420 JSR $2B22` 後停於 `$2B22 MOVEM.L`（opcode `$48E7`）。

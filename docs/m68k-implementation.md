@@ -42,7 +42,9 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | IPL RAM backup loop | 32 次 `$5F…$40` address-port/data-port/Work RAM transaction | BIOS bytes-derived 合成回歸 |
 | CMP.B (An),Dn | byte subtraction flags、operands 不變 | ISA-spec；8 cycles |
 | MOVE.B -(An),(An) | predecrement、byte read/write、MOVE flags | ISA-spec；14 cycles |
-| 真實 IPL | fixed SHA-256，自 `$400` 執行至 `$4C2` | 外部 BIOS/ROM；下一個缺口 `CLR.W D4` |
+| 真實 IPL | fixed SHA-256，自 `$400` 完成至 `$620` 並進入卡帶 | 87,204 指令；雙 overlay 關閉 |
+| checksum ISA | CLR、ADD/SUB/ADDX/ADDQ/SUBQ、CMPM、MULS、BTST、NEG、SWAP | 真實 UMC6650 與卡帶授權兩階段通過 |
+| control transfer | JMP/JSR absolute long、JMP (An)、MOVEA absolute word | 預取跨 high-overlay regression |
 | phase trace | `StepResult.Phases` | 只含目前已建模 phase，尚無 exception trace |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
@@ -59,3 +61,4 @@ displacement 是後續 CPU 型號能力，本核心目前不得套用。
 - Motorola reset phase 的更細 bus timing 審查；目前 40-cycle reset 是 sample-derived
   起始契約，文件中不得標成硬體已證實。
 - 與獨立公開 opcode vectors 及 archived oracle 的自動差分 harness。
+- 卡帶入口下一個缺口為 `$2B22 MOVEM.L`；完整 ISA、exception 與 IRQ 尚未完成。

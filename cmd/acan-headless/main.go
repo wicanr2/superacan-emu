@@ -33,9 +33,10 @@ func main() {
 	}
 	result, err := system.RunInstructions(*steps)
 	state := system.M68K.State()
-	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d\n",
+	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t\n",
 		hex.EncodeToString(ipl.RawSHA256[:]), hex.EncodeToString(rom.RawSHA256[:]),
-		system.Instructions, state.PC, result.Opcode, state.Cycles)
+		system.Instructions, state.PC, result.Opcode, state.Cycles,
+		system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled())
 	if err != nil {
 		fail(err.Error())
 	}

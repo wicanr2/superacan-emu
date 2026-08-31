@@ -26,13 +26,15 @@
 - [x] 完成 IPL `$430–$448` 的 UMC6650 RAM 備份迴圈：byte `(An)`／`(An)+`、
   immediate／register `MOVE.W`、`CMPI.W`、`DBLE` 與立即數到絕對長位址寫入。
   合成回歸執行 32 次迭代並驗證 `$5F…$40`、Work RAM 遞增及三種 DBcc timing。
-- [ ] Go 68000 跑通 Super A'Can IPL 第一段。
+- [x] Go 68000 跑通完整 Super A'Can IPL 並進入卡帶入口。
   完成條件：固定 BIOS hash、reset SSP／PC、phase trace 與 C++ oracle 對照，逐步抵達
   UMC6650 交握；缺 opcode 時明確停止，不用 stub NOP。
 - [x] 建立 Go media／machine 第一層：word-swap 與 SHA-256 manifest、ROM／IPL overlay、
   Work/sound RAM、SRAM lane、`$E90B3C`、UMC6650、shared timeline 與 headless runner。
-- [x] 以固定真實 IPL `2e4d88…c695d7c` 及 Boom Zoo 驗證 `$400 → $4C2`；目前明確停在
-  `CLR.W D4`，不是 bus、loader 或 lockout stub 造成的假進度。
+- [x] 以固定真實 IPL `2e4d88…c695d7c` 及 Boom Zoo 驗證 `$400 → $620 → cart`；
+  UMC6650 checksum、64-word 授權比較、第二階段 MULS hash 與雙 overlay 關閉均通過。
+- [ ] 從 Boom Zoo `$2B22 MOVEM.L` 擴充卡帶啟動 ISA、exception 與 IRQ，直到第一個
+  UM6618／UM6619／sound RAM 初始化交易；不得以遊戲專屬 opcode stub 代替一般語意。
 
 ## Deprecated C++ 收尾紀錄
 
