@@ -158,6 +158,16 @@
 - 證據限制：這證明固定軟體路徑已前進，不代表完整 MC68000、exception／IRQ 或遊戲
   可玩；下一步須以裝置交易 checkpoint 判定 UM6618／UM6619／sound RAM 初始化進度。
 
+## 2026-08-31：deprecated oracle `$F001F0` 動態探針
+
+- 範圍只限 `archive/cpp` 的 `ACAN_WATCH`：補上原先被 `write16` 單次 transaction path
+  繞過的 `$F001F0` word log，輸出 frame、value 與原始 PC；沒有更動 UM6618 state 或 renderer。
+- 以 F003 `The Son of Evil` raw SHA-256 `791ab9…deb` 在 Docker headless 跑 6000 幀：
+  frame 20=`$0009`、211=`$0001`、216/219=`$0009`、255/3155/3349=`$0001`、5914=`$0009`。
+  動態結果確認 bit 3 會切換，並確認 `$27EE` shadow consumer；未證實其 direct-color 語意。
+- 建置沿用既有 `cd-access:dev` SDL2 image、固定 `/tmp/moira` 與 `/tmp/clk` source；一次性
+  容器皆使用 `--rm`，沒有留下專案容器。輸出僅存 `/tmp/superacan-emu-watch` 作本輪探針。
+
 ## 2026-08-31：雙 CPU sound boot 與第一筆 VRAM 初始化
 
 - 新增 bus transaction observer 與 headless `--watch`／`--watch-limit`；byte／word access

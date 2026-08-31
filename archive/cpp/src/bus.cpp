@@ -200,6 +200,9 @@ void SystemBus::write16(uint32_t addr, uint16_t val) {
     // 且第一次觸發已推進 src/dst，第二次等於用推進後的指標再複製一遍
     // （實測 Boom Zoo 標題 tilemap1 雜訊的根因；MAME video_w 為 word 單次）。
     if (addr >= 0xF00000 && addr < 0xF00200) {
+        if (std::getenv("ACAN_WATCH") && addr == 0xF001F0)
+            std::fprintf(stderr, "[watchpix] f=%llu $F001F0 <- $%04X (pc=$%08X)\n",
+                         (unsigned long long)g_dbgFrame, val, g_dbgPc);
         video_.writeReg((addr & 0x1FF) >> 1, val);
         return;
     }

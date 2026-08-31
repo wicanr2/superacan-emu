@@ -30,3 +30,15 @@ cmake --build /tmp/superacan-cpp-build -j2
 ```
 
 此命令只重建 deprecated oracle，不是目前 Go 版的建置入口。
+
+## 窄範圍動態探針
+
+設定 `ACAN_WATCH=1` 時，16-bit 寫入 `$F001F0` 會輸出：
+
+```text
+[watchpix] f=<frame> $F001F0 <- $<value> (pc=$<pc>)
+```
+
+此探針只記錄 frame、完整 word value 與原始 PC，不改變 register 副作用；用途是驗證
+`../acan/docs/f003-video-mode.md` 的 ROM producer。它不是 production 除錯 API，也不能把
+`pixel_mode` 名稱升格為硬體語意。
