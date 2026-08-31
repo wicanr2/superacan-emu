@@ -1061,6 +1061,83 @@ func TestADDQLongAbsoluteLongReadModifyWrite(t *testing.T) {
 	}
 }
 
+func TestBTSTImmediateDataUsesModulo32AndOnlyChangesZero(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x0805, 0x0402: 0x0021, 0x0404: 0x4e71, 0x0406: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[5] = 2
+	cpu.state.SR |= flagExtend | flagNegative | flagZero | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 10 || state.D[5] != 2 || state.SR&0x1f != flagExtend|flagNegative|flagOverflow|flagCarry {
+		t.Fatalf("cycles=%d D5=$%08X SR=$%04X", result.Cycles, state.D[5], state.SR)
+	}
+}
+
+func TestMOVEByteAbsoluteLongToData(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x1e39, 0x0402: 0x0001, 0x0404: 0x2001,
+		0x0406: 0x4e71, 0x0408: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	bus.bytes = map[uint32]uint8{0x012001: 0x80}
+	cpu.state.D[7] = 0x1234_5678
+	cpu.state.SR |= flagExtend | flagZero | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 16 || state.D[7] != 0x1234_5680 || state.SR&0x1f != flagExtend|flagNegative {
+		t.Fatalf("cycles=%d D7=$%08X SR=$%04X", result.Cycles, state.D[7], state.SR)
+	}
+}
+
+func TestCMPByteAbsoluteLongToDataPreservesOperandAndExtend(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xbe39, 0x0402: 0x0001, 0x0404: 0x2001,
+		0x0406: 0x4e71, 0x0408: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	bus.bytes = map[uint32]uint8{0x012001: 2}
+	cpu.state.D[7] = 1
+	cpu.state.SR |= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 16 || state.D[7] != 1 || state.SR&0x1f != flagExtend|flagNegative|flagCarry {
+		t.Fatalf("cycles=%d D7=$%08X SR=$%04X", result.Cycles, state.D[7], state.SR)
+	}
+}
+
+func TestCMPWordAbsoluteLongToDataPreservesOperandAndExtend(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xb279, 0x0402: 0x0001, 0x0404: 0x2000,
+		0x0406: 0x4e71, 0x0408: 0x4e71, 0x012000: 2,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[1] = 1
+	cpu.state.SR |= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 16 || state.D[1] != 1 || state.SR&0x1f != flagExtend|flagNegative|flagCarry {
+		t.Fatalf("cycles=%d D1=$%08X SR=$%04X", result.Cycles, state.D[1], state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

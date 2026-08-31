@@ -78,6 +78,23 @@ func (c *CPU) btstDataData(bitRegister, dataRegister uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) btstImmediateData(dataRegister uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	bit := uint32(immediate & 31)
+	c.state.SR &^= flagZero
+	if c.state.D[dataRegister]&(uint32(1)<<bit) == 0 {
+		c.state.SR |= flagZero
+	}
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) negWordData(register uint8) error {
 	value := uint16(c.state.D[register])
 	result := c.sub16(0, value)

@@ -162,6 +162,10 @@ const (
 	InstructionMOVEByteDisplacementToData
 	InstructionADDWordDataToAbsoluteLong
 	InstructionADDQLongAbsoluteLong
+	InstructionBTSTImmediateData
+	InstructionMOVEByteAbsoluteLongToData
+	InstructionCMPByteAbsoluteLongToData
+	InstructionCMPWordAbsoluteLongToData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -244,6 +248,14 @@ func Decode(opcode uint16) Decoded {
 			quick = 8
 		}
 		return Decoded{Instruction: InstructionADDQLongAbsoluteLong, Quick: quick}
+	case opcode&0xfff8 == 0x0800:
+		return Decoded{Instruction: InstructionBTSTImmediateData, Register: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x1039:
+		return Decoded{Instruction: InstructionMOVEByteAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1ff == 0xb039:
+		return Decoded{Instruction: InstructionCMPByteAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1ff == 0xb079:
+		return Decoded{Instruction: InstructionCMPWordAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
 	case opcode&0xf1f8 == 0x91c8:
 		return Decoded{Instruction: InstructionSUBALongAddress, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode == 0x4eb8:

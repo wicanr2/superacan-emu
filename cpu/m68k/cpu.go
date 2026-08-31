@@ -326,6 +326,22 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.addqLongAbsoluteLong(decoded.Quick); err != nil {
 			return result, fmt.Errorf("m68k ADDQ.L #%d,(xxx).L: %w", decoded.Quick, err)
 		}
+	case InstructionBTSTImmediateData:
+		if err := c.btstImmediateData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k BTST #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEByteAbsoluteLongToData:
+		if err := c.moveByteAbsoluteLongToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (xxx).L,D%d: %w", decoded.Register, err)
+		}
+	case InstructionCMPByteAbsoluteLongToData:
+		if err := c.cmpByteAbsoluteLongToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMP.B (xxx).L,D%d: %w", decoded.Register, err)
+		}
+	case InstructionCMPWordAbsoluteLongToData:
+		if err := c.cmpWordAbsoluteLongToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMP.W (xxx).L,D%d: %w", decoded.Register, err)
+		}
 	case InstructionDBcc:
 		if err := c.dbcc(decoded); err != nil {
 			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
@@ -852,6 +868,34 @@ func (c *CPU) cmpByteAddressIndirectToData(source, destination uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) cmpByteAbsoluteLongToData(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setCompare8(uint8(c.state.D[destination]), value)
+	return stream.finish()
+}
+
+func (c *CPU) cmpWordAbsoluteLongToData(destination uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.setCompare16(uint16(c.state.D[destination]), value)
+	return stream.finish()
+}
+
 func (c *CPU) moveWordImmediateToData(register uint8) error {
 	stream := c.newInstructionStream()
 	value, err := stream.nextWord()
@@ -1114,6 +1158,21 @@ func (c *CPU) moveWordAbsoluteLongToData(register uint8) error {
 	}
 	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
 	c.setNZ16(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveByteAbsoluteLongToData(register uint8) error {
+	stream := c.newInstructionStream()
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.state.D[register] = c.state.D[register]&0xffffff00 | uint32(value)
+	c.setNZ8(value)
 	return stream.finish()
 }
 
