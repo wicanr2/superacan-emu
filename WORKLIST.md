@@ -1,6 +1,6 @@
 # Super A'Can 模擬器工作清單
 
-更新日期：2026-08-31。狀態只反映目前程式與最近證據；歷史見 `WORKLOG.md`。
+更新日期：2026-09-01。狀態只反映目前程式與最近證據；歷史見 `WORKLOG.md`。
 
 ## 進行中：純 Go 轉向
 
@@ -39,8 +39,11 @@
   `$F44400` 起 VRAM 寫入；核心沒有遊戲專屬 opcode stub。
 - [x] 將 UM6618 register／palette／VRAM 接入 Go bus，保證 word write 單次生效；以
   真實 VRAM hash、palette／register trace 與自然離開 vblank poll 驗證。
-- [ ] 實作 UM6618 sprite DMA、tilemap／sprite／window／ROZ framebuffer、掃描線
-  IRQ4／5／7；先完成 Boom Zoo 第一張非黑 frame，再做 archived oracle hash／截圖差分。
+- [x] 建立 UM6618 tilemap／sprite／window／ROZ 第一版 framebuffer；固定 Boom Zoo
+  1,300,000 指令可產生 61,437 個非黑像素與可重現 SHA-256。此項只證明第一張可合成
+  frame，不代表 archived oracle 畫面一致。
+- [ ] 完成 UM6618 sprite DMA transaction、複雜 ROZ 逐行模式與掃描線 IRQ4／5／7；
+  再以相同 frame 的 archived oracle hash／截圖做差分並修正優先度與邊界行為。
 - [ ] 完成 W65C02 ISA、IRQ／NMI／WAI 與 I/O ack，將目前 instruction-total 3:1 排程
   收斂成可驗證的 cycle 邊界。
 - [ ] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ6／IRQ7 來源。

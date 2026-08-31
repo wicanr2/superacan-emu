@@ -24,6 +24,7 @@ type Device struct {
 	spriteDMAStarts uint64
 	irqMask         uint8
 	lineCycles      uint16
+	framebuffer     [Width * Height]uint32
 }
 
 func New() *Device { return &Device{} }
@@ -124,6 +125,7 @@ func (d *Device) AdvanceM68KCycles(cycles uint8) {
 		d.scanline = (d.scanline + 1) % 262
 		if d.scanline == 240 {
 			d.frame++
+			d.RenderFrame()
 			if d.irqMask&0x80 != 0 {
 				d.vblankIRQ = true
 			}

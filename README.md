@@ -21,9 +21,10 @@ driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的純 Go �
 Go 主線目前已有 media manifest、整機 bus、UMC6650、phase timeline、headless runner，
 並以固定 IPL SHA-256 完成真實 Boom Zoo IPL、UMC6650、卡帶授權與 overlay 轉交；
 目前已用純 Go W65C02 完成 Boom Zoo sound driver boot ack；UM6618 register、palette、
-VRAM 與 scanline timing 已接入，卡帶可自然離開 vblank poll。headless runner 可輸出
-有界 bus transaction 與 VRAM hash。尚未完成完整 CPU ISA、exception／IRQ、UM6618
-renderer 與 UMC6619 PCM。下列完整相容性仍是
+VRAM、scanline timing 與第一版 tilemap／sprite／window／ROZ framebuffer 已接入，卡帶
+可自然離開 vblank poll，並產生可重現的非黑畫面指紋。headless runner 可輸出有界 bus
+transaction、VRAM 與 framebuffer hash。尚未完成完整 CPU ISA、exception／IRQ、UM6618
+DMA／逐行 ROZ／畫面差分及 UMC6619 PCM。下列完整相容性仍是
 deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 - [x] 68k（Moira）+ 匯流排記憶體映射（依知識庫 `docs/memory-map.md` §2 (a) 級定案）
@@ -104,8 +105,9 @@ go run ./cmd/acan-headless \
 `--watch e80000-e9001f,f00000-f5ffff --watch-limit 64`；每筆 word 存取只記錄一次，
 並附當下 68000 PC、opcode 與指令序號。
 
-runner 會輸出 IPL／ROM SHA-256、PC、opcode 與 cycle；遇到尚未實作的 opcode 會明確
-失敗停止。以下較完整 CLI 仍屬 deprecated C++ oracle，移植前不得視為 Go 介面承諾。
+runner 會輸出 IPL／ROM SHA-256、PC、opcode、cycle、VRAM 與 framebuffer 指紋；遇到
+尚未實作的 opcode 會明確失敗停止。以下較完整 CLI 仍屬 deprecated C++ oracle，移植前
+不得視為 Go 介面承諾。
 
 ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bcan 的
 `bios/supracan.zip`、`bios/umc6650.zip` 解壓後的檔案，以及卡帶 ROM。

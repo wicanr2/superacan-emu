@@ -19,6 +19,44 @@ func TestRegisterPaletteAndVRAMStorage(t *testing.T) {
 	}
 }
 
+func TestRenderWindowAndBlankedWideArea(t *testing.T) {
+	device := New()
+	device.WritePalette(1, 0x001f)
+	device.WriteRegister(4, 0x0002)
+	device.WriteRegister(0xe8, 0x0001)
+	device.WriteRegister(0xe9, 0x0100)
+	device.WriteVRAM16(0x0400, 0)
+	device.WriteVRAM16(0x0402, 2)
+
+	device.RenderFrame()
+	frame := device.Framebuffer()
+	if frame[0] != 0xfff80000 || frame[1] != 0xfff80000 {
+		t.Fatalf("window pixels=$%08X,$%08X", frame[0], frame[1])
+	}
+	if frame[2] != 0xff000000 || frame[256] != 0xff000000 {
+		t.Fatalf("blank pixels=$%08X,$%08X", frame[2], frame[256])
+	}
+	if count := device.NonblackPixels(); count != Height*2 {
+		t.Fatalf("nonblack pixels=%d", count)
+	}
+}
+
+func TestTilePixelPackedModes(t *testing.T) {
+	device := New()
+	device.WriteVRAM8(0, 0xe4)
+	if got := device.tilePixel(0, 0, 0, 0); got != 0xe4 {
+		t.Fatalf("8bpp pixel=$%02X", got)
+	}
+	if low, high := device.tilePixel(1, 0, 0, 0), device.tilePixel(1, 0, 1, 0); low != 4 || high != 0x0e {
+		t.Fatalf("4bpp pixels=$%X,$%X", low, high)
+	}
+	for x, want := range []uint8{0, 1, 2, 3} {
+		if got := device.tilePixel(2, 0, x, 0); got != want {
+			t.Fatalf("2bpp x=%d pixel=%d want=%d", x, got, want)
+		}
+	}
+}
+
 func TestIRQStatusReadAndSingleSpriteDMATrigger(t *testing.T) {
 	device := New()
 	device.SetScanline(240)

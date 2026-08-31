@@ -1,6 +1,6 @@
 # 純 Go UM6618 實作紀錄
 
-更新日期：2026-08-31
+更新日期：2026-09-01
 
 ## 已建立的裝置契約
 
@@ -25,10 +25,22 @@
   read count 注入 vblank。1,300,000 條 68000 指令的有界執行已完成 88 個 vblank，
   VRAM 有 7,268 個非零 byte，SHA-256 `b0b2d6…0f255`。
 
+## 第一版 framebuffer
+
+- `RenderFrame` 由 UM6618 狀態直接合成 320×240 ARGB framebuffer，已涵蓋三層 tilemap、
+  sprite 與 mask、window、ROZ、優先度及 256／320 顯示寬度；vblank 起點觸發合成，
+  不由 Ebitengine callback 推進時間。
+- 合成測試以 window 邊界確認 xBGR-555 轉換、256 像素寬之外的 blanking，以及固定非黑
+  像素數；另測 8／4／2bpp packed tile 解碼。
+- 固定 IPL `2e4d88…c695d7c` 與 Boom Zoo `090827…370077` 執行 1,300,000 條 68000
+  指令後，frame 88 的 framebuffer 有 61,437 個非黑像素，SHA-256
+  `89ce08232bcfc61c396b514a981057b69ae7cf19733a4c3a247a051fc64684ee`。
+- 此 hash 只作 Go 路徑的決定性回歸。尚未取得相同硬體狀態的 archived C++／實機畫面
+  對照，因此不能標為像素正確或硬體已證實。
+
 ## 尚未完成
 
-- tilemap、sprite、window、ROZ renderer 與 RGB framebuffer。
 - sprite DMA transaction state machine；目前只辨識控制 register 的 start edge，尚未複製。
 - raster／line IRQ4／5、vblank IRQ7 到 68000 的受理與 acknowledge。
-- mid-frame register write、partial update、VRAM 上半部來源與 1bpp swapped view。
-- save state 與 renderer 差分；目前的 VRAM hash 只證明固定軟體路徑與儲存契約。
+- ROZ 複雜逐行模式、mid-frame register write、partial update 與 VRAM 上半部來源。
+- save state 與相同 frame renderer 差分；目前的 framebuffer hash 只證明固定 Go 路徑。

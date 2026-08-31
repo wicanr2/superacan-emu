@@ -205,3 +205,15 @@
 - 最終真實 smoke 無未知 opcode 完成 1,300,000 條 68000 指令與 1,524,044 條 65C02
   指令；video frame=88、scanline=69、video flags=`$120E`，VRAM SHA-256
   `b0b2d6d8a8a77e71928ef88c0980f57493b0e3279634a0956753b0887c80f255`。
+
+## 2026-09-01：UM6618 第一版 framebuffer
+
+- 新增純 Go 320×240 ARGB 合成器，涵蓋三層 tilemap、sprite／mask、window、ROZ、
+  layer priority 與 256／320 顯示寬度；vblank 起點合成，不讓前端控制晶片時間。
+- 合成回歸驗證 xBGR-555、window 邊界、blanking、非黑像素計數與 8／4／2bpp tile
+  packing；完整 `go test ./...`、競態檢查及 `go vet ./...` 在固定 Go Docker image 通過。
+- 固定 IPL／Boom Zoo 執行 1,300,000 條 68000 指令後，frame 88 有 61,437 個非黑
+  像素，framebuffer SHA-256 為
+  `89ce08232bcfc61c396b514a981057b69ae7cf19733a4c3a247a051fc64684ee`。
+- 此結果只證明 Go 合成路徑可重現且非黑；sprite DMA、逐行 ROZ、IRQ 與相同 frame
+  archived oracle 差分尚未完成，未宣稱像素正確。
