@@ -50,3 +50,5 @@
   Release 重建。
 - Docker 清理：上述工作均使用 `docker run --rm`；沒有留下本專案容器，所有可寫
   Go 檔案仍由目前 UID/GID 擁有。
+- Git：C++ 歸檔與純 Go 68000 第一個 vertical slice 已提交為 `977b2eb`，並推送至
+  `origin/master`。
