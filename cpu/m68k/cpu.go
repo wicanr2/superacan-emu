@@ -350,6 +350,22 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveALongData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVEA.L D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionCMPWordAddressIndirectToData:
+		if err := c.cmpWordAddressIndirectToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMP.W (A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionTSTByteDisplacement:
+		if err := c.tstByteDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k TST.B (d16,A%d): %w", decoded.Register, err)
+		}
+	case InstructionCMPByteDisplacementToData:
+		if err := c.cmpByteDisplacementToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMP.B (d16,A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionTSTWordDisplacement:
+		if err := c.tstWordDisplacement(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k TST.W (d16,A%d): %w", decoded.Register, err)
+		}
 	case InstructionSUBALongAddress:
 		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)

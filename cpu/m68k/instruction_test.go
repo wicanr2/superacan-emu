@@ -2054,6 +2054,71 @@ func TestMOVEALongDataPreservesFlags(t *testing.T) {
 	}
 }
 
+func TestCMPWordAddressIndirectToData(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{0x0400: 0xb050, 0x0402: 0x4e71, 0x0404: 0x4e71, 0x012000: 0x1234})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	cpu.state.D[0] = 0xabcd_1234
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 8 || state.D[0] != 0xabcd_1234 || state.SR&0x1f != flagZero {
+		t.Fatalf("cycles=%d D0=$%08X SR=$%04X", result.Cycles, state.D[0], state.SR)
+	}
+}
+
+func TestTSTByteDisplacement(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x4a28, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	bus.bytes = map[uint32]uint8{}
+	bus.bytes[0x012004] = 0x80
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 12 || state.SR&0x1f != flagNegative {
+		t.Fatalf("cycles=%d SR=$%04X", result.Cycles, state.SR)
+	}
+}
+
+func TestCMPByteDisplacementToData(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0xb029, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[1] = 0x012000
+	cpu.state.D[0] = 0x1234_0080
+	bus.bytes = map[uint32]uint8{0x012004: 0x80}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 12 || state.D[0] != 0x1234_0080 || state.SR&0x1f != flagZero {
+		t.Fatalf("cycles=%d D0=$%08X SR=$%04X", result.Cycles, state.D[0], state.SR)
+	}
+}
+
+func TestTSTWordDisplacement(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{0x0400: 0x4a68, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71, 0x012004: 0x8000})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 12 || state.SR&0x1f != flagNegative {
+		t.Fatalf("cycles=%d SR=$%04X", result.Cycles, state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

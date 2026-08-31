@@ -866,6 +866,60 @@ func (c *CPU) moveALongData(source, destination uint8) error {
 	return c.prefetch()
 }
 
+func (c *CPU) cmpWordAddressIndirectToData(source, destination uint8) error {
+	value, err := c.readWord(c.state.A[source], FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.setCompare16(uint16(c.state.D[destination]), value)
+	return c.prefetch()
+}
+
+func (c *CPU) tstByteDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ8(value)
+	return stream.finish()
+}
+
+func (c *CPU) cmpByteDisplacementToData(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[source])+int32(int16(displacement))) & addressMask
+	value, err := c.readByte(address, FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setCompare8(uint8(c.state.D[destination]), value)
+	return stream.finish()
+}
+
+func (c *CPU) tstWordDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	c.setNZ16(value)
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)
