@@ -68,6 +68,7 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | 跨 ROM 中期初始化 | `OR.L (d16,An),Dn`、`MOVE.W (An),(d16,Am)`、`SUB.W (d16,An),Dn`、`MOVEM.W <list>,-(An)`、`CMP.W (d16,An),Dn`、`MOVEA.W Dn,An` | Motorola ISA／Moira phase 模型；Boom Zoo 推進至 4,219,269 條／291 幀，VRAM 非零 23,558 bytes；Formosa Duel 推進至 9,700,346 條／641 幀，DMA ch1 48 次、IRQ5 839 次、VRAM 非零 20,594 bytes；最後兩條已通過合成測試，待下一輪真實 ROM 回歸 |
 | 跨 ROM 堆疊／批次恢復 | `DIVU.W (d16,An),Dn`、`ADD.W An,Dn`、`MOVE.W (xxx).L,(xxx).L`、`MOVEM.W (An)+,<list>`、`OR.W (xxx).L,Dn`、`MOVEA.L Dn,An` | Motorola ISA／Moira phase 模型；Formosa Duel 的 word MOVEM 返回路徑已推進至 9,878,357 條／651 幀，IRQ5 859 次、VRAM 非零 20,796 bytes；最後兩條已通過合成測試，待下一輪真實 ROM 回歸 |
 | 跨 ROM 畫面啟動／狀態檢查 | `CMP.W (An),Dn`、`TST.B (d16,An)`、`CMP.B (d16,An),Dn`、`TST.W (d16,An)` | Motorola ISA／Moira phase 模型；Boom Zoo 推進至 5,194,705 條／350 幀，framebuffer 23,752 個非黑像素且音訊非零樣本 102,101；Formosa Duel 推進至 10,135,499 條／666 幀，VRAM 非零 41,358 bytes；最後兩條已通過合成測試，待下一輪真實 ROM 回歸 |
+| 跨 ROM byte 狀態寫入 | `MOVE.B Dn,(d16,An)`、`MOVE.B #imm,(An)` | Motorola ISA／Moira phase 模型；兩條均通過合成 bus write 與旗標測試，待下一輪真實 ROM 回歸。Boom Zoo 320 幀 PNG 已人工確認為暗色天空、月體與右側前景剪影的可辨識過場構圖，不是隨機像素；調色忠實度仍待 oracle 比對 |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch
 displacement 是後續 CPU 型號能力，本核心目前不得套用。

@@ -920,6 +920,35 @@ func (c *CPU) tstWordDisplacement(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) moveByteDataToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	value := uint8(c.state.D[source])
+	c.setNZ8(value)
+	if err := c.writeByte(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveByteImmediateToAddressIndirect(destination uint8) error {
+	stream := c.newInstructionStream()
+	immediate, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value := uint8(immediate)
+	c.setNZ8(value)
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)

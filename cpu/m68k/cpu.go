@@ -366,6 +366,14 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.tstWordDisplacement(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k TST.W (d16,A%d): %w", decoded.Register, err)
 		}
+	case InstructionMOVEByteDataToDisplacement:
+		if err := c.moveByteDataToDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B D%d,(d16,A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEByteImmediateToAddressIndirect:
+		if err := c.moveByteImmediateToAddressIndirect(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B #imm,(A%d): %w", decoded.Register, err)
+		}
 	case InstructionSUBALongAddress:
 		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
