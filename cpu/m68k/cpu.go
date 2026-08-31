@@ -138,6 +138,34 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.andiWordData(decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k ANDI.W #imm,D%d: %w", decoded.Register, err)
 		}
+	case InstructionMOVEWordImmediateToData:
+		if err := c.moveWordImmediateToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEWordDataToData:
+		if err := c.moveWordDataToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W D%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEByteDataToAddressIndirect:
+		if err := c.moveByteDataToAddressIndirect(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B D%d,(A%d): %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEByteAddressIndirectToPostincrement:
+		if err := c.moveByteAddressIndirectToPostincrement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVE.B (A%d),(A%d)+: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordImmediateToAbsoluteLong:
+		if err := c.moveWordImmediateToAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W #imm,(xxx).L: %w", err)
+		}
+	case InstructionCMPIWordData:
+		if err := c.cmpiWordData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k CMPI.W #imm,D%d: %w", decoded.Register, err)
+		}
+	case InstructionDBcc:
+		if err := c.dbcc(decoded); err != nil {
+			return result, fmt.Errorf("m68k DBcc condition %d,D%d: %w", decoded.Condition, decoded.Register, err)
+		}
 	case InstructionBSR:
 		return result, fmt.Errorf("m68k: unimplemented BSR opcode $%04X at $%06X", c.state.IRD, c.state.PC)
 	default:
@@ -148,6 +176,92 @@ func (c *CPU) Step() (StepResult, error) {
 	result.Cycles = c.state.Cycles - start
 	result.Phases = append(result.Phases, c.stepTrace...)
 	return result, nil
+}
+
+func (c *CPU) moveWordImmediateToData(register uint8) error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.state.D[register] = c.state.D[register]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return stream.finish()
+}
+
+func (c *CPU) moveWordDataToData(source, destination uint8) error {
+	value := uint16(c.state.D[source])
+	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
+	c.setNZ16(value)
+	return c.prefetch()
+}
+
+func (c *CPU) moveByteDataToAddressIndirect(source, destination uint8) error {
+	value := uint8(c.state.D[source])
+	c.setNZ8(value)
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	return c.prefetch()
+}
+
+func (c *CPU) moveByteAddressIndirectToPostincrement(source, destination uint8) error {
+	value, err := c.readByte(c.state.A[source], FCSupervisorData)
+	if err != nil {
+		return err
+	}
+	c.setNZ8(value)
+	if err := c.writeByte(c.state.A[destination], value, FCSupervisorData); err != nil {
+		return err
+	}
+	increment := uint32(1)
+	if destination == 7 {
+		increment = 2
+	}
+	c.state.A[destination] = (c.state.A[destination] + increment) & addressMask
+	return c.prefetch()
+}
+
+func (c *CPU) moveWordImmediateToAbsoluteLong() error {
+	stream := c.newInstructionStream()
+	value, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address, err := stream.nextLong()
+	if err != nil {
+		return err
+	}
+	c.setNZ16(value)
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) cmpiWordData(register uint8) error {
+	stream := c.newInstructionStream()
+	source, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	c.setCompare16(uint16(c.state.D[register]), source)
+	return stream.finish()
+}
+
+func (c *CPU) dbcc(decoded Decoded) error {
+	fallthroughPC := (c.state.PC + 4) & addressMask
+	if conditionTrue(decoded.Condition, c.state.SR) {
+		return c.refillPrefetch(fallthroughPC, 4)
+	}
+
+	count := uint16(c.state.D[decoded.Register]) - 1
+	c.state.D[decoded.Register] = c.state.D[decoded.Register]&0xffff_0000 | uint32(count)
+	if count == 0xffff {
+		return c.refillPrefetch(fallthroughPC, 6)
+	}
+	target := uint32(int32(c.state.PC+2)+int32(int16(c.state.IRC))) & addressMask
+	return c.refillPrefetch(target, 2)
 }
 
 func (c *CPU) moveWordAbsoluteLongToData(register uint8) error {
@@ -247,6 +361,33 @@ func (c *CPU) setNZ16(value uint16) {
 	}
 }
 
+func (c *CPU) setNZ8(value uint8) {
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	if value == 0 {
+		c.state.SR |= flagZero
+	}
+	if value&0x80 != 0 {
+		c.state.SR |= flagNegative
+	}
+}
+
+func (c *CPU) setCompare16(destination, source uint16) {
+	result := destination - source
+	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
+	if result == 0 {
+		c.state.SR |= flagZero
+	}
+	if result&0x8000 != 0 {
+		c.state.SR |= flagNegative
+	}
+	if (destination^source)&(destination^result)&0x8000 != 0 {
+		c.state.SR |= flagOverflow
+	}
+	if source > destination {
+		c.state.SR |= flagCarry
+	}
+}
+
 func (c *CPU) branch(displacement8 uint8) error {
 	base := (c.state.PC + 2) & addressMask
 	var target uint32
@@ -322,6 +463,27 @@ func (c *CPU) readWord(address uint32, fc FunctionCode, kind PhaseKind) (uint16,
 		return 0, err
 	}
 	return c.bus.Read16(address)
+}
+
+func (c *CPU) readByte(address uint32, fc FunctionCode) (uint8, error) {
+	address &= addressMask
+	phase := Phase{Kind: PhaseDataRead, Cycles: 4, Address: address, Width: WidthByte, FC: fc}
+	if err := c.advance(phase); err != nil {
+		return 0, err
+	}
+	return c.bus.Read8(address)
+}
+
+func (c *CPU) writeByte(address uint32, value uint8, fc FunctionCode) error {
+	address &= addressMask
+	phase := Phase{
+		Kind: PhaseDataWrite, Cycles: 4, Address: address,
+		Width: WidthByte, Write: true, Value: uint32(value), FC: fc,
+	}
+	if err := c.advance(phase); err != nil {
+		return err
+	}
+	return c.bus.Write8(address, value)
 }
 
 func (c *CPU) writeWord(address uint32, value uint16, fc FunctionCode) error {

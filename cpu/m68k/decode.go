@@ -16,14 +16,22 @@ const (
 	InstructionMOVEWordAbsoluteLongToData
 	InstructionMOVEWordDataToAbsoluteLong
 	InstructionANDIWordData
+	InstructionMOVEWordImmediateToData
+	InstructionMOVEWordDataToData
+	InstructionMOVEByteDataToAddressIndirect
+	InstructionMOVEByteAddressIndirectToPostincrement
+	InstructionMOVEWordImmediateToAbsoluteLong
+	InstructionCMPIWordData
+	InstructionDBcc
 )
 
 // Decoded is the auditable result of decoding one opcode word.
 type Decoded struct {
-	Instruction Instruction
-	Register    uint8
-	Condition   uint8
-	Immediate8  uint8
+	Instruction    Instruction
+	Register       uint8
+	SourceRegister uint8
+	Condition      uint8
+	Immediate8     uint8
 }
 
 // Decode currently covers the first vertical slice only. Every unmatched
@@ -53,6 +61,42 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{
 			Instruction: InstructionANDIWordData,
 			Register:    uint8(opcode & 7),
+		}
+	case opcode&0xf1ff == 0x303c:
+		return Decoded{
+			Instruction: InstructionMOVEWordImmediateToData,
+			Register:    uint8(opcode >> 9 & 7),
+		}
+	case opcode&0xf1f8 == 0x3000:
+		return Decoded{
+			Instruction:    InstructionMOVEWordDataToData,
+			Register:       uint8(opcode >> 9 & 7),
+			SourceRegister: uint8(opcode & 7),
+		}
+	case opcode&0xf1f8 == 0x1080:
+		return Decoded{
+			Instruction:    InstructionMOVEByteDataToAddressIndirect,
+			Register:       uint8(opcode >> 9 & 7),
+			SourceRegister: uint8(opcode & 7),
+		}
+	case opcode&0xf1f8 == 0x10d0:
+		return Decoded{
+			Instruction:    InstructionMOVEByteAddressIndirectToPostincrement,
+			Register:       uint8(opcode >> 9 & 7),
+			SourceRegister: uint8(opcode & 7),
+		}
+	case opcode == 0x33fc:
+		return Decoded{Instruction: InstructionMOVEWordImmediateToAbsoluteLong}
+	case opcode&0xfff8 == 0x0c40:
+		return Decoded{
+			Instruction: InstructionCMPIWordData,
+			Register:    uint8(opcode & 7),
+		}
+	case opcode&0xf0f8 == 0x50c8:
+		return Decoded{
+			Instruction: InstructionDBcc,
+			Register:    uint8(opcode & 7),
+			Condition:   uint8(opcode >> 8 & 0x0f),
 		}
 	case opcode&0xf100 == 0x7000:
 		return Decoded{

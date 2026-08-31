@@ -320,3 +320,166 @@ func TestSyntheticIPLReachesFirstPollBranch(t *testing.T) {
 		t.Fatalf("cycles=%d, want 132 including reset", state.Cycles)
 	}
 }
+
+func TestCMPIWordFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		dst  uint16
+		src  uint16
+		want uint16
+	}{
+		{"equal", 0x0040, 0x0040, flagZero},
+		{"positive", 0x005f, 0x0040, 0},
+		{"borrow negative", 0x003f, 0x0040, flagNegative | flagCarry},
+		{"signed overflow", 0x8000, 0x0001, flagOverflow},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+				0x0400: 0x0c43, 0x0402: test.src, 0x0404: 0x4e71, 0x0406: 0x7000,
+			})
+			if err := cpu.Reset(); err != nil {
+				t.Fatal(err)
+			}
+			cpu.state.D[3] = 0xabcd_0000 | uint32(test.dst)
+			cpu.state.SR |= flagExtend | flagNegative | flagZero | flagOverflow | flagCarry
+			result, err := cpu.Step()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if state := cpu.State(); state.D[3] != 0xabcd_0000|uint32(test.dst) || state.SR&0x1f != flagExtend|test.want {
+				t.Fatalf("CMPI state: D3=$%08X CCR=$%02X", state.D[3], state.SR&0x1f)
+			}
+			if result.Cycles != 8 {
+				t.Fatalf("CMPI cycles=%d", result.Cycles)
+			}
+		})
+	}
+}
+
+func TestMOVEBytePostincrementUsesTwoBytesForA7(t *testing.T) {
+	log := &eventLog{}
+	bus := &testBus{
+		log: log,
+		words: map[uint32]uint16{
+			0: 0, 2: 0x1000, 4: 0, 6: 0x0400,
+			0x0400: 0x1ed1, 0x0402: 0x4e71, 0x0404: 0x7000,
+		},
+		bytes: map[uint32]uint8{0x2000: 0x7f},
+	}
+	cpu := New(bus, log)
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[1] = 0x2000
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); state.A[7] != 0x1002 {
+		t.Fatalf("A7=$%08X, want $00001002", state.A[7])
+	}
+	if want := []byteWrite{{address: 0x1000, value: 0x7f}}; !reflect.DeepEqual(bus.byteWrites, want) {
+		t.Fatalf("stack byte writes: got %+v want %+v", bus.byteWrites, want)
+	}
+}
+
+func TestDBccPaths(t *testing.T) {
+	tests := []struct {
+		name       string
+		sr         uint16
+		count      uint16
+		wantCount  uint16
+		wantPC     uint32
+		wantCycles uint64
+	}{
+		{"condition true", flagZero, 5, 5, 0x0404, 12},
+		{"branch", 0, 5, 4, 0x03fc, 10},
+		{"counter expired", 0, 0, 0xffff, 0x0404, 14},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+				0x0400: 0x57c8, 0x0402: 0xfffa,
+				0x0404: 0x4e71, 0x0406: 0x7000,
+				0x03fc: 0x4e71, 0x03fe: 0x7000,
+			})
+			if err := cpu.Reset(); err != nil {
+				t.Fatal(err)
+			}
+			cpu.state.SR = 0x2700 | test.sr
+			cpu.state.D[0] = 0xbeef_0000 | uint32(test.count)
+			result, err := cpu.Step()
+			if err != nil {
+				t.Fatal(err)
+			}
+			state := cpu.State()
+			if uint16(state.D[0]) != test.wantCount || state.PC != test.wantPC {
+				t.Fatalf("DBEQ state: D0=$%08X PC=$%06X", state.D[0], state.PC)
+			}
+			if result.Cycles != test.wantCycles {
+				t.Fatalf("DBEQ result: %+v", result)
+			}
+		})
+	}
+}
+
+func TestSyntheticIPLCompletesFirstUMC6650BackupLoop(t *testing.T) {
+	log := &eventLog{}
+	bus := &testBus{
+		log: log,
+		words: map[uint32]uint16{
+			0: 0, 2: 0x1000, 4: 0, 6: 0x0400,
+			0x0400: 0x303c, 0x0402: 0x005f,
+			0x0404: 0x3200,
+			0x0406: 0x1080,
+			0x0408: 0x14d1,
+			0x040a: 0x33fc, 0x040c: 0xc170, 0x040e: 0x00e9, 0x0410: 0x0b3c,
+			0x0412: 0x0c40, 0x0414: 0x0040,
+			0x0416: 0x5fc8, 0x0418: 0xffee,
+			0x041a: 0x4e71, 0x041c: 0x7000,
+		},
+		bytes: map[uint32]uint8{0xeb0d01: 0xa5},
+	}
+	cpu := New(bus, log)
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0xeb0d03
+	cpu.state.A[1] = 0xeb0d01
+	cpu.state.A[2] = 0xfc0000
+	// Two setup instructions followed by 32 loop iterations of five
+	// instructions each ($5F down to and including $40).
+	for step := 0; step < 162; step++ {
+		if _, err := cpu.Step(); err != nil {
+			t.Fatalf("step %d: %v", step, err)
+		}
+	}
+	state := cpu.State()
+	if state.PC != 0x041a || uint16(state.D[0]) != 0x0040 || uint16(state.D[1]) != 0x005f {
+		t.Fatalf("loop state: PC=$%06X D0=$%08X D1=$%08X", state.PC, state.D[0], state.D[1])
+	}
+	if state.A[2] != 0xfc0020 {
+		t.Fatalf("A2=$%08X, want $00FC0020", state.A[2])
+	}
+	if len(bus.byteWrites) != 64 {
+		t.Fatalf("byte write count=%d, want 64", len(bus.byteWrites))
+	}
+	for i := 0; i < 32; i++ {
+		wantAddressWrite := byteWrite{address: 0xeb0d03, value: uint8(0x5f - i)}
+		wantBackupWrite := byteWrite{address: 0xfc0000 + uint32(i), value: 0xa5}
+		if bus.byteWrites[2*i] != wantAddressWrite || bus.byteWrites[2*i+1] != wantBackupWrite {
+			t.Fatalf("iteration %d writes: got %+v %+v", i, bus.byteWrites[2*i], bus.byteWrites[2*i+1])
+		}
+	}
+	if len(bus.writes) != 32 {
+		t.Fatalf("word write count=%d, want 32", len(bus.writes))
+	}
+	for i, write := range bus.writes {
+		if write != (wordWrite{address: 0xe90b3c, value: 0xc170}) {
+			t.Fatalf("noise write %d: %+v", i, write)
+		}
+	}
+	if state.Cycles != 1910 {
+		t.Fatalf("cycles=%d, want 1910 including reset", state.Cycles)
+	}
+}

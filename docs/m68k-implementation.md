@@ -33,6 +33,13 @@ oracle，不是本 Go 實作的程式來源，也不自動等同硬體。
 | MOVE.W Dn,(xxx).L | 絕對長位址 word write、CCR 不變 | ISA-spec；16 cycles；Moira 核對 write-before-final-prefetch |
 | ANDI.W #imm,Dn | Dn 低 word、上半 word 與 X 保留、N/Z/V/C | ISA-spec；8 cycles |
 | IPL 合成路徑 | `$400` 至第一個 poll branch target `$430` | BIOS bytes-derived opcode 序列；不嵌入 BIOS 映像 |
+| MOVE.W #imm,Dn／Dn,Dn | 低 word 寫入、N/Z/V/C、X 與未覆蓋高 word 保留 | ISA-spec；8／4 cycles |
+| MOVE.B Dn,(An) | byte data write 與 MOVE flags | ISA-spec；8 cycles |
+| MOVE.B (An),(An)+ | byte read/write、A7 byte alignment 特例、post-increment | ISA-spec；12 cycles |
+| MOVE.W #imm,(xxx).L | 三個 extension words、data write、final prefetch | ISA-spec；20 cycles |
+| CMPI.W #imm,Dn | subtraction N/Z/V/C、X 與 operand 保留 | ISA-spec；8 cycles |
+| DBcc | condition true 12、branch 10、counter expired 14 cycles | User's Manual execution-time table |
+| IPL RAM backup loop | 32 次 `$5F…$40` address-port/data-port/Work RAM transaction | BIOS bytes-derived 合成回歸 |
 | phase trace | `StepResult.Phases` | 只含目前已建模 phase，尚無 exception trace |
 
 在 MC68000 上，opcode low byte `$FF` 仍是 8-bit displacement `-1`；32-bit branch

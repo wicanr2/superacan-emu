@@ -14,9 +14,16 @@ func (l *eventLog) Advance(p Phase) error {
 }
 
 type testBus struct {
-	log    *eventLog
-	words  map[uint32]uint16
-	writes []wordWrite
+	log        *eventLog
+	words      map[uint32]uint16
+	bytes      map[uint32]uint8
+	writes     []wordWrite
+	byteWrites []byteWrite
+}
+
+type byteWrite struct {
+	address uint32
+	value   uint8
 }
 
 type wordWrite struct {
@@ -24,12 +31,19 @@ type wordWrite struct {
 	value   uint16
 }
 
-func (b *testBus) Read8(address uint32) (uint8, error) { return 0, nil }
+func (b *testBus) Read8(address uint32) (uint8, error) {
+	b.log.events = append(b.log.events, "read8")
+	return b.bytes[address], nil
+}
 func (b *testBus) Read16(address uint32) (uint16, error) {
 	b.log.events = append(b.log.events, "read16")
 	return b.words[address], nil
 }
-func (b *testBus) Write8(address uint32, value uint8) error { return nil }
+func (b *testBus) Write8(address uint32, value uint8) error {
+	b.log.events = append(b.log.events, "write8")
+	b.byteWrites = append(b.byteWrites, byteWrite{address: address, value: value})
+	return nil
+}
 func (b *testBus) Write16(address uint32, value uint16) error {
 	b.log.events = append(b.log.events, "write16")
 	b.writes = append(b.writes, wordWrite{address: address, value: value})

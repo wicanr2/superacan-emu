@@ -95,3 +95,17 @@
   register-to-absolute-long MOVE 是「消耗兩個 extension → data write → final prefetch」。
 - 測試：以最小合成 IPL fixture 執行八條指令，從 `$400` 抵達 `$430`，驗證 A0/A1/A2、
   zero branch、資料 phase 與包含 reset 的 132 cycles；fixture 不含完整 BIOS 或版權資料。
+
+## 2026-08-31：UMC6650 RAM 備份迴圈
+
+- 範圍：實作 BIOS `$430–$448` 所需的 `MOVE.W #imm,Dn`、`MOVE.W Dn,Dn`、
+  `MOVE.B Dn,(An)`、`MOVE.B (An),(An)+`、`MOVE.W #imm,(xxx).L`、`CMPI.W` 與 `DBcc`。
+- 匯流排：新增 byte read/write phase；仍維持 scheduler 先推進、再呼叫 bus side effect。
+  `(A7)+` 的 byte increment 為 2，其餘 address register 為 1。
+- 旗標：MOVE byte／word 與 CMPI word 各有獨立寬度契約；CMPI 保留 X 與 operands，
+  明確測試 equal、positive、borrow-negative 與 signed-overflow。
+- 迴圈回歸：不含 BIOS 映像的合成 fixture 執行 162 條指令，完成 32 次 `$5F…$40`
+  倒數；驗證 32 次 address-port byte write、32 次 data-port read、Work RAM `$FC0000…1F`
+  post-increment write、32 次 noise word write，並以 1910 reset-inclusive cycles 離開迴圈。
+- DBcc：分別測試 condition true 12 cycles、decrement-and-branch 10 cycles、counter expired
+  14 cycles；未將後續 CPU 型號的 loop mode 套入 MC68000。
