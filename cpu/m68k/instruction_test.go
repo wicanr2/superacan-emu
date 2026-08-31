@@ -1952,6 +1952,108 @@ func TestMOVEAWordDataSignExtendsAndPreservesFlags(t *testing.T) {
 	}
 }
 
+func TestDIVUWordDisplacement(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{0x0400: 0x80ea, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71, 0x012004: 7})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[2] = 0x012000
+	cpu.state.D[0] = 100
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 148 || state.D[0] != 0x0002_000e || state.SR&0x1f != 0 {
+		t.Fatalf("cycles=%d D0=$%08X SR=$%04X", result.Cycles, state.D[0], state.SR)
+	}
+}
+
+func TestADDWordAddressToData(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{0x0400: 0xd24e, 0x0402: 0x4e71, 0x0404: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[6] = 1
+	cpu.state.D[1] = 0xabcd_7fff
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 4 || state.D[1] != 0xabcd_8000 || state.SR&0x1f != flagNegative|flagOverflow {
+		t.Fatalf("cycles=%d D1=$%08X SR=$%04X", result.Cycles, state.D[1], state.SR)
+	}
+}
+
+func TestMOVEWordAbsoluteLongToAbsoluteLong(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x33f9, 0x0402: 0x0001, 0x0404: 0x1000, 0x0406: 0x0001, 0x0408: 0x2000,
+		0x040a: 0x4e71, 0x040c: 0x4e71, 0x011000: 0x8001,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012000, value: 0x8001}}
+	if state := cpu.State(); result.Cycles != 28 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
+func TestMOVEMWordPostincrementToRegisters(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x4c9f, 0x0402: 0x8081, 0x0404: 0x4e71, 0x0406: 0x4e71,
+		0x001000: 0xff80, 0x001002: 0x1234, 0x001004: 0x5678,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cpu.State()
+	if result.Cycles != 20 || state.D[0] != 0xffff_ff80 || state.D[7] != 0x0000_1234 || state.A[7] != 0x001006 {
+		t.Fatalf("cycles=%d D0=$%08X D7=$%08X A7=$%06X", result.Cycles, state.D[0], state.D[7], state.A[7])
+	}
+}
+
+func TestORWordAbsoluteLongToData(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x8079, 0x0402: 0x0001, 0x0404: 0x2000, 0x0406: 0x4e71, 0x0408: 0x4e71,
+		0x012000: 0x8001,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[0] = 0xabcd_0002
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 16 || state.D[0] != 0xabcd_8003 || state.SR&0x1f != flagNegative {
+		t.Fatalf("cycles=%d D0=$%08X SR=$%04X", result.Cycles, state.D[0], state.SR)
+	}
+}
+
+func TestMOVEALongDataPreservesFlags(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{0x0400: 0x2c43, 0x0402: 0x4e71, 0x0404: 0x4e71})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[3] = 0x89ab_cdef
+	cpu.state.SR |= flagZero | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state := cpu.State(); result.Cycles != 4 || state.A[6] != 0x89ab_cdef || state.SR&0x1f != flagZero|flagCarry {
+		t.Fatalf("cycles=%d A6=$%08X SR=$%04X", result.Cycles, state.A[6], state.SR)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

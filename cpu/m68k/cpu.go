@@ -326,6 +326,30 @@ func (c *CPU) Step() (StepResult, error) {
 		if err := c.moveAWordData(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k MOVEA.W D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
 		}
+	case InstructionDIVUWordDisplacement:
+		if err := c.divuWordDisplacement(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k DIVU.W (d16,A%d),D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionADDWordAddressToData:
+		if err := c.addWordAddressToData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k ADD.W A%d,D%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
+	case InstructionMOVEWordAbsoluteLongToAbsoluteLong:
+		if err := c.moveWordAbsoluteLongToAbsoluteLong(); err != nil {
+			return result, fmt.Errorf("m68k MOVE.W (xxx).L,(xxx).L: %w", err)
+		}
+	case InstructionMOVEMWordPostincrementToRegisters:
+		if err := c.movemWordPostincrementToRegisters(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEM.W (A%d)+,<list>: %w", decoded.Register, err)
+		}
+	case InstructionORWordAbsoluteLongToData:
+		if err := c.orWordAbsoluteLongToData(decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k OR.W (xxx).L,D%d: %w", decoded.Register, err)
+		}
+	case InstructionMOVEALongData:
+		if err := c.moveALongData(decoded.SourceRegister, decoded.Register); err != nil {
+			return result, fmt.Errorf("m68k MOVEA.L D%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)
+		}
 	case InstructionSUBALongAddress:
 		if err := c.subaLongAddress(decoded.SourceRegister, decoded.Register); err != nil {
 			return result, fmt.Errorf("m68k SUBA.L A%d,A%d: %w", decoded.SourceRegister, decoded.Register, err)

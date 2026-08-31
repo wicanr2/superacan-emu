@@ -210,6 +210,12 @@ const (
 	InstructionMOVEMWordRegistersToPredecrement
 	InstructionCMPWordDisplacementToData
 	InstructionMOVEAWordData
+	InstructionDIVUWordDisplacement
+	InstructionADDWordAddressToData
+	InstructionMOVEWordAbsoluteLongToAbsoluteLong
+	InstructionMOVEMWordPostincrementToRegisters
+	InstructionORWordAbsoluteLongToData
+	InstructionMOVEALongData
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -302,6 +308,18 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionCMPWordDisplacementToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xf1f8 == 0x3040:
 		return Decoded{Instruction: InstructionMOVEAWordData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x80e8:
+		return Decoded{Instruction: InstructionDIVUWordDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0xd048:
+		return Decoded{Instruction: InstructionADDWordAddressToData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode == 0x33f9:
+		return Decoded{Instruction: InstructionMOVEWordAbsoluteLongToAbsoluteLong}
+	case opcode&0xfff8 == 0x4c98:
+		return Decoded{Instruction: InstructionMOVEMWordPostincrementToRegisters, Register: uint8(opcode & 7)}
+	case opcode&0xf1ff == 0x8079:
+		return Decoded{Instruction: InstructionORWordAbsoluteLongToData, Register: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0x2040:
+		return Decoded{Instruction: InstructionMOVEALongData, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x4a40:
 		return Decoded{Instruction: InstructionTSTWordData, Register: uint8(opcode & 7)}
 	case opcode == 0x4a39:
