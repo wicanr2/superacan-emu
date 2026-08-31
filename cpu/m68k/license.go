@@ -1040,6 +1040,85 @@ func (c *CPU) clearByteDisplacement(register uint8) error {
 	return stream.finish()
 }
 
+func (c *CPU) orWordDataToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value |= uint16(c.state.D[source])
+	c.setNZ16(value)
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) subqWordDisplacement(register, quick uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	value, err := c.readWord(address, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	value = c.sub16(value, uint16(quick))
+	if err := c.writeWord(address, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) moveWordIndexedToDisplacement(source, destination uint8) error {
+	stream := c.newInstructionStream()
+	sourceAddress, err := stream.nextBriefIndexedAddress(c.state.A[source])
+	if err != nil {
+		return err
+	}
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	value, err := c.readWord(sourceAddress, FCSupervisorData, PhaseDataRead)
+	if err != nil {
+		return err
+	}
+	destinationAddress := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
+	c.setNZ16(value)
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
+		return err
+	}
+	if err := c.writeWord(destinationAddress, value, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
+func (c *CPU) clearWordDisplacement(register uint8) error {
+	stream := c.newInstructionStream()
+	displacement, err := stream.nextWord()
+	if err != nil {
+		return err
+	}
+	address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+	if _, err := c.readWord(address, FCSupervisorData, PhaseDataRead); err != nil {
+		return err
+	}
+	c.setNZ16(0)
+	if err := c.writeWord(address, 0, FCSupervisorData); err != nil {
+		return err
+	}
+	return stream.finish()
+}
+
 func (c *CPU) jsrAbsoluteLong() error {
 	hi := c.state.IRC
 	lo, err := c.readWord(c.state.PC+4, FCSupervisorProgram, PhaseInstructionFetch)

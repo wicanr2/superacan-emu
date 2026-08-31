@@ -2245,6 +2245,77 @@ func TestCLRByteDisplacementReadModifyWrite(t *testing.T) {
 	}
 }
 
+func TestORWordDataToDisplacementReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x816a, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71, 0x012004: 1})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[2] = 0x012000
+	cpu.state.D[0] = 0x8000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012004, value: 0x8001}}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
+func TestSUBQWordDisplacementReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x5368, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71, 0x012004: 0x8000})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012004, value: 0x7fff}}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagOverflow || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
+func TestMOVEWordIndexedToDisplacement(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x3573, 0x0402: 0x1004, 0x0404: 8, 0x0406: 0x4e71, 0x0408: 0x4e71,
+		0x011008: 0x8001,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[3] = 0x011000
+	cpu.state.D[1] = 4
+	cpu.state.A[2] = 0x012000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012008, value: 0x8001}}
+	if state := cpu.State(); result.Cycles != 22 || state.SR&0x1f != flagNegative || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
+func TestCLRWordDisplacementReadModifyWrite(t *testing.T) {
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{0x0400: 0x4268, 0x0402: 4, 0x0404: 0x4e71, 0x0406: 0x4e71, 0x012004: 0x8000})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[0] = 0x012000
+	cpu.state.SR |= flagExtend | flagNegative | flagOverflow | flagCarry
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wordWrite{{address: 0x012004, value: 0}}
+	if state := cpu.State(); result.Cycles != 16 || state.SR&0x1f != flagExtend|flagZero || !reflect.DeepEqual(bus.writes, want) {
+		t.Fatalf("cycles=%d SR=$%04X writes=%+v", result.Cycles, state.SR, bus.writes)
+	}
+}
+
 func TestCMPByteAddressIndirectToData(t *testing.T) {
 	log := &eventLog{}
 	bus := &testBus{

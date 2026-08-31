@@ -227,6 +227,10 @@ const (
 	InstructionADDWordDataToDisplacement
 	InstructionORWordDataToAddressIndirect
 	InstructionCLRByteDisplacement
+	InstructionORWordDataToDisplacement
+	InstructionSUBQWordDisplacement
+	InstructionMOVEWordIndexedToDisplacement
+	InstructionCLRWordDisplacement
 )
 
 // Decoded is the auditable result of decoding one opcode word.
@@ -353,6 +357,18 @@ func Decode(opcode uint16) Decoded {
 		return Decoded{Instruction: InstructionORWordDataToAddressIndirect, Register: uint8(opcode & 7), SourceRegister: uint8(opcode >> 9 & 7)}
 	case opcode&0xfff8 == 0x4228:
 		return Decoded{Instruction: InstructionCLRByteDisplacement, Register: uint8(opcode & 7)}
+	case opcode&0xf1f8 == 0x8168:
+		return Decoded{Instruction: InstructionORWordDataToDisplacement, Register: uint8(opcode & 7), SourceRegister: uint8(opcode >> 9 & 7)}
+	case opcode&0xf1f8 == 0x5168:
+		quick := uint8(opcode >> 9 & 7)
+		if quick == 0 {
+			quick = 8
+		}
+		return Decoded{Instruction: InstructionSUBQWordDisplacement, Register: uint8(opcode & 7), Quick: quick}
+	case opcode&0xf1f8 == 0x3170:
+		return Decoded{Instruction: InstructionMOVEWordIndexedToDisplacement, Register: uint8(opcode >> 9 & 7), SourceRegister: uint8(opcode & 7)}
+	case opcode&0xfff8 == 0x4268:
+		return Decoded{Instruction: InstructionCLRWordDisplacement, Register: uint8(opcode & 7)}
 	case opcode&0xfff8 == 0x4a40:
 		return Decoded{Instruction: InstructionTSTWordData, Register: uint8(opcode & 7)}
 	case opcode == 0x4a39:
