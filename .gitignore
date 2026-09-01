@@ -3,6 +3,10 @@ build/
 out/
 coverage.out
 /superacan-emu
+/acan-x11
+/acan
+/acan-headless
+/acan-imgdiff
 
 # 版權檔：ROM / BIOS 一律不入庫
 *.bin

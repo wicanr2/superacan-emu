@@ -106,6 +106,16 @@ go run ./cmd/acan \
 frame 後正常結束並輸出 framebuffer SHA-256。`--audio=false` 適用於沒有主機音效裝置
 的 Docker／CI；這不是另一套快速模擬路徑。
 
+Linux 桌面另有不需要 cgo 的入口，鍵位與上面相同，音訊交給外部播放程序：
+
+```sh
+CGO_ENABLED=0 go run ./cmd/acan-x11 \
+    --ipl /path/to/internal_68k.bin \
+    --key /path/to/umc6650.bin \
+    --rom "/path/to/Boom Zoo (Taiwan).bin" \
+    --audio-sink "aplay -f cd -t raw"
+```
+
 Go headless runner 已能載入外部、逐 word byte-swap 的 IPL／ROM 及線性 UMC6650 key：
 
 ```sh
@@ -186,6 +196,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
   可比與不可比的部分、5 位元調色盤展開的證據
 - [`docs/cpu-generic-execution.md`](docs/cpu-generic-execution.md)：68000／65C02 一般化
   執行層的結構、時間模型與已定案的勘誤
+- [`docs/x11-frontend.md`](docs/x11-frontend.md)：純 Go X11 前端的契約、驗證與限制
+- [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：

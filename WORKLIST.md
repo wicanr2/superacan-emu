@@ -111,13 +111,14 @@
 - [x] 盤點禁 cgo 政策的實際缺口。`CGO_ENABLED=0` 下 headless 與 imgdiff 在任何平台
   都能建置，`cmd/acan` 的 `js/wasm` 與 `windows/amd64` 目標也能建置；只有
   `linux/amd64` 失敗。
-- [ ] 讓 Linux 桌面前端在 `CGO_ENABLED=0` 建置成功。Ebitengine v2.9.9 的
-  `internal/glfw` 只在 darwin／windows 走 purego，linbsd 路徑是 cgo；`oto/v3`
-  的 `driver_unix.go` 同樣是 cgo。落地需要純 Go 的視窗／輸入（候選：`jezek/xgb`，
-  已是現有 indirect 依賴）與純 Go 的音訊輸出（候選：直接操作 `/dev/snd` 或改走
-  外部播放行程）。完成條件：`CGO_ENABLED=0 go build ./...` 通過，且八款 ROM 的
-  1200-frame framebuffer SHA-256 與 headless 基準不變。
-- [ ] 在達成上一項之前，Linux 版 `cmd/acan` 只作開發用 GUI，不得列入發行包。
+- [x] 讓 Linux 桌面前端在 `CGO_ENABLED=0` 建置成功。新增 `frontend/x11` 與
+  `cmd/acan-x11`：純 Go 的 X11 視窗、輸入與整數倍放大，音訊交給外部播放程序。
+  八款 ROM 的 1200-frame 指令數與 framebuffer SHA-256 與 headless 完全相同。
+  見 `docs/x11-frontend.md`。
+- [ ] 純 Go 的音訊輸出（直接操作 `/dev/snd` 或 PulseAudio 原生協定），取代目前的
+  外部播放程序。
+- [ ] Linux 發行包改以 `cmd/acan-x11` 為桌面入口；`cmd/acan` 保留給 `js/wasm` 與
+  `windows/amd64` 這兩個 `CGO_ENABLED=0` 可建置的目標。
 - [ ] 在有實體音效裝置的 Linux 驗收 48 kHz 播放、鍵盤操作、延遲與 underrun。
 - [x] 八款 ROM 各完成 1200-frame GUI 正常路徑，指令數與 framebuffer SHA-256 與
   headless 完全一致；結果見 `docs/verify-rom-matrix.md`。
