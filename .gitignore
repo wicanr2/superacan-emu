@@ -6,6 +6,8 @@ coverage.out
 /acan-x11
 /acan
 /acan-headless
+/acan-macos
+/acan-imgdiff
 /acan-imgdiff
 
 # 版權檔：ROM / BIOS 一律不入庫
