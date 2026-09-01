@@ -42,7 +42,7 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 | Formosa Duel | 對戰選角畫面：兩張人物照、姓名框與下方棋盤 |
 | Journey to the Laugh | 實際遊戲場景：油桶、管線、平台與 HUD |
 | Monopoly | 標題畫面：立體字標與 START GAME／LOAD GAME |
-| Sango Fighter | 龍紋開場圖 → 選角畫面（兩名不同武將立繪）|
+| Sango Fighter | 海景開場 → 龍紋選單 → 五名武將的選角畫面 |
 | Speedy Dragon | 實際遊戲場景：角色、草地、磚牆與天空 |
 | Super Taiwanese Baseball League | 實際比賽畫面：球場、守備球員與打者 |
 | The Son of Evil | 開場圖版 → 遊戲中對話：人物立繪、地圖與文字框 |
@@ -84,14 +84,17 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 
 ## 已知落差
 
-- **Sango Fighter 的選單文字落在畫面最右緣**：以 `--layer-mask` 逐層輸出可以確定
-  文字在 ROZ 圖層，而且字形本身正確，只是被畫到 `x≈300` 之後被切掉；Bcan 的同一個
-  選單把文字置中。該 frame 的 ROZ 暫存器是 mode `$0622`、scroll 全零、`incxx`／`incyy`
-  都是 `$0100`（1:1），逐行表因 mode bit 9 而略過。在能取得 oracle 同一瞬間的暫存器
-  之前不改 renderer——目前無法分辨是我們的 scroll 來源錯了，還是兩邊根本不在同一個
-  遊戲狀態。
-- **Sango Fighter 尚未進到對戰**：改用 START／A／B 交替輸入之後可以走到選角畫面，
-  但沒有進入實際對戰。選單文字被切掉會讓玩家看不到選項，兩件事可能同源。
+- **Sango Fighter 的文字與 UI 靠在畫面右緣被切掉**：龍紋選單的三個選項與選角畫面
+  右上角的資訊框都出現在 `x≈300` 之後。以 `--layer-mask 16` 單獨輸出可確認它們在
+  ROZ 圖層且字形正確，只是位置靠右。該 frame 的 ROZ 暫存器是 mode `$0622`
+  （64×32、4bpp、wrap）、scroll 全零、`incxx`／`incyy` 都是 `$0100`（1:1），逐行表因
+  mode bit 9 而略過；維度與圖層選擇都與 MAME 的 `get_tilemap_dimensions` 和
+  `get_tilemap_region` 一致。因此目前沒有證據說 renderer 算錯，只有「取樣到的狀態
+  文字在畫面外」這個觀察。要定案需要 oracle 在同一瞬間的 ROZ 暫存器，這要等
+  ACANRTS save state 的 payload 版面解出來。
+- **Sango Fighter 尚未進到對戰**：以 START／A／B 交替輸入可以走到五名武將的選角
+  畫面，但沒有進到實際對戰；Bcan 在只按 START 的情況下會進到對戰場景。可能是輸入
+  序列本身需要方向鍵選人再確認，也可能與上一項同源。
 - **The Son of Evil 有單張雜訊畫面**：frame 3600 取樣到整片隨機像素，frame 1200 的
   開場圖版與 frame 5400 的遊戲中對話都正常。尚未定位是換場中的暫態還是特定 pixel
   mode 的解碼問題；該遊戲會使用 `$F001F0` 的 bit 3，而 MAME 只保存該位元、渲染路徑
