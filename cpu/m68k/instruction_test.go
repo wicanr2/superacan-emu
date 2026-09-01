@@ -1428,7 +1428,9 @@ func TestLSRLongImmediate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state := cpu.State(); result.Cycles != 14 || state.D[7] != 0x0800_0000 || state.SR&0x1f != flagCarry|flagExtend {
+	// PRM 的位移／旋轉表：暫存器形式長字為 8 + 2n，位元組與字為 6 + 2n。
+	// LSR.L #4 因此是 16 個 cycle。
+	if state := cpu.State(); result.Cycles != 16 || state.D[7] != 0x0800_0000 || state.SR&0x1f != flagCarry|flagExtend {
 		t.Fatalf("cycles=%d D7=$%08X SR=$%04X", result.Cycles, state.D[7], state.SR)
 	}
 }

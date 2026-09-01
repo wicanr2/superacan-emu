@@ -100,9 +100,12 @@ func TestNMIPreemptsMaskedIRQAndUsesNMIVector(t *testing.T) {
 	if err != nil || !result.Interrupt || !result.NMI || result.Cycles != 7 || cpu.state.PC != 0x1234 {
 		t.Fatalf("result=%+v state=%+v err=%v", result, cpu.state, err)
 	}
+	// NMI 是邊緣觸發：向量執行過後不得再次進入，即使 IRQ 線仍然拉著也一樣，
+	// 因為 NMI 服務已把 I 旗標設起來。
+	machine.memory[0x1234] = 0xea // NOP
 	result, err = cpu.Step()
-	if err == nil || result.NMI {
-		t.Fatalf("NMI edge repeated result=%+v err=%v", result, err)
+	if err != nil || result.NMI || result.Interrupt || cpu.state.PC != 0x1235 {
+		t.Fatalf("NMI edge repeated result=%+v state=%+v err=%v", result, cpu.state, err)
 	}
 }
 

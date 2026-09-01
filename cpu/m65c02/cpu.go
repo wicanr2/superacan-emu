@@ -974,7 +974,14 @@ func (c *CPU) Step() (StepResult, error) {
 	case 0x80: // BRA (65C02)
 		err = c.branch(true)
 	default:
-		err = fmt.Errorf("m65c02: unimplemented opcode $%02X at $%04X", opcode, c.state.PC)
+		// 逐一列舉的 case 沒有這個編碼時，交給一般化指令表；兩邊都不認識才
+		// fail-closed，不得靜默當成 NOP。
+		handled, genericErr := c.executeGeneric(opcode)
+		if !handled {
+			err = fmt.Errorf("m65c02: unimplemented opcode $%02X at $%04X", opcode, c.state.PC)
+		} else {
+			err = genericErr
+		}
 	}
 	result.PCAfter = c.state.PC
 	result.Cycles = c.state.Cycles - start

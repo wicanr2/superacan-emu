@@ -1084,7 +1084,15 @@ func (c *CPU) Step() (StepResult, error) {
 			return result, fmt.Errorf("m68k BSR: %w", err)
 		}
 	default:
-		return result, fmt.Errorf("m68k: unimplemented opcode $%04X at $%06X", c.state.IRD, c.state.PC)
+		// 逐一列舉的 decoder 沒有這個編碼時，交給一般化 effective-address 執行層；
+		// 兩邊都不認識才 fail-closed，不得靜默當成 NOP。
+		handled, err := c.executeGeneric(c.state.IRD)
+		if err != nil {
+			return result, fmt.Errorf("m68k opcode $%04X at $%06X: %w", c.state.IRD, c.state.PC, err)
+		}
+		if !handled {
+			return result, fmt.Errorf("m68k: unimplemented opcode $%04X at $%06X", c.state.IRD, c.state.PC)
+		}
 	}
 
 	result.PCAfter = c.state.PC

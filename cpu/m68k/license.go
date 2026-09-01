@@ -1513,7 +1513,7 @@ func (c *CPU) lsrLongImmediate(register, count uint8) error {
 	if carry {
 		c.state.SR |= flagCarry | flagExtend
 	}
-	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4 + 2*count}); err != nil {
 		return err
 	}
 	return c.prefetch()
@@ -2325,7 +2325,7 @@ func (c *CPU) lslLongImmediate(register, count uint8) error {
 	if carry {
 		c.state.SR |= flagCarry | flagExtend
 	}
-	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2 + 2*count}); err != nil {
+	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 4 + 2*count}); err != nil {
 		return err
 	}
 	return c.prefetch()
