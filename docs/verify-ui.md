@@ -40,6 +40,12 @@
 | S5.1 輸入綁定 | 960×720 `compact` | `1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62` |
 | S5.2 熱鍵 | 960×720 `compact` | `2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8` |
 | S5.2 熱鍵（含衝突標示） | 960×720 `compact` | `107ecbc854d803c375197eec83f6c68097dd35778cc307b06767ad6b07f0ddbf` |
+| S5.3 影像 | 960×720 `compact` | 見 `ui/render_test.go` |
+| S5.4 音訊 | 960×720 `compact` | 見 `ui/render_test.go` |
+| S7 診斷 | 960×720 `compact` | 見 `ui/render_test.go` |
+
+畫面雜湊的權威來源是 `ui/render_test.go` 的 `wantHashes`；這張表列出主要畫面供
+查閱，兩者不一致時以測試為準。
 
 雜湊只能守住「沒有意外變動」，看不出版面本來就畫錯。要用人眼檢查時把畫面另存
 PNG：
@@ -107,6 +113,26 @@ acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
 不需要商業 ROM 的版本在 `session` 的單元測試裡：`TestShellBrowsesAndLoadsHeadless`
 用自製的 raw 檔與雙部分 ZIP 走完「啟動畫面 → 瀏覽器 → 載入 → 退出卡帶」，
 `TestIncompleteFirmwareBlocksBrowserLoad` 確認韌體不齊時載不進去。
+
+## 影像、音訊與診斷
+
+四條規則各有測試（`session` 套件）：
+
+- **濾鏡作用在放大後的畫面上，不改 framebuffer。** `TestFilterDoesNotReachScreenshots`
+  比對套 scanline 前後的截圖位元組必須相同——截圖直接取自 UM6618 的顯示孔徑，
+  所以它可以當畫面證據用。
+- **三段 scanline 各自產生不同且可重現的畫面**（`TestScanlineFiltersAreDistinct
+  AndReproducible`）。未知的濾鏡名稱視為不套濾鏡而不是猜一個：設定檔可能來自更新
+  的版本。測試會先把 framebuffer 畫成漸層——全黑的畫面套 scanline 之後還是全黑，
+  那證明不了濾鏡有作用。
+- **圖層遮罩只影響 framebuffer 合成**（`TestLayerMaskDoesNotChangeMachine`）：
+  套用前後指令數與 frame 相同。畫面上同時以 warn 提醒「套了遮罩的畫面雜湊不可拿來
+  對帳」。
+- **音量與緩衝不回饋核心**（`TestAudioSettingsDoNotFeedBackIntoTheCore`）：
+  改音量與緩衝之後，UM6619 送進 sink 的樣本序列雜湊相同。
+
+診斷畫面的數字直接讀 machine（`TestDiagnosticsReadMachineDirectly`），不另外累計，
+所以它顯示的 68000 指令數就是 headless 報出來的那一個。
 
 ## 設定檔與重新綁定
 

@@ -5,11 +5,13 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
 	"github.com/wicanr2/superacan-emu/machine"
+	"github.com/wicanr2/superacan-emu/presentation"
 	"github.com/wicanr2/superacan-emu/ui"
 )
 
@@ -41,6 +43,11 @@ type Session struct {
 	ConfigPath string
 	// ScriptFrontend 是腳本送出的原始按鍵要掛在哪個前端名下。
 	ScriptFrontend string
+	// FrontendName 與 AudioStatsFunc 供診斷與音訊畫面顯示主機端的事實。
+	FrontendName   string
+	AudioStatsFunc func() ui.AudioStats
+	// HostFPS 由前端回報，只用於顯示。
+	HostFPS float64
 
 	firmware  ui.FirmwareIDs
 	romSize   int64
@@ -48,6 +55,7 @@ type Session struct {
 	halt      ui.HaltReason
 	haltNote  string
 
+	config ui.Config
 	frame  *image.RGBA
 	paused bool
 	pacing bool
@@ -84,6 +92,7 @@ func New(options Options) *Session {
 		pacing:    true,
 		pads:      [2]uint16{0xffff, 0xffff},
 	}
+	s.config = options.Config
 	s.Library = options.Library
 	var library ui.Library
 	if options.Library != nil {
@@ -92,6 +101,7 @@ func New(options Options) *Session {
 	s.UI = ui.New(ui.Options{
 		Surface: options.Surface, Config: options.Config, Slots: s,
 		Library: library, Firmware: options.FirmwareSet, About: options.About,
+		AudioStats: s, Diagnostics: s,
 	})
 	if options.System == nil {
 		s.UI.SetMode(ui.ModeShell, "")
@@ -198,7 +208,44 @@ func (s *Session) Compose(dst *image.RGBA) {
 	}
 	snap := snapshot{s}
 	blitNearest(dst, snap.Framebuffer())
+	// 濾鏡作用在放大後的畫面上，不改 framebuffer：截圖與畫面雜湊因此不受影響。
+	presentation.ApplyScanlines(dst, presentation.ScanlinePercent(s.config.Video.Filter))
 	s.UI.Draw(dst, snap)
+}
+
+// SetConfig 讓入口把目前設定交給 session，濾鏡與音量才知道要套什麼。
+func (s *Session) SetConfig(config ui.Config) { s.config = config }
+
+// AudioStats 讓介面顯示主機播放端的狀態。
+func (s *Session) AudioStats() ui.AudioStats {
+	if s.AudioStatsFunc == nil {
+		return ui.AudioStats{BufferMS: s.config.Audio.BufferMS}
+	}
+	return s.AudioStatsFunc()
+}
+
+// Diagnostics 是 S7 顯示的數值。全部讀自 machine 與建置資訊，沒有一項是估的。
+func (s *Session) Diagnostics() ui.DiagnosticsFacts {
+	facts := ui.DiagnosticsFacts{
+		HostFPS:    s.HostFPS,
+		Pacing:     s.pacing,
+		Frontend:   s.FrontendName,
+		Platform:   fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		CGOEnabled: cgoEnabled,
+	}
+	if s.System == nil {
+		return facts
+	}
+	facts.Frame = s.System.Bus.Video().Frame()
+	facts.M68K = s.System.Instructions
+	facts.M65C02 = s.System.SoundInstructions
+	facts.IRQ7 = s.System.IRQAcknowledgements[7]
+	facts.IRQ4 = s.System.IRQAcknowledgements[4]
+	facts.IRQ5 = s.System.IRQAcknowledgements[5]
+	facts.SoundClash = len(s.System.Bus.SoundRAMClashes())
+	facts.IPL = s.System.IPLSHA256
+	facts.Cartridge = s.System.ROMSHA256
+	return facts
 }
 
 // blitNearest 把來源等比例填滿目的地。整數倍時等同像素複製，
@@ -245,8 +292,14 @@ func (s *Session) apply(intent ui.Intent) error {
 	case ui.DeleteState:
 		return s.deleteSlot(value.Slot)
 	case ui.SetLayerMask:
+		// 遮罩只影響 framebuffer 合成，不影響指令數與硬體時序。
 		s.layerMask = value.Mask
+		s.UI.SetLayerMask(value.Mask)
+		if s.System != nil {
+			s.System.Bus.Video().RenderFrameLayers(uint8(value.Mask))
+		}
 	case ui.ApplyConfig:
+		s.config = value.Config
 		if s.ConfigPath == "" {
 			return nil
 		}

@@ -18,6 +18,9 @@ type UI struct {
 	library   Library
 	firmware  FirmwareSource
 	about     AboutInfo
+	audio     AudioStatsSource
+	diag      DiagnosticsSource
+	mask      uint32
 	mode      Mode
 	haltNote  string
 
@@ -47,9 +50,11 @@ type Options struct {
 	Surface  Surface
 	Config   Config
 	Slots    SlotSource
-	Library  Library
-	Firmware FirmwareSource
-	About    AboutInfo
+	Library     Library
+	Firmware    FirmwareSource
+	About       AboutInfo
+	AudioStats  AudioStatsSource
+	Diagnostics DiagnosticsSource
 	Theme    *Theme
 	Font     *Font
 }
@@ -78,6 +83,9 @@ func New(options Options) *UI {
 		library:  options.Library,
 		firmware: options.Firmware,
 		about:    options.About,
+		audio:    options.AudioStats,
+		diag:     options.Diagnostics,
+		mask:     AllLayers,
 	}
 }
 
@@ -99,6 +107,10 @@ func (u *UI) SetMode(mode Mode, note string) {
 
 // Mode 回報目前的常駐畫面。
 func (u *UI) Mode() Mode { return u.mode }
+
+// SetLayerMask 讓入口把實際生效的遮罩回報給介面。介面自己不改 machine，
+// 它送出 SetLayerMask intent，套用成功之後入口再叫這個函式。
+func (u *UI) SetLayerMask(mask uint32) { u.mask = mask }
 
 // rawCapturer 是正在等待實體輸入的畫面。
 type rawCapturer interface{ capturing() bool }

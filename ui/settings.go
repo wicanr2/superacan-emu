@@ -16,8 +16,8 @@ func (s *settingsScreen) rows(u *UI) []menuRow {
 		{label: textSettingsHotkeys, chevron: true, action: func(u *UI) {
 			u.push(&hotkeyScreen{})
 		}},
-		{label: textSettingsVideo, chevron: true, disabled: true, reason: textStageVideo},
-		{label: textSettingsAudio, chevron: true, disabled: true, reason: textStageAudio},
+		{label: textSettingsVideo, chevron: true, action: func(u *UI) { u.push(&videoScreen{}) }},
+		{label: textSettingsAudio, chevron: true, action: func(u *UI) { u.push(&audioScreen{}) }},
 		{label: textSettingsLanguage, chevron: true, disabled: true, reason: textStageLanguage},
 	}
 }

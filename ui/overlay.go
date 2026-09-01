@@ -24,7 +24,7 @@ func (s *overlayScreen) rows(u *UI) []menuRow {
 		}},
 		{label: textCheats, chevron: true, disabled: true, reason: textStageCheats},
 		{label: textSettings, chevron: true, action: func(u *UI) { u.push(&settingsScreen{}) }},
-		{label: textDiagnostics, chevron: true, disabled: true, reason: textStageDiag},
+		{label: textDiagnostics, chevron: true, action: func(u *UI) { u.push(&diagnosticsScreen{}) }},
 		{label: textScreenshot, hotkey: textScreenshotHK, action: func(u *UI) {
 			u.emit(Capture{Kind: CaptureScreenshot})
 		}},

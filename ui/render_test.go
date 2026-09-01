@@ -105,9 +105,9 @@ func render(t *testing.T, key string, u *UI, surface Surface) string {
 // 記錄於 docs/verify-ui.md。畫面一改動這些值就會變，那正是它們的用途：
 // 版面的變更必須是刻意的。
 var wantHashes = map[string]string{
-	"S3/960x720/compact":       "6990880e9083ec950cb87bbade7e1945f95c5040e6776bc9aa13ed5394fc7460",
-	"S3/1280x720/touch":        "ee222da403badeba5a8779e7573c763a1ad16b9df25ceaca029987ec1499d345",
-	"S3+focus/960x720/compact": "5ca59032ac1c4bcaad23445d9b3b96274c65f1bddc91c5a6b6542804e2fe714c",
+	"S3/960x720/compact":       "91362729769dac8a31c026ed32fc7c415f19e22dcf9d02da4288f7a6920d78a0",
+	"S3/1280x720/touch":        "bca89c7a0fa269f7c44fe2309d326b8ee4204d2df66aede794ed5aa1444ccc46",
+	"S3+focus/960x720/compact": "12d7e53a0d45961940ef0a270b3c807280403a9ccb04f7f71fbbf05ed8da8c0d",
 	"S4/960x720/compact":       "8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc",
 	"S4/1280x720/touch":        "ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0",
 	"D1/960x720/compact":       "e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6",
@@ -118,10 +118,13 @@ var wantHashes = map[string]string{
 	"S1/960x720/compact":       "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
 	"S1/1280x720/touch":        "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
 	"S8/960x720/compact":       "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
-	"S5/960x720/compact":          "c48bf197a895e9b46313a21d23dae7e98577ebcd7231e6afb7799228d16056cc",
+	"S5/960x720/compact":          "1f44c225eb1601b0404469739e3bc077bc976771fc099a03cec1b8c149129520",
 	"S5.1/960x720/compact":        "1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62",
 	"S5.2/960x720/compact":        "2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8",
 	"S5.2conflict/960x720/compact": "107ecbc854d803c375197eec83f6c68097dd35778cc307b06767ad6b07f0ddbf",
+	"S5.3/960x720/compact":        "0e30efc0f5565c5a01d61f61d574795ff0afb17337a3890958668ac38bb3c488",
+	"S5.4/960x720/compact":        "5930228c39dd004be79506b4c391b4a64bb55d783d3847df4d4879365cbb1b82",
+	"S7/960x720/compact":          "4fac08f514b33776b9447e0256384f30177655357c835640ec134745541c5f13",
 	"S9/960x720/compact":       "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
 }
 

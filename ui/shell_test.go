@@ -315,3 +315,133 @@ func TestDeleteClearsBothBindings(t *testing.T) {
 		t.Fatal("手把綁定應該被清除")
 	}
 }
+
+// fixedAudioStats 固定播放端的數字，讓 S5.4 的畫面可重現。
+type fixedAudioStats struct{}
+
+func (fixedAudioStats) AudioStats() AudioStats {
+	return AudioStats{BufferedMS: 96, BufferMS: 200, Underruns: 0}
+}
+
+// fixedDiagnostics 固定診斷數字。
+type fixedDiagnostics struct{}
+
+func (fixedDiagnostics) Diagnostics() DiagnosticsFacts {
+	sum := func(seed byte) [32]byte {
+		var out [32]byte
+		for i := range out {
+			out[i] = seed + byte(i)
+		}
+		return out
+	}
+	return DiagnosticsFacts{
+		Frame: 12480, M68K: 17369003, M65C02: 5790112,
+		IRQ7: 12480, IRQ4: 0, IRQ5: 0, SoundClash: 0,
+		HostFPS: 60, Pacing: true, Frontend: "x11", Platform: "linux/amd64",
+		CGOEnabled: false, IPL: sum(0x2e), Cartridge: sum(0x09),
+	}
+}
+
+func newDisplayUI(t *testing.T) *UI {
+	t.Helper()
+	u := New(Options{
+		Surface: surfaceCases[0].surface, Config: DefaultConfig(), Slots: fixedSlots{},
+		Library: fixedLibrary{}, Firmware: fixedFirmware{complete: true}, About: fixedAbout,
+		AudioStats: fixedAudioStats{}, Diagnostics: fixedDiagnostics{},
+	})
+	u.Update(0)
+	u.Open()
+	return u
+}
+
+func TestDisplayScreensRender(t *testing.T) {
+	u := newDisplayUI(t)
+	u.push(&videoScreen{})
+	checkHash(t, "S5.3/"+surfaceCases[0].name, render(t, "S5.3/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+
+	u = newDisplayUI(t)
+	u.push(&audioScreen{})
+	checkHash(t, "S5.4/"+surfaceCases[0].name, render(t, "S5.4/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+
+	u = newDisplayUI(t)
+	u.push(&diagnosticsScreen{})
+	checkHash(t, "S7/"+surfaceCases[0].name, render(t, "S7/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+}
+
+// 左右鍵調值而不是移動焦點；停用項按下去要說明原因。
+func TestOptionRowsAdjustWithLeftRight(t *testing.T) {
+	u := newDisplayUI(t)
+	u.push(&videoScreen{})
+	u.TakeIntents()
+	screen := u.stack[len(u.stack)-1].(*videoScreen)
+
+	before := u.config.Video.Scale
+	u.Handle(Nav{Dir: DirRight})
+	if u.config.Video.Scale != before+1 {
+		t.Fatalf("縮放 %d，want %d", u.config.Video.Scale, before+1)
+	}
+	if screen.focus != 0 {
+		t.Fatal("左右鍵不該移動焦點")
+	}
+	intents := u.TakeIntents()
+	if len(intents) != 1 {
+		t.Fatalf("調整之後要求存檔，得到 %#v", intents)
+	}
+
+	// 上限之後不再增加。
+	for i := 0; i < 20; i++ {
+		u.Handle(Nav{Dir: DirRight})
+	}
+	if u.config.Video.Scale != 8 {
+		t.Fatalf("縮放應停在 8，得到 %d", u.config.Video.Scale)
+	}
+
+	// 動態平滑是停用項：按下去要說明原因，而且不得改變設定。
+	screen.focus = 5
+	u.toasts = nil
+	blend := u.config.Video.FrameBlend
+	u.Handle(Nav{Dir: DirRight})
+	if u.config.Video.FrameBlend != blend {
+		t.Fatal("停用項不得被調整")
+	}
+	if len(u.toasts) != 1 {
+		t.Fatalf("停用項要說明原因，得到 %+v", u.toasts)
+	}
+}
+
+// 濾鏡與長寬比要寫回設定檔的字串值，而不是只改畫面上的索引。
+func TestVideoChoicesWriteBackStrings(t *testing.T) {
+	u := newDisplayUI(t)
+	u.push(&videoScreen{})
+	screen := u.stack[len(u.stack)-1].(*videoScreen)
+	screen.sync(u)
+	screen.focus = 3 // 濾鏡
+	u.Handle(Nav{Dir: DirRight})
+	if u.config.Video.Filter != "scanline25" {
+		t.Fatalf("濾鏡 %q", u.config.Video.Filter)
+	}
+	screen.focus = 2 // 長寬比
+	u.Handle(Nav{Dir: DirRight})
+	if u.config.Video.Aspect != "1:1" {
+		t.Fatalf("長寬比 %q", u.config.Video.Aspect)
+	}
+}
+
+// 診斷的圖層遮罩只送 intent，不自己動 machine，而且要提醒雜湊不可對帳。
+func TestDiagnosticsLayerMaskEmitsIntentAndWarns(t *testing.T) {
+	u := newDisplayUI(t)
+	u.push(&diagnosticsScreen{})
+	u.TakeIntents()
+	u.Handle(Action{Kind: ActConfirm})
+	intents := u.TakeIntents()
+	if len(intents) != 1 {
+		t.Fatalf("得到 %#v", intents)
+	}
+	mask, ok := intents[0].(SetLayerMask)
+	if !ok || mask.Mask != AllLayers^LayerTilemap0 {
+		t.Fatalf("得到 %#v", intents[0])
+	}
+	if len(u.toasts) != 1 || u.toasts[0].severity != SeverityWarn {
+		t.Fatalf("要以 warn 提醒雜湊不可對帳，得到 %+v", u.toasts)
+	}
+}
