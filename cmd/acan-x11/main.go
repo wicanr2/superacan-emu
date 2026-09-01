@@ -3,21 +3,17 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"image"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
-	"github.com/wicanr2/superacan-emu/chip/umc6619"
+	"github.com/wicanr2/superacan-emu/frontend/hostio"
 	"github.com/wicanr2/superacan-emu/frontend/x11"
 	"github.com/wicanr2/superacan-emu/machine"
-	"github.com/wicanr2/superacan-emu/media"
-	"github.com/wicanr2/superacan-emu/presentation"
 	"github.com/wicanr2/superacan-emu/session"
 	"github.com/wicanr2/superacan-emu/ui"
 )
@@ -121,12 +117,12 @@ func main() {
 	menuKeysym := hotkeyKeysym(config, "menu", keysymF1)
 
 	// 韌體只讀一次；換卡帶時整台機器重建，但韌體位元組沿用同一份。
-	iplBytes := loadWordSwapped(*iplPath, machine.IPLSize)
-	keyBytes := loadLinear(*keyPath, 16)
+	iplBytes := must(hostio.LoadWordSwapped(*iplPath, machine.IPLSize))
+	keyBytes := must(hostio.LoadLinear(*keyPath, 16))
 	var soundBIOS [2][]byte
 	if *soundBIOS1Path != "" {
-		soundBIOS[0] = loadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize)
-		soundBIOS[1] = loadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize)
+		soundBIOS[0] = must(hostio.LoadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize))
+		soundBIOS[1] = must(hostio.LoadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize))
 	}
 
 	stopAudio := func() {}
@@ -136,7 +132,7 @@ func main() {
 			return
 		}
 		stopAudio()
-		stop, err := startAudioSink(system, *audioSink, func(pcm []byte) {
+		stop, err := hostio.AudioSink(system, *audioSink, func(pcm []byte) {
 			if overlayRef != nil {
 				overlayRef.PushCapturePCM(pcm)
 			}
@@ -152,7 +148,7 @@ func main() {
 	var current *machine.System
 	var currentSave string
 	newSystem := func(path string) (*machine.System, string, error) {
-		image, err := media.DecodeCartridge(path, mustRead(path))
+		image, err := hostio.LoadCartridge(path)
 		if err != nil {
 			return nil, "", err
 		}
@@ -169,13 +165,15 @@ func main() {
 			}
 		}
 		if current != nil {
-			writeCartridgeSave(current, currentSave)
+			_ = hostio.WriteCartridgeSave(current, currentSave)
 		}
 		save := *savePath
 		if save == "" && *saveDir != "" {
 			save = session.BatteryPathFor(*saveDir, path)
 		}
-		loadCartridgeSave(system, save)
+		if err := hostio.LoadCartridgeSave(system, save); err != nil {
+			return nil, "", err
+		}
 		if err := system.Reset(); err != nil {
 			return nil, "", err
 		}
@@ -192,7 +190,7 @@ func main() {
 			fail(err.Error())
 		}
 	}
-	defer func() { writeCartridgeSave(current, currentSave) }()
+	defer func() { _ = hostio.WriteCartridgeSave(current, currentSave) }()
 
 	window, err := x11.New("Super A'Can Emulator", umc6618.Width, umc6618.Height, *scale)
 	if err != nil {
@@ -224,16 +222,17 @@ func main() {
 	overlay.CaptureDir = *captureDir
 	overlay.FrontendName = frontendName
 	if *captureSink != "" {
-		stopSink, sinkErr := startCaptureSink(overlay, *captureSink)
+		sink, stopSink, sinkErr := hostio.CaptureSink(*captureSink)
 		if sinkErr != nil {
 			fail(fmt.Sprintf("capture sink: %v", sinkErr))
 		}
+		overlay.SetCaptureSink(sink)
 		defer stopSink()
 	}
 	overlay.ScriptFrontend = frontendName
 	overlay.Loader = newSystem
 	overlay.Screenshot = func(frame *image.RGBA) error {
-		return writeScreenshot(filepath.Join(*captureDir, screenshotName()), current.Bus.Video().Framebuffer())
+		return hostio.WriteScreenshot(filepath.Join(*captureDir, screenshotName()), current.Bus.Video().Framebuffer())
 	}
 	input := newOverlayInput()
 	script, err := session.ParseScript(*uiScript)
@@ -309,11 +308,11 @@ func main() {
 		}
 		// 熱鍵取按下的那一瞬間，按著不放不會重複觸發。
 		if pressed := window.KeysymPressed(keysymF5); pressed && !savePressed {
-			reportStateResult("save", writeSaveState(system, *statePath))
+			reportStateResult("save", hostio.WriteSaveState(overlay.System, *statePath))
 		}
 		savePressed = window.KeysymPressed(keysymF5)
 		if pressed := window.KeysymPressed(keysymF7); pressed && !loadPressed {
-			reportStateResult("load", readSaveState(system, *statePath))
+			reportStateResult("load", hostio.ReadSaveState(overlay.System, *statePath))
 		}
 		loadPressed = window.KeysymPressed(keysymF7)
 		overlay.SetPad(0, padState(window, playerOneKeys))
@@ -349,7 +348,7 @@ func main() {
 		fmt.Printf("frames=%d instructions=%d framebuffer_sha256=%x\n", completed, overlay.System.Instructions, sha)
 	}
 	if *screenshot != "" && overlay.System != nil {
-		if err := writeScreenshot(*screenshot, overlay.System.Bus.Video().Framebuffer()); err != nil {
+		if err := hostio.WriteScreenshot(*screenshot, overlay.System.Bus.Video().Framebuffer()); err != nil {
 			fail(err.Error())
 		}
 	}
@@ -365,141 +364,16 @@ func padState(window *x11.Window, bindings []keyBinding) uint16 {
 	return state
 }
 
-// startAudioSink 把 UMC6619 的原生樣本重取樣成 48 kHz stereo，交給外部播放程序。
-// 佇列滿了就丟掉最舊的樣本，播放端的狀態不回饋到模擬器時間線。
-func startAudioSink(system *machine.System, command string, clip func([]byte)) (func(), error) {
-	stream := presentation.NewPCM16StereoStream(48000 / 5)
-	// 播放與錄影共用同一份重取樣輸出，兩者不會不同步。
-	resampler := presentation.NewStereoResampler(umc6619.ClockHz, umc6619.CyclesPerSample, 48000,
-		func(left, right int16) {
-			stream.Push(left, right)
-			if clip != nil {
-				clip([]byte{byte(left), byte(uint16(left) >> 8), byte(right), byte(uint16(right) >> 8)})
-			}
-		})
-	system.SoundBus.Audio().SetSampleSink(func(sample umc6619.Sample) {
-		resampler.Push(sample.Left, sample.Right)
-	})
-
-	process := exec.Command("sh", "-c", command)
-	pipe, err := process.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return nil, err
-	}
-
-	done := make(chan struct{})
-	go func() {
-		buffer := make([]byte, 4*480) // 每次 10 ms
-		ticker := time.NewTicker(10 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-done:
-				_ = pipe.Close()
-				return
-			case <-ticker.C:
-				n, err := stream.Read(buffer)
-				if err != nil || n == 0 {
-					continue
-				}
-				if _, err := pipe.Write(buffer[:n]); err != nil {
-					_ = pipe.Close()
-					return
-				}
-			}
-		}
-	}()
-
-	return func() {
-		close(done)
-		_ = process.Process.Kill()
-		_, _ = process.Process.Wait()
-	}, nil
-}
-
-func writeScreenshot(path string, framebuffer []uint32) error {
-	output, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("create screenshot: %w", err)
-	}
-	if err := presentation.EncodePNG(output, umc6618.Width, umc6618.Height, framebuffer); err != nil {
-		_ = output.Close()
-		return fmt.Errorf("encode screenshot: %w", err)
-	}
-	return output.Close()
-}
-
-func loadWordSwapped(path string, expectedSize int) []byte {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fail(fmt.Sprintf("read %s: %v", path, err))
-	}
-	image, err := media.DecodeWordSwapped(path, raw, expectedSize)
+func must[T any](value T, err error) T {
 	if err != nil {
 		fail(err.Error())
 	}
-	return image.Bytes
-}
-
-// loadCartridge 接受 raw 卡帶與 ZIP（單一成員或雙部分）。
-func loadCartridge(path string) media.Image {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fail(fmt.Sprintf("read %s: %v", path, err))
-	}
-	image, err := media.DecodeCartridge(path, raw)
-	if err != nil {
-		fail(err.Error())
-	}
-	return image
-}
-
-func loadLinear(path string, expectedSize int) []byte {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fail(fmt.Sprintf("read %s: %v", path, err))
-	}
-	image, err := media.DecodeLinear(path, raw, expectedSize)
-	if err != nil {
-		fail(err.Error())
-	}
-	return image.Bytes
+	return value
 }
 
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, "acan-x11:", message)
 	os.Exit(1)
-}
-
-// writeSaveState 與 readSaveState 是熱鍵路徑：失敗只回報，不中斷正在進行的遊戲。
-func writeSaveState(system *machine.System, path string) error {
-	if path == "" {
-		return fmt.Errorf("no --state path given")
-	}
-	var encoded bytes.Buffer
-	if err := system.SaveState(&encoded); err != nil {
-		return err
-	}
-	temporary := path + ".tmp"
-	if err := os.WriteFile(temporary, encoded.Bytes(), 0o644); err != nil {
-		return err
-	}
-	return os.Rename(temporary, path)
-}
-
-func readSaveState(system *machine.System, path string) error {
-	if path == "" {
-		return fmt.Errorf("no --state path given")
-	}
-	payload, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	return system.LoadState(bytes.NewReader(payload))
 }
 
 func reportStateResult(action string, err error) {
@@ -508,35 +382,4 @@ func reportStateResult(action string, err error) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "acan-x11: %s state ok\n", action)
-}
-
-// loadCartridgeSave 在檔案存在時載入電池記憶體；不存在視為全新卡帶，不是錯誤。
-func loadCartridgeSave(system *machine.System, path string) {
-	if path == "" {
-		return
-	}
-	payload, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return
-		}
-		fail(fmt.Sprintf("read save %s: %v", path, err))
-	}
-	if err := system.Bus.LoadCartridgeSave(payload); err != nil {
-		fail(err.Error())
-	}
-}
-
-// writeCartridgeSave 以先寫暫存檔再改名的方式落地，避免中途失敗留下半套存檔。
-func writeCartridgeSave(system *machine.System, path string) {
-	if path == "" {
-		return
-	}
-	temporary := path + ".tmp"
-	if err := os.WriteFile(temporary, system.Bus.CartridgeSave(), 0o644); err != nil {
-		fail(fmt.Sprintf("write save %s: %v", temporary, err))
-	}
-	if err := os.Rename(temporary, path); err != nil {
-		fail(fmt.Sprintf("rename save %s: %v", path, err))
-	}
 }

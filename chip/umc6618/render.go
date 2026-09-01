@@ -158,100 +158,109 @@ func (d *Device) drawTilemap(layer, priority int, indexed []uint16, priorities [
 	}
 }
 
-func (d *Device) drawSpriteTile(tile, palette int, flipX, flipY bool, destX, destY, priority, maskMode int, sprites []uint16, priorities, masks []uint8) {
+// spriteGeometry derives the drawn size from the two scale fields. hscale is
+// word2 bits 15-11 and vscale is word0 bits 15-13; 1:1 is hscale 5, vscale 2.
+// Both formulas and the 1:1 values are measured, not guessed — see the
+// knowledge base, docs/sprite-format.md.
+func spriteGeometry(hscale, vscale, nativeWidth, nativeHeight int) (int, int) {
+	width := (hscale + 6*nativeWidth) / (hscale + 1)
+	height := 3 * nativeHeight
+	if vscale != 0 {
+		height = (vscale + 2*nativeHeight - 1) / vscale
+	}
+	return min(width, 256), min(height, 256)
+}
+
+// spriteSource resolves one source pixel of a sprite, following the whole-sprite
+// flips, the per-tile flips carried by the tile entry, and the sub-tile table
+// used when the sprite spans more than one tile.
+func (d *Device) spriteSource(entry uint16, bank uint32, region, srcX, srcY int) (uint8, int) {
+	bankSize := uint32(0x100) << uint32(region)
+	tile := int(bank*bankSize) + int(entry&0x03ff)
+	px, py := srcX&7, srcY&7
+	if entry&0x0800 != 0 {
+		px ^= 7
+	}
+	if entry&0x0400 != 0 {
+		py ^= 7
+	}
+	return d.tilePixel(region, tile, px, py), int(entry >> 12)
+}
+
+func (d *Device) drawSprites(sprites []uint16, priorities, masks []uint8) {
 	region := 1
 	if d.registers[0x13]&1 != 0 {
 		region = 0
 	}
-	for sy := range 8 {
-		y := destY + sy
-		if y < 0 || y >= Height {
-			continue
-		}
-		py := sy
-		if flipY {
-			py = 7 - sy
-		}
-		for sx := range 8 {
-			x := destX + sx
-			if x < 0 || x >= Width {
-				continue
-			}
-			px := sx
-			if flipX {
-				px = 7 - sx
-			}
-			pixel := d.tilePixel(region, tile, px, py)
-			if pixel == 0 {
-				continue
-			}
-			offset := y*Width + x
-			if maskMode > 1 {
-				masks[offset] = 1
-				continue
-			}
-			if maskMode == 1 && masks[offset] == 0 {
-				continue
-			}
-			if region == 0 {
-				sprites[offset] = uint16(pixel)
-			} else {
-				sprites[offset] = uint16(palette*16) + uint16(pixel)
-			}
-			priorities[offset] = priorities[offset]&0xf0 | uint8(priority)
-		}
-	}
-}
-
-func (d *Device) drawSprites(sprites []uint16, priorities, masks []uint8) {
-	region := uint32(1)
-	if d.registers[0x13]&1 != 0 {
-		region = 0
-	}
-	bankSize := uint32(0x100) << region
 	start := uint32(d.registers[0x10]) << 1
 	end := start + (uint32(d.registers[0x11])+1)*4
 	for index := start; index+3 < end && index+3 < 0x10000; index += 4 {
 		w0, w1 := d.vramWord(index), d.vramWord(index+1)
 		w2, w3 := d.vramWord(index+2), d.vramWord(index+3)
-		if w0&0x4000 == 0 || w3 == 0 {
+		if w3 == 0 {
 			continue
 		}
-		x, y := int(w2&0x01ff), int(w0&0x01ff)
-		if x >= 0x180 {
-			x -= 0x200
+		spriteX, spriteY := int(w2&0x01ff), int(w0&0x01ff)
+		if spriteX >= 0x180 {
+			spriteX -= 0x200
 		}
-		if y >= 0x180 {
-			y -= 0x200
+		if spriteY >= 0x180 {
+			spriteY -= 0x200
 		}
-		bank, mask := uint32(w1>>12), int(w1>>8&3)
+		bank, maskMode := uint32(w1>>12), int(w1>>8&3)
 		flipX, flipY := w1&0x0800 != 0, w1&0x0400 != 0
 		priority := int(w2 >> 9 & 3)
+		mosaic := int(w1>>3&7) + 1
 		xSize, ySize := 1<<int(w1&7), spriteYSize[w0>>9&0x0f]
-		if w3&0x8000 != 0 || xSize == 1 && ySize == 1 {
-			tile := int(bank*bankSize) + int(w3&0x03ff)
-			d.drawSpriteTile(tile, int(w3>>12), flipX != (w3&0x0800 != 0), flipY != (w3&0x0400 != 0), x, y, priority, mask, sprites, priorities, masks)
-			continue
+		direct := w3&0x8000 != 0 || xSize == 1 && ySize == 1
+		if direct {
+			xSize, ySize = 1, 1
 		}
-		for tileY := range ySize {
-			for tileX := range xSize {
-				data := d.vramWord((uint32(w3) << 1) + uint32(tileY*xSize+tileX))
-				if data == 0 {
+		nativeWidth, nativeHeight := xSize*8, ySize*8
+		width, height := spriteGeometry(int(w2>>11), int(w0>>13), nativeWidth, nativeHeight)
+		for destY := range height {
+			y := spriteY + destY
+			if y < 0 || y >= Height {
+				continue
+			}
+			srcY := (destY &^ (mosaic - 1)) * nativeHeight / height
+			if flipY {
+				srcY = nativeHeight - 1 - srcY
+			}
+			for destX := range width {
+				x := spriteX + destX
+				if x < 0 || x >= Width {
 					continue
 				}
-				destX, destY := x+tileX*8, y+tileY*8
+				srcX := (destX &^ (mosaic - 1)) * nativeWidth / width
 				if flipX {
-					destX = x - (tileX+1)*8 + xSize*8
+					srcX = nativeWidth - 1 - srcX
 				}
-				if flipY {
-					destY = y - (tileY+1)*8 + ySize*8
+				entry := w3
+				if !direct {
+					entry = d.vramWord((uint32(w3) << 1) + uint32((srcY/8)*xSize+srcX/8))
+					if entry == 0 {
+						continue
+					}
 				}
-				destX &= 0x1ff
-				if destX >= 0x180 {
-					destX -= 0x200
+				pixel, palette := d.spriteSource(entry, bank, region, srcX, srcY)
+				if pixel == 0 {
+					continue
 				}
-				tile := int(bank*bankSize) + int(data&0x03ff)
-				d.drawSpriteTile(tile, int(data>>12), flipX != (data&0x0800 != 0), flipY != (data&0x0400 != 0), destX, destY, priority, mask, sprites, priorities, masks)
+				offset := y*Width + x
+				if maskMode > 1 {
+					masks[offset] = 1
+					continue
+				}
+				if maskMode == 1 && masks[offset] == 0 {
+					continue
+				}
+				if region == 0 {
+					sprites[offset] = uint16(pixel)
+				} else {
+					sprites[offset] = uint16(palette*16) + uint16(pixel)
+				}
+				priorities[offset] = priorities[offset]&0xf0 | uint8(priority)
 			}
 		}
 	}

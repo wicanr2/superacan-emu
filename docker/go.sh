@@ -29,5 +29,8 @@ exec timeout "${ACAN_GO_TIMEOUT:-900}" docker run --rm --network none \
     -e GOPROXY=file:///hostmod/cache/download \
     -e GOSUMDB=off \
     -e GOTOOLCHAIN=local \
+    ${ACAN_GOOS:+-e "GOOS=$ACAN_GOOS"} \
+    ${ACAN_GOARCH:+-e "GOARCH=$ACAN_GOARCH"} \
+    ${ACAN_CGO:+-e "CGO_ENABLED=$ACAN_CGO"} \
     -e "ACAN_UI_DUMP=${ACAN_UI_DUMP:-}" \
     -w /src "$IMAGE" go "$@"

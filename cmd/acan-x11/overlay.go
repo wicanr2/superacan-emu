@@ -102,15 +102,6 @@ func recentFor(romPath string) []string {
 	return []string{romPath}
 }
 
-// mustRead 讀檔失敗即結束；換卡帶路徑上的錯誤由呼叫端處理，這裡只給啟動用。
-func mustRead(path string) []byte {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	return raw
-}
-
 // startCaptureSink 把原始 RGBA 幀送給一個外部程序。這條路存在的理由是純 Go 沒有
 // H.264 編碼器：想要小檔案的使用者可以自備 ffmpeg，內建的 AVI/MJPEG 則不需要
 // 任何外部工具。

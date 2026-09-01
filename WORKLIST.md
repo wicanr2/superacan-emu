@@ -109,15 +109,15 @@
 ## C. 平台層與發行
 
 - [x] Linux 桌面：純 Go X11 前端 `cmd/acan-x11`，`CGO_ENABLED=0` 可建置，九款卡帶與
-  headless 逐位元相同。見 `docs/x11-frontend.md`。
+  headless 逐位元相同。見 `docs/x11-frontend.md`。主機側的媒體載入、電池記憶體、
+  截圖與外部音訊已抽到 `frontend/hostio`，與 macOS 前端共用。
 - [ ] 純 Go 音訊輸出，取代目前的外部播放程序（候選：直接操作 `/dev/snd`、
   PulseAudio 原生協定）。
 - [ ] 在有實體音效裝置的 Linux 驗收 48 kHz 播放、鍵盤操作、延遲與 underrun。
-- [ ] macOS 平台層，走 purego。音訊已有無 cgo 路徑（`oto/v3` 在 darwin 建置通過），
-  Ebitengine 的 `internal/cocoa` 與 Metal 驅動也已是純 Go，缺的是視窗與輸入：以
-  `purego/objc` 自建 NSApplication／NSWindow／CAMetalLayer，貼上 320×240 RGBA 並收
-  鍵盤事件。完成條件：實機啟動、輸入、音訊、存讀檔 smoke 全過，且不修改模擬核心來
-  遷就平台。
+- [~] macOS 平台層：`frontend/cocoa` 與 `cmd/acan-macos` 已完成並在 darwin 的兩個
+  架構上 `CGO_ENABLED=0` 建置與 vet 通過，鍵碼表有單元測試。**還沒在真實 macOS 上
+  跑過**——交叉編譯只證明組得起來，證明不了 Objective-C 呼叫慣例與事件迴圈的實機
+  行為。實機 smoke 步驟見 [`docs/macos-frontend.md`](docs/macos-frontend.md)。
 - [ ] Android 平台層：走 Ebitengine 的 gomobile 路徑（cgo 例外），觸控輸入、虛擬手把、
   生命週期（暫停／恢復）、存檔落地、螢幕旋轉與返回鍵行為。完成條件同 macOS，
   另加建置需要 Android NDK 的說明。

@@ -205,6 +205,7 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - [`docs/platform-targets.md`](docs/platform-targets.md)：三個發行平台的建置矩陣與 cgo 邊界
 - [`docs/capture-formats.md`](docs/capture-formats.md)：截圖與錄影在純 Go 下的可行格式
 - [`docs/verify-ui.md`](docs/verify-ui.md)：介面畫面雜湊、headless 覆蓋層驗證與卡帶基準
+- [`docs/macos-frontend.md`](docs/macos-frontend.md)：macOS 的 purego 視窗層與實機 smoke 步驟
 - [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
