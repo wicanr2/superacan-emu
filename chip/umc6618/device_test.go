@@ -132,6 +132,57 @@ func TestROZBitmapModeFollowsPixelModeBit3(t *testing.T) {
 	}
 }
 
+func TestSpriteScaleAndMosaicFields(t *testing.T) {
+	// 尺寸公式與 1:1 的值（hscale 5、vscale 2）量自 Bcan，見知識庫 docs/sprite-format.md。
+	for _, c := range []struct{ hscale, vscale, nw, nh, w, h int }{
+		{5, 2, 8, 8, 8, 8},    // 1:1
+		{0, 2, 8, 8, 48, 8},   // 水平放到 6 倍
+		{2, 2, 8, 8, 16, 8},   // 兩倍寬
+		{24, 2, 8, 8, 2, 8},   // 縮到 2 像素
+		{5, 0, 8, 8, 8, 24},   // vscale 0 是三倍高
+		{5, 1, 8, 8, 8, 16},   // 兩倍高
+		{5, 7, 8, 8, 8, 3},    // 壓扁
+		{5, 2, 16, 16, 16, 16}, // 多 tile 的 1:1
+	} {
+		w, h := spriteGeometry(c.hscale, c.vscale, c.nw, c.nh)
+		if w != c.w || h != c.h {
+			t.Errorf("hscale=%d vscale=%d %dx%d → %dx%d，預期 %dx%d",
+				c.hscale, c.vscale, c.nw, c.nh, w, h, c.w, c.h)
+		}
+	}
+}
+
+func TestSpriteMosaicSamplesBlockOrigin(t *testing.T) {
+	device := New()
+	device.WriteRegister(0x13, 0x0001) // 8bpp
+	device.WriteRegister(0x10, 0x0400) // sprite table 在 VRAM byte $1000
+	device.WriteRegister(0x11, 0x0000)
+	device.videoFlags = 0x0108
+	for i := range 64 {
+		device.WriteVRAM8(uint32(64+i), uint8(i+1)) // tile 1：像素值 = 索引 + 1
+	}
+	// mosaic 欄位 = 2 → 塊大小 3；1:1 尺寸；直接指定 tile 1。
+	for i, value := range []uint16{0x4000, 2 << 3, 0x2800, 0x8001} {
+		device.WriteVRAM16(uint32(0x1000+i*2), value)
+	}
+	sprites := make([]uint16, Width*Height)
+	priorities := make([]uint8, Width*Height)
+	for i := range priorities {
+		priorities[i] = 0xff
+	}
+	device.drawSprites(sprites, priorities, make([]uint8, Width*Height))
+	// 塊原點是 floor(d/3)*3，不是位元遮罩；第 3、4、5 欄都要取來源第 3 欄。
+	for _, c := range []struct{ x, y, want int }{
+		{0, 0, 1}, {1, 0, 1}, {2, 0, 1},
+		{3, 0, 4}, {4, 0, 4}, {5, 0, 4},
+		{6, 0, 7}, {0, 3, 25}, {3, 3, 28},
+	} {
+		if got := sprites[c.y*Width+c.x]; got != uint16(c.want) {
+			t.Errorf("(%d,%d) = %d，預期 %d", c.x, c.y, got, c.want)
+		}
+	}
+}
+
 func TestIRQStatusReadAndSingleSpriteDMATrigger(t *testing.T) {
 	device := New()
 	device.SetScanline(240)

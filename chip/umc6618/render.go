@@ -223,7 +223,8 @@ func (d *Device) drawSprites(sprites []uint16, priorities, masks []uint8) {
 			if y < 0 || y >= Height {
 				continue
 			}
-			srcY := (destY &^ (mosaic - 1)) * nativeHeight / height
+			// mosaic 不保證是 2 的冪次，量到的分塊是 floor(d/m)*m，不能用位元遮罩。
+			srcY := destY / mosaic * mosaic * nativeHeight / height
 			if flipY {
 				srcY = nativeHeight - 1 - srcY
 			}
@@ -232,7 +233,7 @@ func (d *Device) drawSprites(sprites []uint16, priorities, masks []uint8) {
 				if x < 0 || x >= Width {
 					continue
 				}
-				srcX := (destX &^ (mosaic - 1)) * nativeWidth / width
+				srcX := destX / mosaic * mosaic * nativeWidth / width
 				if flipX {
 					srcX = nativeWidth - 1 - srcX
 				}
