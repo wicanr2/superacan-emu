@@ -439,3 +439,45 @@
 - UI 規劃寫入 `docs/ui-plan.md`：自繪的 `ui` 套件把介面畫進 RGBA 緩衝，兩個前端只負責
   貼圖與翻譯輸入，因此可在 headless 比對畫面雜湊，也不會讓 UI 滲進模擬路徑。
 
+
+## 2026-09-01（續）：UI 設計定案與 `ui` 套件 P1
+
+- UX 設計產出 `docs/ui-design.md`：Bcan 功能逐項對照、十六張畫面線框、三平台差異化、
+  互動模型、視覺規範、文案表、設定檔、P0–P8 分階段與可用畫面雜湊驗證的驗收條件。
+- 六項決定全部定案（紀錄在該文件 §15）：cgo 禁令縮為「Linux 與 macOS 的發行 binary」
+  而 **Android 開例外**；嵌入 `bitmapfont/v4` 並做五種介面語言；錄影預設
+  MP4／MJPEG＋PCM、OpenH264 為選配；金手指進第一個發行版但啟用時畫面常駐標記且該
+  工作階段的雜湊不作硬體證據。
+- Android 的關鍵事實是量出來的，不是估的：`-buildmode=c-shared` 在 linux、darwin、
+  android 三個目標上都回「requires external (cgo) linking, but cgo is not enabled」，
+  而 Android 應用的原生碼一定要是共享程式庫，所以禁 cgo 之下沒有產出 Android 應用的
+  路徑。對照組是同一份程式建成**執行檔**在 android/arm64 成功——核心跑得動，
+  不能成立的是應用程式形式。
+- macOS 反而比原估便宜：Ebitengine 的 `internal/cocoa`（367 行）與 Metal 驅動
+  （3,252 行）已經走 `purego/objc`，darwin 的 cgo 幾乎只剩 GLFW 的 Cocoa 視窗。
+- 新增 `ui` 套件（P1）：抽象事件與 Intent、`compact`／`touch` 兩套度量、十二色主題、
+  點陣字繪製、S3 覆蓋選單、S4 存檔槽、toast 與錯誤列、D1 確認對話。
+- 三個雜湊擋不住的版面錯誤是靠 `ACAN_UI_DUMP` 存出 PNG 用人眼抓到的：字型基線多加
+  一次 ascent 讓整行下墜、面板高度沒把分隔線算進去讓最後一列被外框切掉、整頁畫面
+  沿用帶 alpha 的面板色讓下層畫面透出來。**畫面雜湊只證明沒有意外變動，
+  證明不了版面本來就對。**
+- `text-off` 由 `#5A646E` 改為 `#68727C`：原值對面板的對比只有 2.5:1，達不到設計自己
+  訂的 3:1。對比檢查已寫成測試。
+- `machine` 抽出 `ParseSaveState`，`LoadState` 與新增的 `InspectSaveState` 共用，
+  存檔槽畫面的拒絕理由與實際載入的錯誤字串同源，測試直接比對兩者。
+- 新增 `docker/go.sh`：Go 工具鏈在容器內跑，模組來源是主機下載快取的唯讀
+  `file://` proxy，解壓與建置快取寫在容器外的工作目錄，不動主機的 `~/go/pkg/mod`。
+
+### 本輪收尾
+
+- HEAD：`faafac3`。
+- 驗證：`docker/go.sh test ./...` 全綠（含 `ui` 的六組畫面雜湊與 `machine` 的
+  存檔拒絕理由一致性測試）；`docker/go.sh vet ./...` 無輸出。九款卡帶各跑
+  1200 frame 全部完成，68000 指令數與 framebuffer SHA-256 記入
+  `docs/verify-ui.md` 作為後續介面階段的 C10 對照。
+- 未證實：`ui` 尚未接上任何前端，兩個前端「叫出選單並完成存讀檔」的手動 smoke
+  還沒做；`touch` 版面只有 1280×720 的渲染，沒有在真實 Android 上看過。
+- 下一個最小行動：P2（S0 無卡帶啟動、S0.1 主機韌體設定、S1 卡帶瀏覽器、S8 關於），
+  並在其中一個前端接上 `ui` 完成第一次 smoke。
+- Docker 清理：本輪全部使用 `docker run --rm`，沒有留下本專案容器；主機的
+  `~/go/pkg/mod` 只以唯讀掛載，未寫入。
