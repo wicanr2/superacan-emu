@@ -39,6 +39,43 @@ ACAN_UI_DUMP=/src/build/uidump docker/go.sh test ./ui/ -count=1
 版面刻意改動時，先看 PNG 確認新版面正確，再把新雜湊填回 `ui/render_test.go`
 與這張表——順序反過來就等於用雜湊掩蓋錯誤。
 
+## 在 headless 驗證覆蓋層
+
+「叫出選單、存檔、讀檔」這條流程不靠人在視窗前面按一次來證明。`session` 套件把
+模擬核心與介面接在一起，`cmd/acan-headless` 用 `--ui-script` 餵抽象事件，因此整條
+流程在沒有視窗的容器裡就能跑完並比對。
+
+事件名稱是介面層的動作而不是按鍵（`menu`、`up`、`down`、`left`、`right`、
+`confirm`、`cancel`、`delete`、`secondary`、`tabprev`、`tabnext`、`home`、`end`、
+`back`），格式與 `--press` 一樣是 `frame:事件`。
+
+```sh
+docker/go.sh run ./cmd/acan-headless --ipl /bios/internal_68k.bin --key /bios/umc6650.bin \
+    --sound-bios1 /bios/internal_6502_1.bin --sound-bios2 /bios/internal_6502_2.bin \
+    --rom "/media/Boom Zoo (Taiwan).bin" --frames 1200 \
+    --ui-state-dir /gowork/states \
+    --ui-script "600:menu,601:down,602:confirm,603:confirm,604:cancel,\
+900:menu,901:down,902:down,903:confirm,904:confirm" \
+    --ui-compose /gowork/ui-boomzoo.png
+```
+
+2026-09-01 的結果：
+
+```
+ui_visible=false ui_halt=0 ui_slot=0 present=true rejected=false
+steps=13048709 video_frame=896
+```
+
+`video_frame=896` 是這條驗證的關鍵：迴圈跑了 1200 次，但 frame 600 存檔、
+frame 904 讀檔之後機器退回存檔當下，再往前 296 個 frame，600＋296＝896。
+如果讀檔沒有真的生效，這個數字會是 1200。`ui_slot=0 present=true` 則說明存檔槽
+畫面讀到的檔案通過了與實際載入同一份驗證。
+
+不需要商業 ROM 的版本在 `session` 的單元測試裡：`TestMenuSaveAndLoadRoundTripHeadless`
+走完同一條流程，`TestLoadStateResumesIdentically` 證明從存檔續跑與一路跑到底的
+指令數、frame 與 framebuffer SHA-256 完全相同，`TestOverlayGatesPadInput` 證明選單
+開著時 machine 收到的是「全部放開」。
+
 ## 卡帶基準（C10）
 
 介面不得滲進模擬路徑。每一個介面階段完成後，九款卡帶的 1200-frame 執行結果

@@ -39,8 +39,11 @@ func (u *UI) toast(text string, severity Severity) {
 	}
 }
 
-// fail 顯示錯誤列。錯誤不用 toast：會自己消失的錯誤等於沒說。
-func (u *UI) fail(text string) { u.errorText = text }
+// Fail 顯示錯誤列。錯誤不用 toast：會自己消失的錯誤等於沒說。
+// 入口執行 Intent 失敗時走這條路，使用者才知道剛才那個動作沒有成功。
+func (u *UI) Fail(text string) { u.errorText = text }
+
+func (u *UI) fail(text string) { u.Fail(text) }
 
 func (u *UI) expireToasts() {
 	kept := u.toasts[:0]

@@ -31,16 +31,16 @@ func (fakeSnapshot) Framebuffer() *image.RGBA {
 	return img
 }
 
-func (fakeSnapshot) FrameIndex() uint64                { return 12480 }
-func (fakeSnapshot) Instructions() (uint64, uint64)    { return 17369003, 5122334 }
-func (fakeSnapshot) Halt() (HaltReason, bool)          { return HaltNone, false }
+func (fakeSnapshot) FrameIndex() uint64             { return 12480 }
+func (fakeSnapshot) Instructions() (uint64, uint64) { return 17369003, 5122334 }
+func (fakeSnapshot) Halt() (HaltReason, bool)       { return HaltNone, false }
 func (fakeSnapshot) Cartridge() (string, [32]byte, int64) {
 	return "BOOM ZOO", [32]byte{0x11, 0x22}, 4 << 20
 }
-func (fakeSnapshot) Firmware() FirmwareIDs        { return FirmwareIDs{IPLOK: true, KeyOK: true} }
+func (fakeSnapshot) Firmware() FirmwareIDs                   { return FirmwareIDs{IPLOK: true, KeyOK: true} }
 func (fakeSnapshot) ReadWorkRAM(dst []byte, addr uint32) int { return 0 }
-func (fakeSnapshot) VideoRegisters() [256]uint16  { return [256]uint16{} }
-func (fakeSnapshot) LayerMask() uint32            { return 0x1f }
+func (fakeSnapshot) VideoRegisters() [256]uint16             { return [256]uint16{} }
+func (fakeSnapshot) LayerMask() uint32                       { return 0x1f }
 
 // fixedSlots 是固定的存檔槽現況：兩個可讀、一個被拒絕、其餘為空。
 type fixedSlots struct{}

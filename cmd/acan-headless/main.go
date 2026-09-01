@@ -17,6 +17,8 @@ import (
 	"github.com/wicanr2/superacan-emu/machine"
 	"github.com/wicanr2/superacan-emu/media"
 	"github.com/wicanr2/superacan-emu/presentation"
+	"github.com/wicanr2/superacan-emu/session"
+	"github.com/wicanr2/superacan-emu/ui"
 )
 
 func main() {
@@ -43,6 +45,12 @@ func main() {
 	soundRAMAlias := flag.Bool("sound-ram-alias", false, "diagnostic: model the sound SRAM as a single 32 KiB device (drop A15 for RAM accesses)")
 	press := flag.String("press", "", "P1 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
 	press2 := flag.String("press2", "", "P2 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
+	uiScript := flag.String("ui-script", "", "overlay UI event timeline: frame:EVENT,... (menu, down, confirm, ...)")
+	uiSurfaceSpec := flag.String("ui-surface", "960x720", "overlay UI surface size WxH")
+	uiScale := flag.Int("ui-scale", 1, "overlay UI design-unit scale")
+	uiTouch := flag.Bool("ui-touch", false, "use the touch layout profile instead of compact")
+	uiStateDir := flag.String("ui-state-dir", "", "directory holding the ten save-state slots the overlay UI reads and writes")
+	uiCompose := flag.String("ui-compose", "", "write the final composed game+overlay frame as PNG")
 	flag.Parse()
 
 	if *iplPath == "" || *keyPath == "" || *romPath == "" {
@@ -56,6 +64,19 @@ func main() {
 		fail(err.Error())
 	}
 	presses2, err := parsePresses(*press2)
+	if err != nil {
+		fail(err.Error())
+	}
+	uiEnabled := *uiScript != "" || *uiCompose != ""
+	script, err := parseUIScript(*uiScript)
+	if err != nil {
+		fail(err.Error())
+	}
+	profile := ui.ProfileCompact
+	if *uiTouch {
+		profile = ui.ProfileTouch
+	}
+	surface, err := uiSurface(*uiSurfaceSpec, profile, *uiScale)
 	if err != nil {
 		fail(err.Error())
 	}
@@ -144,14 +165,38 @@ func main() {
 	if *frames == 0 {
 		result, err = system.RunInstructions(*steps)
 	} else {
+		var overlay *session.Session
+		if uiEnabled {
+			overlay = session.New(session.Options{
+				System:   system,
+				Title:    session.TitleFromPath(*romPath),
+				StateDir: *uiStateDir,
+				ROMSize:  int64(len(rom.Bytes)),
+				Surface:  surface,
+				Config:   ui.DefaultConfig(),
+			})
+			// 存檔槽的時間戳是環境不是行為，固定它才能對合成畫面取雜湊。
+			overlay.Stamp = func(os.FileInfo) string { return "01-01 00:00" }
+		}
 		p1, p2 := machine.PadReleased, machine.PadReleased
 		for frame := uint64(0); frame < *frames; frame++ {
 			p1 = applyPresses(frame, p1, presses)
 			p2 = applyPresses(frame, p2, presses2)
-			system.SoundBus.SetPad(0, p1)
-			system.SoundBus.SetPad(1, p2)
-			if _, err = system.RunFrame(2_000_000); err != nil {
-				break
+			if overlay != nil {
+				for _, event := range script[frame] {
+					overlay.Handle(event)
+				}
+				overlay.SetPad(0, p1)
+				overlay.SetPad(1, p2)
+				if err = overlay.Advance(frameClock(frame)); err != nil {
+					break
+				}
+			} else {
+				system.SoundBus.SetPad(0, p1)
+				system.SoundBus.SetPad(1, p2)
+				if _, err = system.RunFrame(2_000_000); err != nil {
+					break
+				}
 			}
 			if *screenshotDir != "" && *screenshotEvery > 0 && (frame+1)%*screenshotEvery == 0 {
 				video := system.Bus.Video()
@@ -165,6 +210,26 @@ func main() {
 			}
 		}
 		result.Opcode = system.M68K.State().IRD
+		if overlay != nil {
+			composed := composeFrame(overlay, surface)
+			sum := sha256.Sum256(composed.Pix)
+			visible, reason := overlay.Halt()
+			fmt.Printf("ui_surface=%dx%d ui_scale=%d ui_visible=%t ui_halt=%d ui_halt_note=%q ui_sha256=%s\n",
+				surface.W, surface.H, surface.Scale, overlay.UI.Visible(), visible, reason,
+				hex.EncodeToString(sum[:]))
+			for _, slot := range overlay.Slots() {
+				if !slot.Present && !slot.Rejected {
+					continue
+				}
+				fmt.Printf("ui_slot=%d present=%t rejected=%t frame=%d reason=%q\n",
+					slot.Index, slot.Present, slot.Rejected, slot.Frame, slot.Reason)
+			}
+			if *uiCompose != "" {
+				if writeErr := writeComposedPNG(*uiCompose, composed); writeErr != nil {
+					fail(writeErr.Error())
+				}
+			}
+		}
 	}
 	state := system.M68K.State()
 	if *disableROZLineTables {

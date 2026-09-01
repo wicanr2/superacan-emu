@@ -7,19 +7,19 @@ import (
 
 // Theme 是十二個語意色。改色時 TestThemeContrast 會擋住對比不足的組合。
 type Theme struct {
-	Scrim      color.NRGBA
-	ScrimHalt  color.NRGBA
-	Panel      color.NRGBA
-	PanelAlt   color.NRGBA
-	Border     color.NRGBA
-	Text       color.NRGBA
-	TextDim    color.NRGBA
-	TextOff    color.NRGBA
-	Focus      color.NRGBA
-	FocusText  color.NRGBA
-	OK         color.NRGBA
-	Warn       color.NRGBA
-	Error      color.NRGBA
+	Scrim     color.NRGBA
+	ScrimHalt color.NRGBA
+	Panel     color.NRGBA
+	PanelAlt  color.NRGBA
+	Border    color.NRGBA
+	Text      color.NRGBA
+	TextDim   color.NRGBA
+	TextOff   color.NRGBA
+	Focus     color.NRGBA
+	FocusText color.NRGBA
+	OK        color.NRGBA
+	Warn      color.NRGBA
+	Error     color.NRGBA
 }
 
 // DefaultTheme 見 docs/ui-design.md §10.1。面板不透明度 0.92 而不是常見的 0.6：

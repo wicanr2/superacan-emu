@@ -263,9 +263,24 @@ func (d *Device) readSwapped(offset uint32) uint8 {
 	return d.ReadVRAM8(original)
 }
 
+// rozBitmapPixel reads the ROZ layer as a linear bitmap. Bcan takes this path
+// when $F001F0 pixel mode is exactly $08 and the ROZ layer is in the 8bpp
+// region; it skips the tilemap and tile graphics entirely and indexes VRAM by
+// pixel. Base address, mask and palette bank all follow the decompiled
+// renderer (see the knowledge base, docs/f003-video-mode.md section 7.3).
+func (d *Device) rozBitmapPixel(x, y uint32) uint16 {
+	xs, _ := tilemapDimensions(d.registers[0xc0])
+	bit := 8 * (x + uint32(xs*8)*y)
+	address := ((bit >> 3) + 4*uint32(d.registers[0xcb])) & (VRAMSize - 1)
+	return uint16(d.ReadVRAM8(address)) + uint16(d.registers[0xc1]&0x0f)<<8
+}
+
 func (d *Device) rozPixel(x, y uint32) uint16 {
 	mode := d.registers[0xc0]
 	region := [4]int{4, 2, 1, 0}[mode&3]
+	if region == 0 && d.pixelMode&0x18 == 0x08 {
+		return d.rozBitmapPixel(x, y)
+	}
 	if region == 4 {
 		count := (y>>3)*32 + (x >> 3)
 		tile := 0x880 + int(count&7)*2
