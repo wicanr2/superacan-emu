@@ -63,6 +63,25 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 | Super Taiwanese Baseball League | 17,572,195 | `e28f1c411a389ecd46206d8006e1e9b54f62a75047bcb2e64b7f12763f094023` |
 | The Son of Evil | 16,727,440 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
 
+## 音訊
+
+以 `--frames 1800 --wav` 匯出 48 kHz 16-bit stereo，八款都有實際內容，不是只有非零值：
+
+| ROM | 樣本數 | 峰值 | RMS | 觸頂樣本比例 |
+|---|---:|---:|---:|---:|
+| Boom Zoo | 1,427,305 | 20,128 | 2,108 | 0.00% |
+| Formosa Duel | 1,508,407 | 32,768 | 11,874 | 1.80% |
+| Journey to the Laugh | 1,497,757 | 32,768 | 10,983 | 0.70% |
+| Monopoly | 1,511,950 | 32,768 | 11,624 | 0.42% |
+| Sango Fighter | 1,515,024 | 32,768 | 9,914 | 0.08% |
+| Speedy Dragon | 1,510,581 | 32,768 | 11,515 | 1.44% |
+| Super Taiwanese Baseball League | 1,517,209 | 32,768 | 5,534 | 0.00% |
+| The Son of Evil | 1,430,002 | 23,599 | 2,540 | 0.00% |
+
+五款會撞到滿刻度，最高的 Formosa Duel 有 1.80% 的樣本觸頂。UM6619 的混音增益與削波
+行為本來就列在「尚未升格為硬體事實」，這組數字把它從「未知」變成「已量到多少」：
+在取得實機或 Bcan 的同狀態音訊之前，不以聽感調整增益。
+
 ## 已知落差
 
 - **Sango Fighter 的選單文字落在畫面最右緣**：以 `--layer-mask` 逐層輸出可以確定
