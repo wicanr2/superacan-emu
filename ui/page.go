@@ -14,12 +14,13 @@ func (p page) draw(u *UI, c *canvas) (int, int) {
 	m := u.metrics
 	u.fillPage(c)
 	if p.back {
-		c.rowText(m.PanelPad, 0, m.TitleBar, m.BodySize, u.theme.TextDim, textBack)
+		c.rowTextFit(m.PanelPad, 0, m.TitleBar, m.BodySize, c.width()/4, u.theme.TextDim, u.s.Back)
 	}
 	c.textCenter(0, (m.TitleBar-c.font.Height(m.TitleSize))/2, c.width(), m.TitleSize, u.theme.Text, p.title)
 	if p.right != "" {
-		c.rowText(c.width()-m.PanelPad-c.font.Measure(p.right, m.BodySize), 0, m.TitleBar,
-			m.BodySize, u.theme.TextDim, p.right)
+		width := min(c.font.Measure(p.right, m.BodySize), c.width()/3)
+		c.rowTextFit(c.width()-m.PanelPad-width, 0, m.TitleBar, m.BodySize, width,
+			u.theme.TextDim, p.right)
 	}
 	c.rect(0, m.TitleBar, c.width(), 1, u.theme.Border)
 
@@ -27,7 +28,8 @@ func (p page) draw(u *UI, c *canvas) (int, int) {
 	if p.status != "" {
 		bottom -= m.FooterBar + m.Grid
 		c.rect(0, bottom, c.width(), 1, u.theme.Border)
-		c.rowText(m.PanelPad, bottom+1, m.FooterBar, m.BodySize, u.theme.TextDim, p.status)
+		c.rowTextFit(m.PanelPad, bottom+1, m.FooterBar, m.BodySize, c.width()-m.PanelPad*2,
+			u.theme.TextDim, p.status)
 	}
 	top := m.TitleBar + 1 + m.PanelPad
 	return top, bottom - top
@@ -35,7 +37,8 @@ func (p page) draw(u *UI, c *canvas) (int, int) {
 
 // sectionTitle 畫區塊標題，回傳下一個 y。
 func (u *UI) sectionTitle(c *canvas, x, y int, text string) int {
-	c.rowText(x, y, u.metrics.RowHeight, u.metrics.BodySize, u.theme.TextDim, text)
+	c.rowTextFit(x, y, u.metrics.RowHeight, u.metrics.BodySize, c.width()-x-u.metrics.PanelPad,
+		u.theme.TextDim, text)
 	return y + u.metrics.RowHeight
 }
 

@@ -100,7 +100,7 @@ func TestIncompleteFirmwareBlocksLoading(t *testing.T) {
 	start := u.stack[0].(*startScreen)
 	rows := start.rows(u)
 	for index, row := range rows {
-		if row.label != textChooseCartridge {
+		if row.label != u.s.ChooseCartridge {
 			continue
 		}
 		if !row.disabled {
@@ -247,7 +247,7 @@ func TestConflictIsVisible(t *testing.T) {
 	u.Open()
 	u.push(&hotkeyScreen{})
 	screen := u.stack[len(u.stack)-1].(*hotkeyScreen)
-	conflicts := conflictsIn(screen.rows(u), func(r bindingRow) Binding { return r.keyboard })
+	conflicts := conflictsIn(u.s, screen.rows(u), func(r bindingRow) Binding { return r.keyboard })
 	if len(conflicts) != 2 {
 		t.Fatalf("兩列都要標出衝突，得到 %v", conflicts)
 	}

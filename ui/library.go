@@ -78,16 +78,16 @@ type AboutInfo struct {
 }
 
 // firmwareLabel 是韌體項目的顯示名稱。
-func firmwareLabel(kind FirmwareKind) string {
+func (u *UI) firmwareLabel(kind FirmwareKind) string {
 	switch kind {
 	case FirmwareIPL:
-		return textFirmwareIPL
+		return u.s.FirmwareIPL
 	case FirmwareKey:
-		return textFirmwareKey
+		return u.s.FirmwareKey
 	case FirmwareSoundA:
-		return textFirmwareSoundA
+		return u.s.FirmwareSoundA
 	default:
-		return textFirmwareSoundB
+		return u.s.FirmwareSoundB
 	}
 }
 

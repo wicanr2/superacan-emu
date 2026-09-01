@@ -69,10 +69,10 @@ type VideoConfig struct {
 
 // AudioConfig 是音訊設定。
 type AudioConfig struct {
-	MasterVolume     int    `json:"master_volume"`
-	MuteOnFastFwd    bool   `json:"mute_on_fast_forward"`
-	BufferMS         int    `json:"buffer_ms"`
-	Sink             string `json:"sink,omitempty"`
+	MasterVolume  int    `json:"master_volume"`
+	MuteOnFastFwd bool   `json:"mute_on_fast_forward"`
+	BufferMS      int    `json:"buffer_ms"`
+	Sink          string `json:"sink,omitempty"`
 }
 
 // TouchConfig 是觸控版面設定。
@@ -102,8 +102,8 @@ type InterfaceConfig struct {
 
 // DiagnosticsConfig 是診斷設定。
 type DiagnosticsConfig struct {
-	LayerMask       uint32 `json:"layer_mask"`
-	VideoRegisters  bool   `json:"video_registers"`
+	LayerMask      uint32 `json:"layer_mask"`
+	VideoRegisters bool   `json:"video_registers"`
 }
 
 // CheatsConfig 是金手指設定。

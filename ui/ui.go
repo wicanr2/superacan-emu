@@ -15,15 +15,20 @@ type UI struct {
 	config  Config
 	slots   SlotSource
 
-	library   Library
-	firmware  FirmwareSource
-	about     AboutInfo
-	audio     AudioStatsSource
-	diag      DiagnosticsSource
-	cheat     CheatSource
-	mask      uint32
-	mode      Mode
-	haltNote  string
+	library  Library
+	firmware FirmwareSource
+	about    AboutInfo
+	audio    AudioStatsSource
+	diag     DiagnosticsSource
+	cheat    CheatSource
+	mask     uint32
+	s        Strings
+	language Language
+
+	// textRightEdge 是最後一次 Draw 時文字畫到的最右邊，供版面溢出測試使用。
+	textRightEdge int
+	mode          Mode
+	haltNote      string
 
 	stack     []screen
 	modal     *confirm
@@ -48,17 +53,17 @@ const (
 
 // Options 是建立 UI 的參數。Font 留空時用嵌入的 bitmapfont/v4。
 type Options struct {
-	Surface  Surface
-	Config   Config
-	Slots    SlotSource
+	Surface     Surface
+	Config      Config
+	Slots       SlotSource
 	Library     Library
 	Firmware    FirmwareSource
 	About       AboutInfo
 	AudioStats  AudioStatsSource
 	Diagnostics DiagnosticsSource
 	Cheats      CheatSource
-	Theme    *Theme
-	Font     *Font
+	Theme       *Theme
+	Font        *Font
 }
 
 // New 建立介面狀態機。
@@ -75,7 +80,7 @@ func New(options Options) *UI {
 	if surface.Scale < 1 {
 		surface.Scale = 1
 	}
-	return &UI{
+	ui := &UI{
 		surface:  surface,
 		metrics:  MetricsFor(surface.Profile),
 		theme:    theme,
@@ -90,7 +95,31 @@ func New(options Options) *UI {
 		cheat:    options.Cheats,
 		mask:     AllLayers,
 	}
+	ui.setLanguage(Language(options.Config.Interface.Language))
+	return ui
 }
+
+// setLanguage 換掉整份字串表。切換不需要重啟：畫面每一幀都從 u.s 取字，
+// 沒有任何一份翻譯被快取在別的地方。
+func (u *UI) setLanguage(language Language) {
+	if _, known := LanguageNames[language]; !known {
+		language = LanguageTraditionalChinese
+	}
+	u.language = language
+	u.s = stringsFor(language)
+}
+
+// SetLanguage 切換介面語言。
+func (u *UI) SetLanguage(language Language) {
+	u.setLanguage(language)
+	u.config.Interface.Language = string(u.language)
+}
+
+// Language 回報目前的介面語言。
+func (u *UI) Language() Language { return u.language }
+
+// TextRightEdge 是最後一次 Draw 中文字畫到的最右邊，單位是設計單位。
+func (u *UI) TextRightEdge() int { return u.textRightEdge }
 
 // SetMode 切換常駐畫面。ModeShell 與 ModeHalt 的根畫面關不掉：
 // 沒有卡帶時沒有東西可以回去，停機時不能假裝沒事發生。
@@ -280,6 +309,7 @@ func (u *UI) Update(now time.Duration) {
 // snap 可以是 nil（尚未載入卡帶）。
 func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
 	c := &canvas{dst: dst, scale: u.surface.Scale, metrics: u.metrics, font: u.font, theme: u.theme}
+	defer func() { u.textRightEdge = c.textRightEdge }()
 	if u.Visible() {
 		// 只畫最上層。每一層都自己負責畫滿需要的底，堆疊在視覺上不疊加；
 		// 半透明面板疊在半透明面板上會讓下層的字透出來。

@@ -29,28 +29,28 @@ func (a *aboutScreen) handle(u *UI, ev Event) bool {
 
 func (a *aboutScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
-	top, height := page{title: textAboutTitle, back: true}.draw(u, c)
+	top, height := page{title: u.s.AboutTitle, back: true}.draw(u, c)
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
 
 	info := u.about
-	cgo := textCGODisabled
+	cgo := u.s.CGODisabled
 	if info.CGOEnabled {
-		cgo = textCGOEnabled
+		cgo = u.s.CGOEnabled
 	}
 	y := top
-	c.rowText(x, y, m.RowHeight, m.BodySize, u.theme.Text, textAboutName)
+	c.rowText(x, y, m.RowHeight, m.BodySize, u.theme.Text, u.s.AboutName)
 	y += m.RowHeight
 	c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, fmt.Sprintf("%s · %s · %s · %s · %s",
 		info.Version, info.BuildDate, info.GoVersion, info.Platform, cgo))
 	y += m.RowHeight + m.Grid
 
-	for _, line := range wrapText(c.font, textAboutDisclaimer, m.BodySize, width) {
+	for _, line := range wrapText(c.font, u.s.AboutDisclaimer, m.BodySize, width) {
 		c.rowText(x, y, m.RowHeight, m.BodySize, u.theme.Text, line)
 		y += m.RowHeight
 	}
 	y += m.Grid
-	y = u.sectionTitle(c, x, y, textAboutThirdParty)
+	y = u.sectionTitle(c, x, y, u.s.AboutThirdParty)
 
 	remaining := (top + height - y) / m.RowHeight
 	if remaining < 1 {
@@ -68,5 +68,5 @@ func (a *aboutScreen) draw(u *UI, c *canvas, _ Snapshot) {
 			m.SmallSize, u.theme.TextDim, dep.License)
 		y += m.RowHeight
 	}
-	c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, textAboutMAME)
+	c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.AboutMAME)
 }

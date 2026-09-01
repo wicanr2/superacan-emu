@@ -10,11 +10,11 @@ func (h *haltScreen) id() string { return "S9" }
 
 func (h *haltScreen) rows(u *UI) []menuRow {
 	return []menuRow{
-		{label: textSaveState, action: func(u *UI) {
+		{label: u.s.SaveState, action: func(u *UI) {
 			u.push(&slotsScreen{mode: slotModeSave, focus: u.config.Interface.SaveSlot})
 		}},
-		{label: textEjectToShell, action: func(u *UI) { u.emit(UnloadCartridge{}) }},
-		{label: textQuit, action: func(u *UI) { u.emit(Quit{}) }},
+		{label: u.s.EjectToShell, action: func(u *UI) { u.emit(UnloadCartridge{}) }},
+		{label: u.s.Quit, action: func(u *UI) { u.emit(Quit{}) }},
 	}
 }
 
@@ -42,7 +42,7 @@ func (h *haltScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	c.rect(x, y, width, height, theme.Panel)
 	c.border(x, y, width, height, theme.Error)
 
-	c.rowText(x+m.PanelPad, y, titleH, m.BodySize, theme.Error, textHaltTitle)
+	c.rowText(x+m.PanelPad, y, titleH, m.BodySize, theme.Error, u.s.HaltTitle)
 	cursor := y + titleH
 	c.rect(x, cursor, width, 1, theme.Border)
 	cursor++
@@ -50,7 +50,7 @@ func (h *haltScreen) draw(u *UI, c *canvas, snap Snapshot) {
 		c.rowText(x+m.PanelPad, cursor, m.RowHeight, m.BodySize, theme.Text, line)
 		cursor += m.RowHeight
 	}
-	c.rowText(x+m.PanelPad, cursor, m.RowHeight, m.BodySize, theme.TextDim, textHaltBody)
+	c.rowText(x+m.PanelPad, cursor, m.RowHeight, m.BodySize, theme.TextDim, u.s.HaltBody)
 	cursor += m.RowHeight + m.Grid
 	for _, fact := range facts {
 		c.rowText(x+m.PanelPad, cursor, m.RowHeight, m.SmallSize, theme.TextDim, fact.label)
@@ -72,9 +72,9 @@ func (u *UI) haltFacts(snap Snapshot) []haltFact {
 	name, sum, _ := snap.Cartridge()
 	firmware := snap.Firmware()
 	return []haltFact{
-		{textHaltFrame, group(snap.FrameIndex())},
-		{textHaltInstructions, group(instructions)},
-		{textHaltCartridge, fmt.Sprintf("%s  %s", name, shortHash(sum))},
-		{textHaltIPL, shortHash(firmware.IPL)},
+		{u.s.HaltFrame, group(snap.FrameIndex())},
+		{u.s.HaltInstructions, group(instructions)},
+		{u.s.HaltCartridge, fmt.Sprintf("%s  %s", name, shortHash(sum))},
+		{u.s.HaltIPL, shortHash(firmware.IPL)},
 	}
 }

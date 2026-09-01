@@ -134,6 +134,23 @@ acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
 診斷畫面的數字直接讀 machine（`TestDiagnosticsReadMachineDirectly`），不另外累計，
 所以它顯示的 68000 指令數就是 headless 報出來的那一個。
 
+## 多語言
+
+字串表是結構不是 map：少一個 key 會在編譯期就發現，不會變成畫面上的空白。
+另有三條測試：`TestEveryLanguageHasEveryString` 斷言五種語言的每個欄位都有值、
+`TestTranslationTableMatchesStruct` 斷言表與結構沒有多餘或缺少的 key、
+`TestSwitchingLanguageChangesTheScreen` 斷言五種語言的同一畫面雜湊互不相同
+——相同就表示字串沒有真的換掉。
+
+**版面溢出有測試守著**：canvas 記錄每一幀文字畫到的最右邊，
+`TestNoScreenOverflowsInAnyLanguage` 對十六個畫面 × 五種語言 × 兩組表面渲染，
+斷言沒有文字掉出畫面。它第一次跑就抓到八處溢出（S5.3／S5.4／S7 在法文與西班牙文
+的觸控版面），修法是加上 `textFit`：放不下就截斷並補省略號，而不是畫到容器之外
+蓋掉別的欄位。
+
+技術標識（IPL、SHA-256、tilemap0、CHEAT、48,000 Hz、frame）五種語言相同。
+那不是沒翻譯，是不該翻。
+
 ## 擷取
 
 - **截圖等同硬體輸出**（`TestScreenshotMatchesHardwareOutput`）：介面走的路徑與

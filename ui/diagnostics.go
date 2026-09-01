@@ -5,20 +5,20 @@ import "fmt"
 // DiagnosticsFacts 是診斷畫面顯示的數值。全部由入口提供，ui 不查詢執行環境，
 // 也不從畫面反推任何硬體狀態。
 type DiagnosticsFacts struct {
-	Frame        uint64
-	M68K         uint64
-	M65C02       uint64
-	IRQ7         uint64
-	IRQ4         uint64
-	IRQ5         uint64
-	SoundClash   int
-	HostFPS      float64
-	Pacing       bool
-	Frontend     string
-	Platform     string
-	CGOEnabled   bool
-	IPL          [32]byte
-	Cartridge    [32]byte
+	Frame      uint64
+	M68K       uint64
+	M65C02     uint64
+	IRQ7       uint64
+	IRQ4       uint64
+	IRQ5       uint64
+	SoundClash int
+	HostFPS    float64
+	Pacing     bool
+	Frontend   string
+	Platform   string
+	CGOEnabled bool
+	IPL        [32]byte
+	Cartridge  [32]byte
 	// Recording 與 CaptureFrames 讓覆蓋選單顯示擷取狀態。
 	Recording     bool
 	CaptureFrames int
@@ -39,16 +39,17 @@ const (
 	AllLayers = LayerTilemap0 | LayerTilemap1 | LayerTilemap2 | LayerSprite | LayerROZ | LayerWindow
 )
 
+// layerBits 的名稱是硬體用語，五種語言相同，所以直接寫在這裡而不進語言表。
 var layerBits = []struct {
 	bit   uint32
 	label string
 }{
-	{LayerTilemap0, textLayerTilemap0},
-	{LayerTilemap1, textLayerTilemap1},
-	{LayerTilemap2, textLayerTilemap2},
-	{LayerSprite, textLayerSprite},
-	{LayerROZ, textLayerROZ},
-	{LayerWindow, textLayerWindow},
+	{LayerTilemap0, "tilemap0"},
+	{LayerTilemap1, "tilemap1"},
+	{LayerTilemap2, "tilemap2"},
+	{LayerSprite, "sprite"},
+	{LayerROZ, "ROZ"},
+	{LayerWindow, "window"},
 }
 
 // diagnosticsScreen 是 S7。只讀，唯一會動到 machine 之外的東西是圖層遮罩，
@@ -72,7 +73,7 @@ func (d *diagnosticsScreen) handle(u *UI, ev Event) bool {
 		case ActConfirm:
 			mask := u.layerMask() ^ layerBits[d.focus].bit
 			u.emit(SetLayerMask{Mask: mask})
-			u.toast(textDiagMaskWarning, SeverityWarn)
+			u.toast(u.s.DiagMaskWarning, SeverityWarn)
 			return true
 		case ActCancel:
 			u.pop()
@@ -84,32 +85,32 @@ func (d *diagnosticsScreen) handle(u *UI, ev Event) bool {
 
 func (d *diagnosticsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	m := u.metrics
-	top, _ := page{title: textDiagTitle, back: true, status: textDiagLayerNote}.draw(u, c)
+	top, _ := page{title: u.s.DiagTitle, back: true, status: u.s.DiagLayerNote}.draw(u, c)
 	facts := u.diagnostics(snap)
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
 
 	left := []struct{ label, value string }{
-		{textDiagFrame, group(facts.Frame)},
-		{textDiagM68K, group(facts.M68K)},
-		{textDiagM65C02, group(facts.M65C02)},
-		{textDiagIRQ7, group(facts.IRQ7)},
-		{textDiagIRQ45, fmt.Sprintf("%s / %s", group(facts.IRQ4), group(facts.IRQ5))},
-		{textDiagClash, fmt.Sprintf("%d", facts.SoundClash)},
+		{u.s.DiagFrame, group(facts.Frame)},
+		{u.s.DiagM68K, group(facts.M68K)},
+		{u.s.DiagM65C02, group(facts.M65C02)},
+		{u.s.DiagIRQ7, group(facts.IRQ7)},
+		{u.s.DiagIRQ45, fmt.Sprintf("%s / %s", group(facts.IRQ4), group(facts.IRQ5))},
+		{u.s.DiagClash, fmt.Sprintf("%d", facts.SoundClash)},
 	}
 	right := []struct{ label, value string }{
-		{textHaltIPL, shortHash(facts.IPL)},
-		{textHaltCartridge, shortHash(facts.Cartridge)},
-		{textDiagFrontend, fmt.Sprintf("%s / %s", facts.Frontend, facts.Platform)},
-		{textDiagCGO, cgoLabel(facts.CGOEnabled)},
+		{u.s.HaltIPL, shortHash(facts.IPL)},
+		{u.s.HaltCartridge, shortHash(facts.Cartridge)},
+		{u.s.DiagFrontend, fmt.Sprintf("%s / %s", facts.Frontend, facts.Platform)},
+		{u.s.DiagCGO, u.cgoLabel(facts.CGOEnabled)},
 	}
 	y := top
 	for index, fact := range left {
-		c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, fact.label)
-		c.rowText(x+width/4, y, m.RowHeight, m.SmallSize, u.theme.Text, fact.value)
+		c.rowTextFit(x, y, m.RowHeight, m.SmallSize, width/4-m.Grid, u.theme.TextDim, fact.label)
+		c.rowTextFit(x+width/4, y, m.RowHeight, m.SmallSize, width/4-m.Grid, u.theme.Text, fact.value)
 		if index < len(right) {
-			c.rowText(x+width/2, y, m.RowHeight, m.SmallSize, u.theme.TextDim, right[index].label)
-			c.rowText(x+width*3/4, y, m.RowHeight, m.SmallSize, u.theme.Text, right[index].value)
+			c.rowTextFit(x+width/2, y, m.RowHeight, m.SmallSize, width/4-m.Grid, u.theme.TextDim, right[index].label)
+			c.rowTextFit(x+width*3/4, y, m.RowHeight, m.SmallSize, width/4-m.Grid, u.theme.Text, right[index].value)
 		}
 		y += m.RowHeight
 	}
@@ -117,7 +118,7 @@ func (d *diagnosticsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	y += m.SectionGap
 	c.rect(x, y, width, 1, u.theme.Border)
 	y += 1 + m.Grid
-	c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, textDiagLayerMask)
+	c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.DiagLayerMask)
 	mask := u.layerMask()
 	cursor := x + width/4
 	for index, layer := range layerBits {
@@ -132,16 +133,21 @@ func (d *diagnosticsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 			c.rect(cursor-m.Grid/2, y, w, m.RowHeight, u.theme.Focus)
 			colour = u.theme.FocusText
 		}
+		if cursor+c.font.Measure(text, m.SmallSize) > x+width {
+			// 一列排不下就換行，不要畫出面板之外。
+			cursor = x + width/4
+			y += m.RowHeight
+		}
 		c.rowText(cursor, y, m.RowHeight, m.SmallSize, colour, text)
 		cursor += c.font.Measure(text, m.SmallSize) + m.SectionGap
 	}
 }
 
-func cgoLabel(enabled bool) string {
+func (u *UI) cgoLabel(enabled bool) string {
 	if enabled {
-		return textCGOEnabled
+		return u.s.CGOEnabled
 	}
-	return textCGODisabled
+	return u.s.CGODisabled
 }
 
 func (u *UI) diagnostics(snap Snapshot) DiagnosticsFacts {

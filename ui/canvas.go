@@ -49,6 +49,10 @@ type canvas struct {
 	metrics Metrics
 	font    *Font
 	theme   Theme
+
+	// textRightEdge 是這一幀所有文字畫到的最右邊（設計單位）。翻譯之後的字串
+	// 比原文長是常態，這個值讓測試能斷言「沒有文字掉出畫面」。
+	textRightEdge int
 }
 
 func (c *canvas) width() int  { return c.dst.Bounds().Dx() / c.scale }
@@ -74,7 +78,37 @@ func (c *canvas) text(x, y, size int, col rgba, s string) int {
 	for _, r := range s {
 		pen += c.font.blit(c.dst, pen, top, r, pixel, col)
 	}
+	if right := pen / c.scale; right > c.textRightEdge {
+		c.textRightEdge = right
+	}
 	return (pen - x*c.scale) / c.scale
+}
+
+// textFit 在 limit 寬度內畫字，放不下就截斷並補省略號。翻譯之後的字串比原文長
+// 是常態，讓它畫出容器之外會蓋到別的欄位；截斷至少還看得出前半段。
+func (c *canvas) textFit(x, y, size, limit int, col rgba, s string) int {
+	if limit <= 0 {
+		return 0
+	}
+	if c.font.Measure(s, size) <= limit {
+		return c.text(x, y, size, col, s)
+	}
+	ellipsis := c.font.Measure("…", size)
+	width, cut := 0, 0
+	for index, r := range s {
+		advance := c.font.Advance(r) * size
+		if width+advance+ellipsis > limit {
+			break
+		}
+		width += advance
+		cut = index + len(string(r))
+	}
+	return c.text(x, y, size, col, s[:cut]+"…")
+}
+
+// rowTextFit 是「在 h 高的列裡垂直置中，並限制寬度」。
+func (c *canvas) rowTextFit(x, y, h, size, limit int, col rgba, s string) {
+	c.textFit(x, y+(h-c.font.Height(size))/2, size, limit, col, s)
 }
 
 // textRight 讓一行字的右緣落在 x。
@@ -82,8 +116,12 @@ func (c *canvas) textRight(x, y, size int, col rgba, s string) {
 	c.text(x-c.font.Measure(s, size), y, size, col, s)
 }
 
-// textCenter 讓一行字水平置中於 [x, x+w)。
+// textCenter 讓一行字水平置中於 [x, x+w)，太長就截斷。
 func (c *canvas) textCenter(x, y, w, size int, col rgba, s string) {
+	if c.font.Measure(s, size) > w {
+		c.textFit(x, y, size, w, col, s)
+		return
+	}
 	c.text(x+(w-c.font.Measure(s, size))/2, y, size, col, s)
 }
 

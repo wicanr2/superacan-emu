@@ -105,30 +105,31 @@ func render(t *testing.T, key string, u *UI, surface Surface) string {
 // 記錄於 docs/verify-ui.md。畫面一改動這些值就會變，那正是它們的用途：
 // 版面的變更必須是刻意的。
 var wantHashes = map[string]string{
-	"S3/960x720/compact":       "70d4a1ec0e40adcea37cd8d342527b9c150b21073f681f9b84d253a64212a174",
-	"S3/1280x720/touch":        "4e58e94ea95d3f6feed1a9fca0126a3fe03f22701dfdf901e1b8562ac83cca4e",
-	"S3+focus/960x720/compact": "5f42e13ff05fd76ce48f7f8fe20af6fd2673203d543acbe71787abd73c6fa5c8",
-	"S4/960x720/compact":       "8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc",
-	"S4/1280x720/touch":        "ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0",
-	"D1/960x720/compact":       "e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6",
-	"S0/960x720/compact":       "84e731b98b74525e2414a15c7df179c9b787ce415a11b8a12a1bc55e16a1f65a",
-	"S0/1280x720/touch":        "fa17df07234c345ca9edeafef255dbe9c1ad6094d7b3588e2b18c3fe21794446",
-	"S0ready/960x720/compact":  "8ca7a1e7fbfb1a66eaedae4c2d31498a08da1f6915e698f6e42048b74c092148",
-	"S0.1/960x720/compact":     "90adda11beebb2cb6fb7529b7177f8522a8b42b372ba37ca0fc94cc1deef90bf",
-	"S1/960x720/compact":       "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
-	"S1/1280x720/touch":        "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
-	"S8/960x720/compact":       "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
-	"S5/960x720/compact":          "1f44c225eb1601b0404469739e3bc077bc976771fc099a03cec1b8c149129520",
-	"S5.1/960x720/compact":        "1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62",
-	"S5.2/960x720/compact":        "2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8",
+	"S3/960x720/compact":           "70d4a1ec0e40adcea37cd8d342527b9c150b21073f681f9b84d253a64212a174",
+	"S3/1280x720/touch":            "4e58e94ea95d3f6feed1a9fca0126a3fe03f22701dfdf901e1b8562ac83cca4e",
+	"S3+focus/960x720/compact":     "5f42e13ff05fd76ce48f7f8fe20af6fd2673203d543acbe71787abd73c6fa5c8",
+	"S4/960x720/compact":           "8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc",
+	"S4/1280x720/touch":            "ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0",
+	"D1/960x720/compact":           "e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6",
+	"S0/960x720/compact":           "84e731b98b74525e2414a15c7df179c9b787ce415a11b8a12a1bc55e16a1f65a",
+	"S0/1280x720/touch":            "fa17df07234c345ca9edeafef255dbe9c1ad6094d7b3588e2b18c3fe21794446",
+	"S0ready/960x720/compact":      "8ca7a1e7fbfb1a66eaedae4c2d31498a08da1f6915e698f6e42048b74c092148",
+	"S0.1/960x720/compact":         "90adda11beebb2cb6fb7529b7177f8522a8b42b372ba37ca0fc94cc1deef90bf",
+	"S1/960x720/compact":           "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
+	"S1/1280x720/touch":            "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
+	"S8/960x720/compact":           "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
+	"S5/960x720/compact":           "4b36e9aaae6f6f336b271a0da4d4226503baa72dfa3c08325c3bf496ccfadff8",
+	"S5.1/960x720/compact":         "1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62",
+	"S5.2/960x720/compact":         "2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8",
 	"S5.2conflict/960x720/compact": "107ecbc854d803c375197eec83f6c68097dd35778cc307b06767ad6b07f0ddbf",
-	"S5.3/960x720/compact":        "0e30efc0f5565c5a01d61f61d574795ff0afb17337a3890958668ac38bb3c488",
-	"S5.4/960x720/compact":        "5930228c39dd004be79506b4c391b4a64bb55d783d3847df4d4879365cbb1b82",
-	"S7/960x720/compact":          "4fac08f514b33776b9447e0256384f30177655357c835640ec134745541c5f13",
-	"S6.1/960x720/compact":        "69aae92d12377cd4551dc95fee6db21c94e866ad26ff30cf482b8da05f8cda89",
-	"S6.2/960x720/compact":        "2a9a1b920de23e41add79372579ba9de3123e4f2f6e3b3a04690c5c33326c23c",
-	"S2cheat/960x720/compact":     "00c5f434b6f9d487dc216dcb6e1b2880749249992c49747ed83b03a2e165aec0",
-	"S9/960x720/compact":       "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
+	"S5.3/960x720/compact":         "0e30efc0f5565c5a01d61f61d574795ff0afb17337a3890958668ac38bb3c488",
+	"S5.4/960x720/compact":         "5930228c39dd004be79506b4c391b4a64bb55d783d3847df4d4879365cbb1b82",
+	"S7/960x720/compact":           "4fac08f514b33776b9447e0256384f30177655357c835640ec134745541c5f13",
+	"S6.1/960x720/compact":         "69aae92d12377cd4551dc95fee6db21c94e866ad26ff30cf482b8da05f8cda89",
+	"S6.2/960x720/compact":         "2a9a1b920de23e41add79372579ba9de3123e4f2f6e3b3a04690c5c33326c23c",
+	"S2cheat/960x720/compact":      "00c5f434b6f9d487dc216dcb6e1b2880749249992c49747ed83b03a2e165aec0",
+	"S5.5/960x720/compact":         "bd03a3f823ad79bc27ddeca87beb956036579343b2e1d7592d971a4b79d6ce0d",
+	"S9/960x720/compact":           "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
 }
 
 // dumpDir 由 ACAN_UI_DUMP 指定；設了就把每張畫面寫成 PNG，供人眼檢查版面。
@@ -328,7 +329,7 @@ func TestDisabledRowExplainsItself(t *testing.T) {
 	if len(u.toasts) != 1 {
 		t.Fatalf("停用項應以 toast 說明原因，得到 %+v", u.toasts)
 	}
-	want := fmt.Sprintf(textNotYet, rows[index].reason)
+	want := fmt.Sprintf(u.s.NotYet, rows[index].reason)
 	if u.toasts[0].text != want {
 		t.Fatalf("toast=%q，want %q", u.toasts[0].text, want)
 	}

@@ -73,9 +73,9 @@ type Cheat struct {
 func (Cheat) isIntent() {}
 
 var (
-	cheatWidths   = []string{"8-bit", "16-bit", "32-bit"}
+	cheatWidths    = []string{"8-bit", "16-bit", "32-bit"}
 	cheatWidthBits = []uint8{8, 16, 32}
-	cheatCompares = []string{"等於", "不等於", "大於前值", "小於前值", "變動", "未變"}
+	cheatCompares  = []string{"等於", "不等於", "大於前值", "小於前值", "變動", "未變"}
 )
 
 // cheatSearchScreen 是 S6.1。
@@ -92,19 +92,19 @@ func (s *cheatSearchScreen) id() string { return "S6.1" }
 
 func (s *cheatSearchScreen) rows(u *UI) []optionRow {
 	return []optionRow{
-		{kind: optionReadOnly, label: textCheatRange, text: textCheatRangeValue},
-		{kind: optionChoice, label: textCheatWidth, choices: cheatWidths, index: &s.width},
-		{kind: optionChoice, label: textCheatCompare, choices: cheatCompares, index: &s.compare},
-		{kind: optionReadOnly, label: textCheatValue, text: s.valueDisplay()},
+		{kind: optionReadOnly, label: u.s.CheatRange, text: u.s.CheatRangeValue},
+		{kind: optionChoice, label: u.s.CheatWidth, choices: cheatWidths, index: &s.width},
+		{kind: optionChoice, label: u.s.CheatCompare, choices: cheatCompares, index: &s.compare},
+		{kind: optionReadOnly, label: u.s.CheatValue, text: s.valueDisplay(u.s)},
 	}
 }
 
-func (s *cheatSearchScreen) valueDisplay() string {
+func (s *cheatSearchScreen) valueDisplay(strings Strings) string {
 	if s.editing {
 		return s.value + "▏"
 	}
 	if s.value == "" {
-		return textNone
+		return strings.None
 	}
 	return s.value
 }
@@ -221,7 +221,7 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	state := u.cheats()
 	// 標題列不再重複標示：常駐的 CHEAT 標記已經在同一個角落，
 	// 兩個講同一件事只會互相蓋掉。
-	top, _ := page{title: textCheatTitle, back: true, status: textCheatTruncNote}.draw(u, c)
+	top, _ := page{title: u.s.CheatTitle, back: true, status: u.s.CheatTruncNote}.draw(u, c)
 
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
@@ -229,7 +229,7 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	y := drawOptionRows(u, c, x, top, width, rows, s.focus)
 	y += m.Grid
 
-	buttons := []string{textCheatNewSearch, textCheatRefine, textCheatClear}
+	buttons := []string{u.s.CheatNewSearch, u.s.CheatRefine, u.s.CheatClear}
 	buttonW := width / 4
 	for index, label := range buttons {
 		u.drawButton(c, x+index*(buttonW+m.Grid), y, buttonW, m.RowHeight, label,
@@ -237,9 +237,9 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	}
 	y += m.RowHeight + m.SectionGap
 
-	summary := fmt.Sprintf(textCheatCandidates, state.Total, len(state.Candidates))
+	summary := fmt.Sprintf(u.s.CheatCandidates, state.Total, len(state.Candidates))
 	if state.Started {
-		summary += fmt.Sprintf(textCheatRefines, state.Refines)
+		summary += fmt.Sprintf(u.s.CheatRefines, state.Refines)
 	}
 	c.rowText(x, y, m.RowHeight, m.SmallSize, u.theme.TextDim, summary)
 	y += m.RowHeight
@@ -253,7 +253,7 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 			fmt.Sprintf("$%06X", candidate.Address))
 		c.rowText(x+width/4, y, m.RowHeight, m.SmallSize, colour, fmt.Sprintf("%d", candidate.Value))
 		c.rowText(x+width/2, y, m.RowHeight, m.SmallSize, colour,
-			fmt.Sprintf(textCheatPrevious, candidate.Previous))
+			fmt.Sprintf(u.s.CheatPrevious, candidate.Previous))
 		y += m.RowHeight
 	}
 }
@@ -279,7 +279,7 @@ func (s *cheatListScreen) handle(u *UI, ev Event) bool {
 		case ActConfirm:
 			if s.focus < len(state.Entries) {
 				u.emit(Cheat{Command: CheatToggleLock, Index: s.focus})
-				u.toast(textCheatEvidenceWarning, SeverityWarn)
+				u.toast(u.s.CheatEvidenceWarning, SeverityWarn)
 			}
 			return true
 		case ActDelete:
@@ -305,16 +305,16 @@ func (s *cheatListScreen) handle(u *UI, ev Event) bool {
 func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	state := u.cheats()
-	top, _ := page{title: textCheatTitle, back: true, status: textCheatLockNote}.draw(u, c)
+	top, _ := page{title: u.s.CheatTitle, back: true, status: u.s.CheatLockNote}.draw(u, c)
 
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
-	enabled := "[ ] " + textCheatEnable
+	enabled := "[ ] " + u.s.CheatEnable
 	if state.Enabled {
-		enabled = "[■] " + textCheatEnable
+		enabled = "[■] " + u.s.CheatEnable
 	}
 	c.rowText(x, top, m.RowHeight, m.BodySize, u.theme.Text, enabled)
-	c.rowText(x+width/3, top, m.RowHeight, m.SmallSize, u.theme.TextDim, textCheatEnableHint)
+	c.rowText(x+width/3, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.CheatEnableHint)
 	y := top + m.RowHeight + m.Grid
 	c.rect(x, y, width, 1, u.theme.Border)
 	y += 1 + m.Grid
@@ -323,16 +323,16 @@ func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		offset int
 		label  string
 	}{
-		{m.RowPadX, textCheatColumnLock}, {width / 8, textCheatColumnName},
-		{width / 2, textCheatColumnAddress}, {width * 5 / 8, textCheatColumnWidth},
-		{width * 3 / 4, textCheatColumnValue}, {width * 7 / 8, textCheatColumnFormat},
+		{m.RowPadX, u.s.CheatColumnLock}, {width / 8, u.s.CheatColumnName},
+		{width / 2, u.s.CheatColumnAddress}, {width * 5 / 8, u.s.CheatColumnWidth},
+		{width * 3 / 4, u.s.CheatColumnValue}, {width * 7 / 8, u.s.CheatColumnFormat},
 	} {
 		c.rowText(x+column.offset, y, m.RowHeight, m.SmallSize, u.theme.TextDim, column.label)
 	}
 	y += m.RowHeight
 
 	if len(state.Entries) == 0 {
-		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, u.theme.TextOff, textCheatEmpty)
+		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, u.theme.TextOff, u.s.CheatEmpty)
 		return
 	}
 	for index, entry := range state.Entries {
@@ -366,7 +366,7 @@ func (u *UI) drawCheatMarker(c *canvas) {
 		return
 	}
 	m := u.metrics
-	label := textCheatMarker
+	label := u.s.CheatMarker
 	width := c.font.Measure(label, m.SmallSize) + m.RowPadX*2
 	c.rect(c.width()-width-m.Grid, m.Grid, width, m.RowHeight, u.theme.Warn)
 	c.textCenter(c.width()-width-m.Grid, m.Grid+(m.RowHeight-c.font.Height(m.SmallSize))/2,

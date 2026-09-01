@@ -90,6 +90,6 @@ func (u *UI) drawErrorBar(c *canvas) {
 	y := c.height() - height
 	c.rect(0, y, c.width(), height, u.theme.Error)
 	c.rowText(m.PanelPad, y, height, m.BodySize, u.theme.FocusText, u.errorText)
-	label := textDismissError
+	label := u.s.DismissError
 	c.rowText(c.width()-m.PanelPad-c.font.Measure(label, m.SmallSize), y, height, m.SmallSize, u.theme.FocusText, label)
 }

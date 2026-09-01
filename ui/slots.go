@@ -82,30 +82,30 @@ func (s *slotsScreen) activate(u *UI) {
 	if s.mode == slotModeSave {
 		if info.Present {
 			u.modal = &confirm{
-				title:  fmt.Sprintf(textOverwriteAsk, slot),
-				body:   fmt.Sprintf(textOverwriteWhy, slot, info.Stamp, info.Frame),
-				accept: textOverwrite,
+				title:  fmt.Sprintf(u.s.OverwriteAsk, slot),
+				body:   fmt.Sprintf(u.s.OverwriteWhy, slot, info.Stamp, info.Frame),
+				accept: u.s.Overwrite,
 				onYes: func(u *UI) {
 					u.emit(SaveState{Slot: slot})
-					u.toast(fmt.Sprintf(textSaved, slot), SeverityInfo)
+					u.toast(fmt.Sprintf(u.s.Saved, slot), SeverityInfo)
 					u.pop()
 				},
 			}
 			return
 		}
 		u.emit(SaveState{Slot: slot})
-		u.toast(fmt.Sprintf(textSaved, slot), SeverityInfo)
+		u.toast(fmt.Sprintf(u.s.Saved, slot), SeverityInfo)
 		u.pop()
 		return
 	}
 	switch {
 	case info.Rejected:
-		u.fail(fmt.Sprintf(textSlotRejected, slot, info.Reason))
+		u.fail(fmt.Sprintf(u.s.SlotRejected, slot, info.Reason))
 	case !info.Present:
-		u.toast(fmt.Sprintf(textSlotEmpty, slot), SeverityWarn)
+		u.toast(fmt.Sprintf(u.s.SlotEmpty, slot), SeverityWarn)
 	default:
 		u.emit(LoadState{Slot: slot})
-		u.toast(fmt.Sprintf(textLoaded, slot), SeverityInfo)
+		u.toast(fmt.Sprintf(u.s.Loaded, slot), SeverityInfo)
 		u.Close()
 	}
 }
@@ -114,16 +114,16 @@ func (s *slotsScreen) remove(u *UI) {
 	slot := s.focus
 	info := u.slotInfo(slot)
 	if !info.Present && !info.Rejected {
-		u.toast(fmt.Sprintf(textSlotEmpty, slot), SeverityWarn)
+		u.toast(fmt.Sprintf(u.s.SlotEmpty, slot), SeverityWarn)
 		return
 	}
 	u.modal = &confirm{
-		title:  fmt.Sprintf(textDeleteAsk, slot),
-		body:   fmt.Sprintf(textDeleteWhy, slot, info.Stamp),
-		accept: textDelete,
+		title:  fmt.Sprintf(u.s.DeleteAsk, slot),
+		body:   fmt.Sprintf(u.s.DeleteWhy, slot, info.Stamp),
+		accept: u.s.Delete,
 		onYes: func(u *UI) {
 			u.emit(DeleteState{Slot: slot})
-			u.toast(fmt.Sprintf(textDeleted, slot), SeverityInfo)
+			u.toast(fmt.Sprintf(u.s.Deleted, slot), SeverityInfo)
 		},
 	}
 }
@@ -134,11 +134,11 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	u.fillPage(c)
 
 	// 標題列
-	c.rowText(m.PanelPad, 0, m.TitleBar, m.BodySize, theme.TextDim, textBack)
-	title := textSlotsTitle
+	c.rowText(m.PanelPad, 0, m.TitleBar, m.BodySize, theme.TextDim, u.s.Back)
+	title := u.s.SlotsTitle
 	if snap != nil {
 		if name, _, _ := snap.Cartridge(); name != "" {
-			title = textSlotsTitle + " — " + name
+			title = u.s.SlotsTitle + " — " + name
 		}
 	}
 	c.textCenter(0, (m.TitleBar-c.font.Height(m.TitleSize))/2, c.width(), m.TitleSize, theme.Text, title)
@@ -167,13 +167,13 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 		case info.Rejected:
 			c.textCenter(x, y+thumbH/2, thumbW, m.BodySize, theme.Error, "✖ "+info.Reason)
 		case !info.Present:
-			c.textCenter(x, y+thumbH/2, thumbW, m.BodySize, theme.TextOff, textEmptySlot)
+			c.textCenter(x, y+thumbH/2, thumbW, m.BodySize, theme.TextOff, u.s.EmptySlot)
 		default:
 			c.blitScaled(x, y, thumbW, thumbH, info.Thumb)
 		}
 		c.border(x, y, thumbW, thumbH, theme.Border)
 
-		label := fmt.Sprintf("%s%d", textSlotPrefix, slot)
+		label := fmt.Sprintf("%s%d", u.s.SlotPrefix, slot)
 		mark, markColor := "", theme.TextDim
 		switch {
 		case info.Rejected:
@@ -200,13 +200,13 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 		footerY -= m.FooterBar
 	}
 	c.rect(0, footerY, c.width(), 1, theme.Border)
-	c.rowText(m.PanelPad, footerY, m.FooterBar, m.BodySize, theme.TextDim, textSlotLegend)
-	c.rowText(m.PanelPad, footerY+m.FooterBar, m.FooterBar, m.BodySize, theme.TextDim, textSlotKeys)
+	c.rowText(m.PanelPad, footerY, m.FooterBar, m.BodySize, theme.TextDim, u.s.SlotLegend)
+	c.rowText(m.PanelPad, footerY+m.FooterBar, m.FooterBar, m.BodySize, theme.TextDim, u.s.SlotKeys)
 }
 
 func (u *UI) drawModeTabs(c *canvas, barHeight int, mode slotMode) {
 	m := u.metrics
-	labels := [2]string{textModeSave, textModeLoad}
+	labels := [2]string{u.s.ModeSave, u.s.ModeLoad}
 	width := 0
 	for _, label := range labels {
 		width = max(width, c.font.Measure(label, m.BodySize)+m.RowPadX*2)

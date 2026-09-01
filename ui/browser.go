@@ -47,11 +47,11 @@ func (b *browserScreen) handle(u *UI, ev Event) bool {
 			}
 			entry := entries[b.focus]
 			if entry.Missing {
-				u.fail(textMissingFile)
+				u.fail(u.s.MissingFile)
 				return true
 			}
 			if !u.firmwareReady() {
-				u.toast(fmt.Sprintf(textNotYet, textFirmwareIncompl), SeverityWarn)
+				u.toast(fmt.Sprintf(u.s.NotYet, u.s.FirmwareIncompl), SeverityWarn)
 				return true
 			}
 			u.emit(LoadCartridge{Path: entry.Path})
@@ -69,14 +69,14 @@ func (b *browserScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	}
 	entries := b.entries(u)
 	top, height := page{
-		title: textBrowserTitle, back: true, right: directory,
-		status: textBrowserKeys,
+		title: u.s.BrowserTitle, back: true, right: directory,
+		status: u.s.BrowserKeys,
 	}.draw(u, c)
 
 	listWidth := c.width()/2 - m.PanelPad
 	x := m.PanelPad
 	if len(entries) == 0 {
-		c.rowText(x, top, m.RowHeight, m.BodySize, u.theme.TextDim, textBrowserEmpty)
+		c.rowText(x, top, m.RowHeight, m.BodySize, u.theme.TextDim, u.s.BrowserEmpty)
 		return
 	}
 
@@ -119,26 +119,26 @@ func (b *browserScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	c.rect(detailX, dy, detailW, previewH, u.theme.PanelAlt)
 	c.border(detailX, dy, detailW, previewH, u.theme.Border)
 	c.textCenter(detailX, dy+(previewH-c.font.Height(m.SmallSize))/2, detailW, m.SmallSize,
-		u.theme.TextOff, textBrowserNoPreview)
+		u.theme.TextOff, u.s.BrowserNoPreview)
 	dy += previewH + m.Grid
 
-	compat := textCompatUnverified
+	compat := u.s.CompatUnverified
 	compatColour := u.theme.Warn
 	if entry.Verified {
-		compat, compatColour = textCompatVerified, u.theme.OK
+		compat, compatColour = u.s.CompatVerified, u.theme.OK
 	}
-	battery := textNone
+	battery := u.s.None
 	if entry.Battery > 0 {
 		battery = groupInt(entry.Battery)
 	}
-	saves := textNone
+	saves := u.s.None
 	if len(entry.SaveSlots) > 0 {
 		saves = ""
 		for i, slot := range entry.SaveSlots {
 			if i > 0 {
 				saves += "、"
 			}
-			saves += fmt.Sprintf("%s%d", textSlotPrefix, slot)
+			saves += fmt.Sprintf("%s%d", u.s.SlotPrefix, slot)
 		}
 	}
 	for _, field := range []struct {
@@ -146,12 +146,12 @@ func (b *browserScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		value  string
 		colour rgba
 	}{
-		{textFieldSize, groupInt(entry.Size), u.theme.Text},
-		{textFieldKind, entry.Kind, u.theme.Text},
-		{textFieldSHA, shortHash(entry.SHA256), u.theme.TextDim},
-		{textFieldSaves, saves, u.theme.TextDim},
-		{textFieldBattery, battery, u.theme.TextDim},
-		{textFieldCompat, compat, compatColour},
+		{u.s.FieldSize, groupInt(entry.Size), u.theme.Text},
+		{u.s.FieldKind, entry.Kind, u.theme.Text},
+		{u.s.FieldSHA, shortHash(entry.SHA256), u.theme.TextDim},
+		{u.s.FieldSaves, saves, u.theme.TextDim},
+		{u.s.FieldBattery, battery, u.theme.TextDim},
+		{u.s.FieldCompat, compat, compatColour},
 	} {
 		c.rowText(detailX, dy, m.RowHeight, m.SmallSize, u.theme.TextDim, field.label)
 		c.rowText(detailX+m.SectionGap*3, dy, m.RowHeight, m.SmallSize, field.colour, field.value)

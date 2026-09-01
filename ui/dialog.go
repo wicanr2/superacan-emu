@@ -80,12 +80,12 @@ func (d *confirm) draw(u *UI, c *canvas) {
 	// 要往右移動才會碰到破壞性的那一個。
 	buttonY := cursor + m.Grid
 	buttonW := max(
-		c.font.Measure(textCancel, m.BodySize),
+		c.font.Measure(u.s.Cancel, m.BodySize),
 		c.font.Measure(d.accept, m.BodySize),
 	) + m.RowPadX*2
 	right := x + width - m.PanelPad
 	u.drawButton(c, right-buttonW, buttonY, buttonW, m.RowHeight, d.accept, d.focused == 1)
-	u.drawButton(c, right-buttonW*2-m.Grid, buttonY, buttonW, m.RowHeight, textCancel, d.focused == 0)
+	u.drawButton(c, right-buttonW*2-m.Grid, buttonY, buttonW, m.RowHeight, u.s.Cancel, d.focused == 0)
 }
 
 func (u *UI) drawButton(c *canvas, x, y, w, h int, label string, focused bool) {

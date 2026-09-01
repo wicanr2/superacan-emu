@@ -54,7 +54,7 @@ func handleMenu(u *UI, ev Event, focus *int, rows []menuRow) bool {
 		if e.Kind == ActConfirm && *focus < len(rows) {
 			row := rows[*focus]
 			if row.disabled {
-				u.toast(fmt.Sprintf(textNotYet, row.reason), SeverityWarn)
+				u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
 				return true
 			}
 			if row.action != nil {

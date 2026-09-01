@@ -10,15 +10,15 @@ func (s *settingsScreen) id() string { return "S5" }
 
 func (s *settingsScreen) rows(u *UI) []menuRow {
 	return []menuRow{
-		{label: textSettingsInput, chevron: true, action: func(u *UI) {
+		{label: u.s.SettingsInput, chevron: true, action: func(u *UI) {
 			u.push(&bindingScreen{})
 		}},
-		{label: textSettingsHotkeys, chevron: true, action: func(u *UI) {
+		{label: u.s.SettingsHotkeys, chevron: true, action: func(u *UI) {
 			u.push(&hotkeyScreen{})
 		}},
-		{label: textSettingsVideo, chevron: true, action: func(u *UI) { u.push(&videoScreen{}) }},
-		{label: textSettingsAudio, chevron: true, action: func(u *UI) { u.push(&audioScreen{}) }},
-		{label: textSettingsLanguage, chevron: true, disabled: true, reason: textStageLanguage},
+		{label: u.s.SettingsVideo, chevron: true, action: func(u *UI) { u.push(&videoScreen{}) }},
+		{label: u.s.SettingsAudio, chevron: true, action: func(u *UI) { u.push(&audioScreen{}) }},
+		{label: u.s.SettingsLanguage, chevron: true, action: func(u *UI) { u.push(&languageScreen{}) }},
 	}
 }
 
@@ -35,7 +35,7 @@ func (s *settingsScreen) handle(u *UI, ev Event) bool {
 
 func (s *settingsScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
-	top, _ := page{title: textSettingsTitle, back: true}.draw(u, c)
+	top, _ := page{title: u.s.SettingsTitle, back: true}.draw(u, c)
 	drawMenuRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, s.rows(u), s.focus)
 }
 
@@ -52,7 +52,7 @@ type bindingRow struct {
 // 但使用者一定要看得到，否則會以為某個按鈕壞了。
 //
 // 標記用「※」而不是「⚠」：嵌入的字型沒有 U+26A0，會畫成替換字元。
-func conflictsIn(rows []bindingRow, pick func(bindingRow) Binding) map[int]string {
+func conflictsIn(strings Strings, rows []bindingRow, pick func(bindingRow) Binding) map[int]string {
 	seen := make(map[[2]interface{}][]int)
 	for index, row := range rows {
 		binding := pick(row)
@@ -72,7 +72,7 @@ func conflictsIn(rows []bindingRow, pick func(bindingRow) Binding) map[int]strin
 				if other == index {
 					continue
 				}
-				out[index] = fmt.Sprintf(textConflictWith, rows[other].label)
+				out[index] = fmt.Sprintf(strings.ConflictWith, rows[other].label)
 				break
 			}
 		}
@@ -192,14 +192,14 @@ func (b *bindingScreen) handle(u *UI, ev Event) bool {
 func (b *bindingScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	rows := b.rows(u)
-	keyboardConflicts := conflictsIn(rows, func(r bindingRow) Binding { return r.keyboard })
-	gamepadConflicts := conflictsIn(rows, func(r bindingRow) Binding { return r.gamepad })
+	keyboardConflicts := conflictsIn(u.s, rows, func(r bindingRow) Binding { return r.keyboard })
+	gamepadConflicts := conflictsIn(u.s, rows, func(r bindingRow) Binding { return r.gamepad })
 
 	top, _ := page{
-		title:  textInputTitle,
+		title:  u.s.InputTitle,
 		back:   true,
-		right:  fmt.Sprintf("P%d · %s", b.player+1, deviceLabel(b.gamepad)),
-		status: textInputHelp,
+		right:  fmt.Sprintf("P%d · %s", b.player+1, deviceLabel(u.s, b.gamepad)),
+		status: u.s.InputHelp,
 	}.draw(u, c)
 
 	x := m.PanelPad
@@ -208,22 +208,22 @@ func (b *bindingScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	columnGamepad := x + width/2
 	columnNote := x + width*3/4
 
-	c.rowText(x+m.RowPadX, top, m.RowHeight, m.SmallSize, u.theme.TextDim, textColumnButton)
-	c.rowText(columnKeyboard, top, m.RowHeight, m.SmallSize, u.theme.TextDim, textColumnKeyboard)
-	c.rowText(columnGamepad, top, m.RowHeight, m.SmallSize, u.theme.TextDim, textColumnGamepad)
+	c.rowText(x+m.RowPadX, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnButton)
+	c.rowText(columnKeyboard, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnKeyboard)
+	c.rowText(columnGamepad, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnGamepad)
 	y := top + m.RowHeight
 
 	for index, row := range rows {
 		colour := u.focusRow(c, x, y, width, index == b.focus)
 		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, row.label)
 
-		keyboardText := bindingText(row.keyboard)
-		gamepadText := bindingText(row.gamepad)
+		keyboardText := bindingText(u.s, row.keyboard)
+		gamepadText := bindingText(u.s, row.gamepad)
 		if index == b.focus && b.waiting {
 			if b.gamepad {
-				gamepadText = textPressInput
+				gamepadText = u.s.PressInput
 			} else {
-				keyboardText = textPressInput
+				keyboardText = u.s.PressInput
 			}
 		}
 		c.rowText(columnKeyboard, y, m.RowHeight, m.SmallSize, colour, keyboardText)
@@ -311,28 +311,28 @@ func (h *hotkeyScreen) handle(u *UI, ev Event) bool {
 func (h *hotkeyScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	rows := h.rows(u)
-	conflicts := conflictsIn(rows, func(r bindingRow) Binding { return r.keyboard })
-	status := textHotkeyHelp
+	conflicts := conflictsIn(u.s, rows, func(r bindingRow) Binding { return r.keyboard })
+	status := u.s.HotkeyHelp
 	if len(conflicts) > 0 {
-		status = textHotkeyConflict
+		status = u.s.HotkeyConflict
 	}
-	top, _ := page{title: textHotkeyTitle, back: true, status: status}.draw(u, c)
+	top, _ := page{title: u.s.HotkeyTitle, back: true, status: status}.draw(u, c)
 
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
 	columnKeyboard := x + width/2
 	columnNote := x + width*3/4
 
-	c.rowText(x+m.RowPadX, top, m.RowHeight, m.SmallSize, u.theme.TextDim, textColumnAction)
-	c.rowText(columnKeyboard, top, m.RowHeight, m.SmallSize, u.theme.TextDim, textColumnKeyboard)
+	c.rowText(x+m.RowPadX, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnAction)
+	c.rowText(columnKeyboard, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnKeyboard)
 	y := top + m.RowHeight
 
 	for index, row := range rows {
 		colour := u.focusRow(c, x, y, width, index == h.focus)
 		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, row.label)
-		text := bindingText(row.keyboard)
+		text := bindingText(u.s, row.keyboard)
 		if index == h.focus && h.waiting {
-			text = textPressInput
+			text = u.s.PressInput
 		}
 		c.rowText(columnKeyboard, y, m.RowHeight, m.SmallSize, colour, text)
 		if note := conflicts[index]; note != "" {
@@ -342,9 +342,9 @@ func (h *hotkeyScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	}
 }
 
-func bindingText(binding Binding) string {
+func bindingText(strings Strings, binding Binding) string {
 	if binding.Empty() {
-		return textNone
+		return strings.None
 	}
 	if binding.Label != "" {
 		return binding.Label
@@ -352,9 +352,9 @@ func bindingText(binding Binding) string {
 	return fmt.Sprintf("#%d", binding.Code)
 }
 
-func deviceLabel(gamepad bool) string {
+func deviceLabel(strings Strings, gamepad bool) string {
 	if gamepad {
-		return textColumnGamepad
+		return strings.ColumnGamepad
 	}
-	return textColumnKeyboard
+	return strings.ColumnKeyboard
 }

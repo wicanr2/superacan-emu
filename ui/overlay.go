@@ -10,41 +10,41 @@ type overlayScreen struct{ focus int }
 func (s *overlayScreen) id() string { return "S3" }
 
 func (s *overlayScreen) rows(u *UI) []menuRow {
-	slot := fmt.Sprintf("%s%d", textSlotPrefix, u.config.Interface.SaveSlot)
+	slot := fmt.Sprintf("%s%d", u.s.SlotPrefix, u.config.Interface.SaveSlot)
 	return []menuRow{
-		{label: textResume, action: func(u *UI) { u.Close() }},
-		{label: textSaveState, value: slot, chevron: true, action: func(u *UI) {
+		{label: u.s.Resume, action: func(u *UI) { u.Close() }},
+		{label: u.s.SaveState, value: slot, chevron: true, action: func(u *UI) {
 			u.push(&slotsScreen{mode: slotModeSave, focus: u.config.Interface.SaveSlot})
 		}},
-		{label: textLoadState, value: slot, chevron: true, action: func(u *UI) {
+		{label: u.s.LoadState, value: slot, chevron: true, action: func(u *UI) {
 			u.push(&slotsScreen{mode: slotModeLoad, focus: u.config.Interface.SaveSlot})
 		}},
-		{label: textResetMachine, chevron: true, action: func(u *UI) {
+		{label: u.s.ResetMachine, chevron: true, action: func(u *UI) {
 			u.push(&resetScreen{})
 		}},
-		{label: textCheats, chevron: true, action: func(u *UI) { u.push(&cheatListScreen{}) }},
-		{label: textSettings, chevron: true, action: func(u *UI) { u.push(&settingsScreen{}) }},
-		{label: textDiagnostics, chevron: true, action: func(u *UI) { u.push(&diagnosticsScreen{}) }},
-		{label: textScreenshot, hotkey: textScreenshotHK, action: func(u *UI) {
+		{label: u.s.Cheats, chevron: true, action: func(u *UI) { u.push(&cheatListScreen{}) }},
+		{label: u.s.Settings, chevron: true, action: func(u *UI) { u.push(&settingsScreen{}) }},
+		{label: u.s.Diagnostics, chevron: true, action: func(u *UI) { u.push(&diagnosticsScreen{}) }},
+		{label: u.s.Screenshot, hotkey: u.s.ScreenshotHK, action: func(u *UI) {
 			u.emit(Capture{Kind: CaptureScreenshot})
-			u.toast(textScreenshotSaved, SeverityInfo)
+			u.toast(u.s.ScreenshotSaved, SeverityInfo)
 		}},
-		{label: captureLabel(u), hotkey: textCaptureHK, value: captureValue(u), action: func(u *UI) {
+		{label: captureLabel(u), hotkey: u.s.CaptureHK, value: captureValue(u), action: func(u *UI) {
 			if u.diagnostics(nil).Recording {
 				u.emit(Capture{Kind: CaptureClipStop})
-				u.toast(textCaptureStopped, SeverityInfo)
+				u.toast(u.s.CaptureStopped, SeverityInfo)
 				return
 			}
 			u.emit(Capture{Kind: CaptureClipStart})
-			u.toast(textCaptureStarted, SeverityInfo)
+			u.toast(u.s.CaptureStarted, SeverityInfo)
 		}},
-		{label: textEjectCart, gapBefore: true, action: func(u *UI) {
+		{label: u.s.EjectCart, gapBefore: true, action: func(u *UI) {
 			u.emit(UnloadCartridge{})
 			u.Close()
 		}},
-		{label: textQuit, action: func(u *UI) {
+		{label: u.s.Quit, action: func(u *UI) {
 			u.modal = &confirm{
-				title: textQuitAsk, body: textQuitWhy, accept: textQuit,
+				title: u.s.QuitAsk, body: u.s.QuitWhy, accept: u.s.Quit,
 				onYes: func(u *UI) { u.emit(Quit{}) },
 			}
 		}},
@@ -81,7 +81,7 @@ func (s *overlayScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	c.rect(x, y, width, height, u.theme.Panel)
 	c.border(x, y, width, height, u.theme.Border)
 
-	title := textNoCartridge
+	title := u.s.NoCartridge
 	if snap != nil {
 		if name, _, _ := snap.Cartridge(); name != "" {
 			title = name
@@ -89,7 +89,7 @@ func (s *overlayScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	}
 	c.rowText(x+m.RowPadX, y, titleH, m.BodySize, u.theme.Text, title)
 	if u.paused {
-		c.textRight(x+width-m.RowPadX, y+(titleH-c.font.Height(m.BodySize))/2, m.BodySize, u.theme.TextDim, "‖ "+textPaused)
+		c.textRight(x+width-m.RowPadX, y+(titleH-c.font.Height(m.BodySize))/2, m.BodySize, u.theme.TextDim, "‖ "+u.s.Paused)
 	}
 	c.rect(x, y+titleH, width, 1, u.theme.Border)
 
@@ -100,9 +100,9 @@ func (s *overlayScreen) draw(u *UI, c *canvas, snap Snapshot) {
 
 func captureLabel(u *UI) string {
 	if u.diagnostics(nil).Recording {
-		return textCaptureStop
+		return u.s.CaptureStop
 	}
-	return textCaptureStart
+	return u.s.CaptureStart
 }
 
 func captureValue(u *UI) string {
@@ -110,7 +110,7 @@ func captureValue(u *UI) string {
 	if !facts.Recording {
 		return ""
 	}
-	return fmt.Sprintf(textCaptureFrames, facts.CaptureFrames)
+	return fmt.Sprintf(u.s.CaptureFrames, facts.CaptureFrames)
 }
 
 func statusLine(snap Snapshot) string {
@@ -143,11 +143,11 @@ func (s *resetScreen) id() string { return "S3.reset" }
 
 func (s *resetScreen) rows(u *UI) []menuRow {
 	return []menuRow{
-		{label: textSoftReset, action: func(u *UI) {
+		{label: u.s.SoftReset, action: func(u *UI) {
 			u.emit(Reset{Kind: ResetSoft})
 			u.Close()
 		}},
-		{label: textColdReset, action: func(u *UI) {
+		{label: u.s.ColdReset, action: func(u *UI) {
 			u.emit(Reset{Kind: ResetCold})
 			u.Close()
 		}},
@@ -175,7 +175,7 @@ func (s *resetScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	c.rect(0, 0, c.width(), c.height(), u.theme.Scrim)
 	c.rect(x, y, width, height, u.theme.Panel)
 	c.border(x, y, width, height, u.theme.Border)
-	c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, u.theme.Text, textResetMachine)
+	c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, u.theme.Text, u.s.ResetMachine)
 	c.rect(x, y+m.RowHeight, width, 1, u.theme.Border)
 	drawMenuRows(u, c, x, y+m.RowHeight+1, width, rows, s.focus)
 }

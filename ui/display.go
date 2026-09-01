@@ -37,17 +37,17 @@ func (v *videoScreen) sync(u *UI) {
 func (v *videoScreen) rows(u *UI) []optionRow {
 	video := &u.config.Video
 	return []optionRow{
-		{kind: optionRange, label: textVideoScale, value: &video.Scale, min: 1, max: 8, step: 1, unit: "×",
+		{kind: optionRange, label: u.s.VideoScale, value: &video.Scale, min: 1, max: 8, step: 1, unit: "×",
 			note: fmt.Sprintf("%d×%d", 320*video.Scale, 240*video.Scale)},
-		{kind: optionToggle, label: textVideoInteger, flag: &video.IntegerScale},
-		{kind: optionChoice, label: textVideoAspect, choices: aspectLabels, index: &v.aspect},
-		{kind: optionChoice, label: textVideoFilter, choices: filterLabels, index: &v.filter},
-		{kind: optionToggle, label: textVideoFullscreen, flag: &video.Fullscreen, note: "F11"},
-		{kind: optionToggle, label: textVideoFrameBlend, flag: &video.FrameBlend,
-			disabled: true, reason: textStageFrameBlend},
-		{kind: optionToggle, label: textVideoShowFPS, flag: &video.ShowFPS, note: "F10"},
-		{kind: optionToggle, label: textVideoSuppress, flag: &u.config.Interface.SuppressInfoToasts,
-			note: textVideoSuppressNote},
+		{kind: optionToggle, label: u.s.VideoInteger, flag: &video.IntegerScale},
+		{kind: optionChoice, label: u.s.VideoAspect, choices: aspectLabels, index: &v.aspect},
+		{kind: optionChoice, label: u.s.VideoFilter, choices: filterLabels, index: &v.filter},
+		{kind: optionToggle, label: u.s.VideoFullscreen, flag: &video.Fullscreen, note: "F11"},
+		{kind: optionToggle, label: u.s.VideoFrameBlend, flag: &video.FrameBlend,
+			disabled: true, reason: u.s.StageFrameBlend},
+		{kind: optionToggle, label: u.s.VideoShowFPS, flag: &video.ShowFPS, note: "F10"},
+		{kind: optionToggle, label: u.s.VideoSuppress, flag: &u.config.Interface.SuppressInfoToasts,
+			note: u.s.VideoSuppressNote},
 	}
 }
 
@@ -63,7 +63,7 @@ func (v *videoScreen) handle(u *UI, ev Event) bool {
 func (v *videoScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	v.sync(u)
-	top, _ := page{title: textVideoTitle, back: true, status: textVideoApertureNote}.draw(u, c)
+	top, _ := page{title: u.s.VideoTitle, back: true, status: u.s.VideoApertureNote}.draw(u, c)
 	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, v.rows(u), v.focus)
 }
 
@@ -83,21 +83,21 @@ func (a *audioScreen) rows(u *UI) []optionRow {
 	audio := &u.config.Audio
 	sink := audio.Sink
 	if sink == "" {
-		sink = textAudioNoSink
+		sink = u.s.AudioNoSink
 	}
 	stats := u.audioStats()
 	return []optionRow{
-		{kind: optionRange, label: textAudioVolume, value: &audio.MasterVolume,
+		{kind: optionRange, label: u.s.AudioVolume, value: &audio.MasterVolume,
 			min: 0, max: 100, step: 5, bar: true},
-		{kind: optionToggle, label: textAudioMuteFast, flag: &audio.MuteOnFastFwd},
-		{kind: optionRange, label: textAudioBuffer, value: &audio.BufferMS,
-			min: 50, max: 400, step: 50, unit: " ms", note: textAudioBufferNote},
-		{kind: optionReadOnly, label: textAudioSink, text: sink},
-		{kind: optionReadOnly, label: textAudioFormat, text: textAudioFormatValue},
-		{kind: optionReadOnly, label: textAudioBufferState,
+		{kind: optionToggle, label: u.s.AudioMuteFast, flag: &audio.MuteOnFastFwd},
+		{kind: optionRange, label: u.s.AudioBuffer, value: &audio.BufferMS,
+			min: 50, max: 400, step: 50, unit: " ms", note: u.s.AudioBufferNote},
+		{kind: optionReadOnly, label: u.s.AudioSink, text: sink},
+		{kind: optionReadOnly, label: u.s.AudioFormat, text: u.s.AudioFormatValue},
+		{kind: optionReadOnly, label: u.s.AudioBufferState,
 			text: fmt.Sprintf("%s 已用 %d / %d ms",
 				meterBar(stats.BufferedMS, 0, max(stats.BufferMS, 1), 16), stats.BufferedMS, stats.BufferMS)},
-		{kind: optionReadOnly, label: textAudioUnderrun, text: fmt.Sprintf("%d", stats.Underruns)},
+		{kind: optionReadOnly, label: u.s.AudioUnderrun, text: fmt.Sprintf("%d", stats.Underruns)},
 	}
 }
 
@@ -110,7 +110,7 @@ func (a *audioScreen) handle(u *UI, ev Event) bool {
 
 func (a *audioScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
-	top, _ := page{title: textAudioTitle, back: true, status: textAudioNote}.draw(u, c)
+	top, _ := page{title: u.s.AudioTitle, back: true, status: u.s.AudioNote}.draw(u, c)
 	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, a.rows(u), a.focus)
 }
 

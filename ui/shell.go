@@ -10,16 +10,16 @@ func (s *startScreen) id() string { return "S0" }
 
 func (s *startScreen) rows(u *UI) []menuRow {
 	ready := u.firmwareReady()
-	reason := textFirmwareIncompl
+	reason := u.s.FirmwareIncompl
 	rows := []menuRow{
-		{label: textFirmwareSetUp, action: func(u *UI) { u.push(&firmwareScreen{}) }},
+		{label: u.s.FirmwareSetUp, action: func(u *UI) { u.push(&firmwareScreen{}) }},
 	}
 	for _, entry := range u.recentEntries() {
 		entry := entry
 		row := menuRow{label: entry.Name, value: shortHash(entry.SHA256)}
 		switch {
 		case entry.Missing:
-			row.disabled, row.reason, row.value = true, textMissingFile, textMissingFile
+			row.disabled, row.reason, row.value = true, u.s.MissingFile, u.s.MissingFile
 		case !ready:
 			row.disabled, row.reason = true, reason
 		default:
@@ -28,10 +28,10 @@ func (s *startScreen) rows(u *UI) []menuRow {
 		rows = append(rows, row)
 	}
 	rows = append(rows,
-		menuRow{label: textChooseCartridge, gapBefore: true, disabled: !ready, reason: reason,
+		menuRow{label: u.s.ChooseCartridge, gapBefore: true, disabled: !ready, reason: reason,
 			action: func(u *UI) { u.push(&browserScreen{}) }},
-		menuRow{label: textAbout, action: func(u *UI) { u.push(&aboutScreen{}) }},
-		menuRow{label: textQuit, action: func(u *UI) { u.emit(Quit{}) }},
+		menuRow{label: u.s.About, action: func(u *UI) { u.push(&aboutScreen{}) }},
+		menuRow{label: u.s.Quit, action: func(u *UI) { u.emit(Quit{}) }},
 	)
 	return rows
 }
@@ -42,28 +42,28 @@ func (s *startScreen) handle(u *UI, ev Event) bool {
 
 func (s *startScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
-	status := textStatusNoCartridge
+	status := u.s.StatusNoCartridge
 	if u.firmwareReady() {
-		status = textStatusReady
+		status = u.s.StatusReady
 	}
-	top, _ := page{title: textAppTitle, status: status}.draw(u, c)
+	top, _ := page{title: u.s.AppTitle, status: status}.draw(u, c)
 
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
-	y := u.sectionTitle(c, x, top, textSectionFirmware)
+	y := u.sectionTitle(c, x, top, u.s.SectionFirmware)
 
 	entries := u.firmwareEntries()
 	panelTop := y
 	y = u.framedRows(c, x, y, width, len(entries)) - 1
 	rowY := panelTop + 1
 	for _, entry := range entries {
-		mark, state, colour := "○", textFirmwareMissing, u.theme.Error
+		mark, state, colour := "○", u.s.FirmwareMissing, u.theme.Error
 		if entry.Loaded {
-			mark, state, colour = "●", textFirmwareLoaded, u.theme.OK
+			mark, state, colour = "●", u.s.FirmwareLoaded, u.theme.OK
 		}
 		c.rowText(x+m.RowPadX, rowY, m.RowHeight, m.BodySize, colour, mark)
-		c.rowText(x+m.RowPadX+m.SectionGap, rowY, m.RowHeight, m.BodySize, u.theme.Text, firmwareLabel(entry.Kind))
-		detail := textFirmwareUnset
+		c.rowText(x+m.RowPadX+m.SectionGap, rowY, m.RowHeight, m.BodySize, u.theme.Text, u.firmwareLabel(entry.Kind))
+		detail := u.s.FirmwareUnset
 		if entry.Loaded {
 			detail = shortHash(entry.SHA256)
 		}
@@ -79,7 +79,7 @@ func (s *startScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	y = drawMenuRows(u, c, x, y, width, rows[:1], s.focus)
 
 	y += m.SectionGap
-	y = u.sectionTitle(c, x, y, fmt.Sprintf("%s（%d）", textSectionRecent, len(recent)))
+	y = u.sectionTitle(c, x, y, fmt.Sprintf("%s（%d）", u.s.SectionRecent, len(recent)))
 	y = drawMenuRows(u, c, x, y, width, rows[1:1+len(recent)], s.focus-1)
 
 	y += m.SectionGap
@@ -110,7 +110,7 @@ func (f *firmwareScreen) handle(u *UI, ev Event) bool {
 		case ActConfirm:
 			// 選檔案要平台的檔案對話框，目前入口以命令列旗標提供路徑；
 			// 在那條路徑接上之前不假裝這個按鈕有作用。
-			u.toast(fmt.Sprintf(textNotYet, textFirmwareTitle), SeverityWarn)
+			u.toast(fmt.Sprintf(u.s.NotYet, u.s.FirmwareTitle), SeverityWarn)
 			return true
 		}
 	}
@@ -121,36 +121,36 @@ func (f *firmwareScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	status := ""
 	if !u.firmwareReady() {
-		status = textFirmwareIncompl
+		status = u.s.FirmwareIncompl
 	}
-	top, _ := page{title: textFirmwareTitle, back: true, status: status}.draw(u, c)
+	top, _ := page{title: u.s.FirmwareTitle, back: true, status: status}.draw(u, c)
 
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
-	y := u.sectionTitle(c, x, top, textFirmwareNotice)
+	y := u.sectionTitle(c, x, top, u.s.FirmwareNotice)
 	y += m.Grid
 
 	for index, entry := range u.firmwareEntries() {
 		colour := u.focusRow(c, x, y, width, index == f.focus)
-		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, firmwareLabel(entry.Kind))
+		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, u.firmwareLabel(entry.Kind))
 		path := entry.Path
 		if path == "" {
-			path = textFirmwareUnset
+			path = u.s.FirmwareUnset
 		}
 		c.rowText(x+width/3, y, m.RowHeight, m.SmallSize, colour, path)
 		y += m.RowHeight
 
-		detail := textNone
+		detail := u.s.None
 		if entry.Loaded {
-			detail = fmt.Sprintf("%s %s · SHA-256 %s", textFieldSize, groupInt(entry.Size), shortHash(entry.SHA256))
+			detail = fmt.Sprintf("%s %s · SHA-256 %s", u.s.FieldSize, groupInt(entry.Size), shortHash(entry.SHA256))
 		}
 		c.rowText(x+m.RowPadX+m.SectionGap, y, m.RowHeight, m.SmallSize, u.theme.TextDim, detail)
-		known, knownColour := textFirmwareUnlisted, u.theme.Warn
+		known, knownColour := u.s.FirmwareUnlisted, u.theme.Warn
 		switch {
 		case !entry.Loaded:
-			known, knownColour = textFirmwareMissing, u.theme.Error
+			known, knownColour = u.s.FirmwareMissing, u.theme.Error
 		case entry.Known:
-			known, knownColour = textFirmwareKnown, u.theme.OK
+			known, knownColour = u.s.FirmwareKnown, u.theme.OK
 		}
 		c.rowText(x+width-m.RowPadX-c.font.Measure(known, m.SmallSize), y, m.RowHeight, m.SmallSize, knownColour, known)
 		y += m.RowHeight + m.Grid

@@ -85,21 +85,21 @@ func (o optionRow) adjust(delta int) bool {
 }
 
 // display 是右欄要顯示的字串。
-func (o optionRow) display() string {
+func (o optionRow) display(s Strings) string {
 	switch o.kind {
 	case optionChoice:
 		if o.index == nil || len(o.choices) == 0 {
-			return textNone
+			return s.None
 		}
 		return "‹ " + o.choices[*o.index] + " ›"
 	case optionToggle:
 		if o.flag != nil && *o.flag {
-			return "[■] " + textOn
+			return "[■] " + s.On
 		}
-		return "[ ] " + textOff
+		return "[ ] " + s.Off
 	case optionRange:
 		if o.value == nil {
-			return textNone
+			return s.None
 		}
 		if o.bar {
 			return fmt.Sprintf("‹ %s %d%s ›", meterBar(*o.value, o.min, o.max, 10), *o.value, o.unit)
@@ -153,7 +153,7 @@ func handleOptions(u *UI, ev Event, focus *int, rows []optionRow, changed func()
 			if *focus < len(rows) {
 				row := rows[*focus]
 				if row.disabled {
-					u.toast(fmt.Sprintf(textNotYet, row.reason), SeverityWarn)
+					u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
 					return true
 				}
 				if row.adjust(delta) && changed != nil {
@@ -168,7 +168,7 @@ func handleOptions(u *UI, ev Event, focus *int, rows []optionRow, changed func()
 			if *focus < len(rows) {
 				row := rows[*focus]
 				if row.disabled {
-					u.toast(fmt.Sprintf(textNotYet, row.reason), SeverityWarn)
+					u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
 					return true
 				}
 				if row.adjust(1) && changed != nil {
@@ -192,14 +192,14 @@ func drawOptionRows(u *UI, c *canvas, x, y, width int, rows []optionRow, focus i
 		if row.disabled && index != focus {
 			colour = u.theme.TextOff
 		}
-		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, row.label)
-		c.rowText(x+width/3, y, m.RowHeight, m.BodySize, colour, row.display())
+		c.rowTextFit(x+m.RowPadX, y, m.RowHeight, m.BodySize, width/3-m.RowPadX*2, colour, row.label)
+		c.rowTextFit(x+width/3, y, m.RowHeight, m.BodySize, width/3-m.Grid, colour, row.display(u.s))
 		if row.note != "" {
 			note := u.theme.TextDim
 			if index == focus {
 				note = u.theme.FocusText
 			}
-			c.rowText(x+width*2/3, y, m.RowHeight, m.SmallSize, note, row.note)
+			c.rowTextFit(x+width*2/3, y, m.RowHeight, m.SmallSize, width/3-m.RowPadX, note, row.note)
 		}
 		y += m.RowHeight
 	}
