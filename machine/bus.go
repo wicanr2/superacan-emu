@@ -117,6 +117,21 @@ func (b *Bus) Control() uint16          { return b.control }
 
 func (b *Bus) attachSound(sound *SoundBus) { b.sound = sound }
 
+// CartridgeSave 回傳卡帶電池記憶體的完整映像。Bcan 也是以固定 32768 bytes
+// 保存，兩邊的檔案大小因此一致（內容格式由遊戲決定，不保證互通）。
+func (b *Bus) CartridgeSave() []byte {
+	return append([]byte(nil), b.sram[:]...)
+}
+
+// LoadCartridgeSave 覆蓋卡帶電池記憶體。大小不符一律拒絕且不改變現行狀態。
+func (b *Bus) LoadCartridgeSave(payload []byte) error {
+	if len(payload) != SRAMSize {
+		return fmt.Errorf("machine: cartridge save is %d bytes, want %d", len(payload), SRAMSize)
+	}
+	copy(b.sram[:], payload)
+	return nil
+}
+
 // SetSoundCycleSource 提供 $E90018/19 讀回的音效 CPU 週期計數。
 func (b *Bus) SetSoundCycleSource(source func() uint64) { b.soundCycles = source }
 

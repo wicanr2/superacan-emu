@@ -229,3 +229,29 @@ func TestSoundCycleCounterPortIsReadable(t *testing.T) {
 		t.Fatalf("$E90018=$%04X err=%v", value, err)
 	}
 }
+
+func TestCartridgeSaveRoundTripsAndRejectsWrongSize(t *testing.T) {
+	bus := testMachineBus(t)
+	if err := bus.Write8(0xec0001, 0x5a); err != nil {
+		t.Fatal(err)
+	}
+	payload := bus.CartridgeSave()
+	if len(payload) != SRAMSize || payload[0] != 0x5a {
+		t.Fatalf("save len=%d first=$%02X", len(payload), payload[0])
+	}
+
+	fresh := testMachineBus(t)
+	if err := fresh.LoadCartridgeSave(payload); err != nil {
+		t.Fatal(err)
+	}
+	value, err := fresh.Read8(0xec0001)
+	if err != nil || value != 0x5a {
+		t.Fatalf("restored=$%02X err=%v", value, err)
+	}
+	if err := fresh.LoadCartridgeSave(payload[:10]); err == nil {
+		t.Fatal("大小不符必須拒絕")
+	}
+	if value, _ := fresh.Read8(0xec0001); value != 0x5a {
+		t.Fatalf("拒絕載入不得改變現行狀態，讀到 $%02X", value)
+	}
+}

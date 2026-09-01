@@ -9,16 +9,39 @@ import (
 
 const DefaultFrameInstructionBound uint64 = 2_000_000
 
-var playerOneKeys = [...]struct {
+type keyBinding struct {
 	key    ebiten.Key
 	button uint16
-}{
+}
+
+var playerOneKeys = [...]keyBinding{
 	{ebiten.KeyZ, machine.ButtonA}, {ebiten.KeyX, machine.ButtonB},
 	{ebiten.KeyEnter, machine.ButtonStart}, {ebiten.KeyShiftRight, machine.ButtonSelect},
 	{ebiten.KeyArrowUp, machine.ButtonUp}, {ebiten.KeyArrowDown, machine.ButtonDown},
 	{ebiten.KeyArrowLeft, machine.ButtonLeft}, {ebiten.KeyArrowRight, machine.ButtonRight},
 	{ebiten.KeyA, machine.ButtonX}, {ebiten.KeyS, machine.ButtonY},
 	{ebiten.KeyQ, machine.ButtonL}, {ebiten.KeyW, machine.ButtonR},
+}
+
+// P2 的鍵位參考 Bcan.ini 的預設值（方向 R/F/D/G、按鍵 U/I/K/Y/O/P、Start=2、Select=6），
+// 讓習慣 Bcan 的人不必重學。
+var playerTwoKeys = [...]keyBinding{
+	{ebiten.KeyU, machine.ButtonA}, {ebiten.KeyI, machine.ButtonB},
+	{ebiten.KeyDigit2, machine.ButtonStart}, {ebiten.KeyDigit6, machine.ButtonSelect},
+	{ebiten.KeyR, machine.ButtonUp}, {ebiten.KeyF, machine.ButtonDown},
+	{ebiten.KeyD, machine.ButtonLeft}, {ebiten.KeyG, machine.ButtonRight},
+	{ebiten.KeyK, machine.ButtonX}, {ebiten.KeyY, machine.ButtonY},
+	{ebiten.KeyO, machine.ButtonL}, {ebiten.KeyP, machine.ButtonR},
+}
+
+func pressedButtons(bindings []keyBinding) uint16 {
+	var pressed uint16
+	for _, binding := range bindings {
+		if ebiten.IsKeyPressed(binding.key) {
+			pressed |= binding.button
+		}
+	}
+	return pressed
 }
 
 // Game is a thin Ebitengine presentation adapter over the shared machine core.
@@ -39,13 +62,8 @@ func NewGame(system *machine.System) *Game {
 }
 
 func (g *Game) Update() error {
-	var pressed uint16
-	for _, binding := range playerOneKeys {
-		if ebiten.IsKeyPressed(binding.key) {
-			pressed |= binding.button
-		}
-	}
-	g.System.SoundBus.SetPad(0, machine.PadState(pressed))
+	g.System.SoundBus.SetPad(0, machine.PadState(pressedButtons(playerOneKeys[:])))
+	g.System.SoundBus.SetPad(1, machine.PadState(pressedButtons(playerTwoKeys[:])))
 	if _, err := g.System.RunFrame(g.InstructionBound); err != nil {
 		return err
 	}

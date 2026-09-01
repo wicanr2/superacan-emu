@@ -373,3 +373,164 @@ func TestGenericAddressRegistersKeepAllThirtyTwoBits(t *testing.T) {
 		t.Fatalf("CMPA.L 必須相等，SR=$%04X", cpu.state.SR)
 	}
 }
+
+func TestGenericTrapPushesFrameAndTakesVector(t *testing.T) {
+	// TRAP #3 → 向量 35（$8C）。PRM 的 TRAP 是 34(4/3)。
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x4e43, 0x0402: 0x4e71,
+		0x008c: 0x0000, 0x008e: 0x0500,
+		0x0500: 0x4e71, 0x0502: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[7] = 0x2000
+	cpu.state.SR = 0x2700
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.PC != 0x0500 {
+		t.Fatalf("PC=$%06X, want $000500", cpu.state.PC)
+	}
+	if cpu.state.A[7] != 0x1ffa {
+		t.Fatalf("A7=$%08X, want $00001FFA", cpu.state.A[7])
+	}
+	if bus.words[0x1ffa] != 0x2700 {
+		t.Fatalf("pushed SR=$%04X, want $2700", bus.words[0x1ffa])
+	}
+	if bus.words[0x1ffc] != 0 || bus.words[0x1ffe] != 0x0402 {
+		t.Fatalf("pushed PC=$%04X%04X, want $00000402", bus.words[0x1ffc], bus.words[0x1ffe])
+	}
+	if result.Cycles != 34 {
+		t.Fatalf("cycles=%d, want 34", result.Cycles)
+	}
+}
+
+func TestGenericTrapOnOverflowOnlyWhenSet(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x4e76, 0x0402: 0x4e71, 0x0404: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x2700
+	cpu.state.A[7] = 0x2000
+	if _, err := cpu.Step(); err != nil { // V 未設：只是繼續
+		t.Fatal(err)
+	}
+	if cpu.state.PC != 0x0402 || cpu.state.A[7] != 0x2000 {
+		t.Fatalf("V 未設時不得進例外：PC=$%06X A7=$%08X", cpu.state.PC, cpu.state.A[7])
+	}
+}
+
+func TestGenericCheckTakesVectorWhenOutOfRange(t *testing.T) {
+	// CHK D1,D0：D0 為負 → 向量 6，並設定 N。
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x4181, 0x0402: 0x4e71,
+		0x0018: 0x0000, 0x001a: 0x0600,
+		0x0600: 0x4e71, 0x0602: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x2700
+	cpu.state.A[7] = 0x2000
+	cpu.state.D[0] = 0xffff_ffff
+	cpu.state.D[1] = 0x0010
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.PC != 0x0600 {
+		t.Fatalf("PC=$%06X, want $000600", cpu.state.PC)
+	}
+	if cpu.state.SR&flagNegative == 0 {
+		t.Fatalf("CHK 負值必須設 N，SR=$%04X", cpu.state.SR)
+	}
+}
+
+func TestGenericDivideByZeroTakesVectorFive(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x80c1, 0x0402: 0x4e71,
+		0x0014: 0x0000, 0x0016: 0x0700,
+		0x0700: 0x4e71, 0x0702: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x2700
+	cpu.state.A[7] = 0x2000
+	cpu.state.D[0] = 0x1234
+	cpu.state.D[1] = 0
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.PC != 0x0700 {
+		t.Fatalf("PC=$%06X, want $000700", cpu.state.PC)
+	}
+}
+
+func TestLineFEncodingTakesException(t *testing.T) {
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xffff, 0x0402: 0x4e71,
+		0x002c: 0x0000, 0x002e: 0x0800,
+		0x0800: 0x4e71, 0x0802: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x2700
+	cpu.state.A[7] = 0x2000
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.PC != 0x0800 {
+		t.Fatalf("PC=$%06X, want $000800（line-F 向量 11）", cpu.state.PC)
+	}
+}
+
+func TestUserStackPointerSwapsWithSupervisorBit(t *testing.T) {
+	// MOVE #$0700,SR 從監督者切到使用者模式時，A7 換成 USP。
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x46fc, 0x0402: 0x0700, 0x0404: 0x4e71, 0x0406: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.SR = 0x2700
+	cpu.state.A[7] = 0x00ff_0000
+	cpu.state.InactiveSP = 0x00fe_0000
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.A[7] != 0x00fe_0000 || cpu.state.InactiveSP != 0x00ff_0000 {
+		t.Fatalf("A7=$%08X inactive=$%08X，切到使用者模式必須交換", cpu.state.A[7], cpu.state.InactiveSP)
+	}
+}
+
+func TestGenericCompareMemoryLongPostincrementsBoth(t *testing.T) {
+	// CMPM.L (A6)+,(A6)+：Super Dragon Force 的雙部分卡帶會走到這個編碼。
+	// 兩個運算元共用 A6 時，來源先取值再遞增，目的取到的是下一個長字。
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xbd8e, 0x0402: 0x4e71,
+		0x2000: 0x0000, 0x2002: 0x0001,
+		0x2004: 0x0000, 0x2006: 0x0001,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[6] = 0x2000
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.A[6] != 0x2008 {
+		t.Fatalf("A6=$%08X, want $00002008", cpu.state.A[6])
+	}
+	if cpu.state.SR&flagZero == 0 {
+		t.Fatalf("兩個長字相同必須設 Z，SR=$%04X", cpu.state.SR)
+	}
+	if result.Cycles != 20 {
+		t.Fatalf("cycles=%d, want 20", result.Cycles)
+	}
+}

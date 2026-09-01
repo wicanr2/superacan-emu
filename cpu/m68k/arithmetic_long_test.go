@@ -45,10 +45,22 @@ func TestMULUAndDIVURegisterSemantics(t *testing.T) {
 	}
 }
 
-func TestDIVUZeroFailsBeforeMutation(t *testing.T) {
-	cpu, _ := newExecutionCPU(map[uint32]uint16{})
+func TestDIVUZeroTakesVectorFiveWithoutMutatingQuotient(t *testing.T) {
+	// 除以零是 68000 的向量 5 例外，不是模擬器的錯誤：目的暫存器不得被改動。
+	cpu, _ := newExecutionCPU(map[uint32]uint16{
+		0x0014: 0x0000, 0x0016: 0x0900,
+		0x0900: 0x4e71, 0x0902: 0x4e71,
+	})
+	cpu.state.SR = 0x2000
+	cpu.state.A[7] = 0x2000
 	cpu.state.D[2] = 0x1234_5678
-	if err := cpu.divuWordData(1, 2); err == nil || cpu.state.D[2] != 0x1234_5678 || cpu.state.Cycles != 0 {
-		t.Fatalf("DIVU zero state=%+v err=%v", cpu.state, err)
+	if err := cpu.divuWordData(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.D[2] != 0x1234_5678 {
+		t.Fatalf("D2=$%08X，除以零不得改動目的暫存器", cpu.state.D[2])
+	}
+	if cpu.state.PC != 0x0900 {
+		t.Fatalf("PC=$%06X, want $000900", cpu.state.PC)
 	}
 }

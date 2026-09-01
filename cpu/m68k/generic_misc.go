@@ -6,18 +6,22 @@ func (c *CPU) genericMiscellaneous(opcode uint16) (bool, error) {
 	switch {
 	case opcode&0x01c0 == 0x01c0: // LEA <ea>,An
 		return c.genericLoadEffectiveAddress(opcode)
-	case opcode == 0x4e70, opcode == 0x4e72, opcode == 0x4e76:
-		return false, nil // RESET／STOP／TRAPV 仍待例外路徑
+	case opcode&0x01c0 == 0x0180: // CHK <ea>,Dn
+		return c.genericCheck(opcode)
+	case opcode == 0x4e70, opcode == 0x4e72:
+		return false, nil // RESET／STOP 仍待外部訊號建模
+	case opcode == 0x4e76:
+		return c.genericTrapOnOverflow()
 	case opcode == 0x4e77:
 		return c.genericReturnAndRestore()
 	case opcode&0xfff0 == 0x4e40:
-		return false, nil // TRAP 仍待例外路徑
+		return c.genericTrap(uint8(opcode & 0x0f))
 	case opcode&0xfff8 == 0x4e50:
 		return c.genericLink(uint8(opcode & 7))
 	case opcode&0xfff8 == 0x4e58:
 		return c.genericUnlink(uint8(opcode & 7))
 	case opcode&0xfff0 == 0x4e60:
-		return false, nil // MOVE USP 仍待 USP/SSP 分離
+		return c.genericMoveUserStackPointer(opcode)
 	case opcode&0xffc0 == 0x4e80:
 		return c.genericJump(opcode, true)
 	case opcode&0xffc0 == 0x4ec0:
@@ -212,7 +216,7 @@ func (c *CPU) genericMoveToCondition(opcode uint16) (bool, error) {
 
 func (c *CPU) genericMoveToStatus(opcode uint16) (bool, error) {
 	if c.state.SR&0x2000 == 0 {
-		return true, errPrivilege
+		return true, c.privilegeViolation()
 	}
 	mode := uint8(opcode >> 3 & 7)
 	register := uint8(opcode & 7)
@@ -225,11 +229,26 @@ func (c *CPU) genericMoveToStatus(opcode uint16) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	c.state.SR = uint16(value)
+	c.setStatusRegister(uint16(value))
 	if err := c.internal(8); err != nil {
 		return true, err
 	}
 	return true, stream.finish()
+}
+
+// genericMoveUserStackPointer 實作 MOVE An,USP 與 MOVE USP,An。監督者模式下
+// USP 就是 InactiveSP。
+func (c *CPU) genericMoveUserStackPointer(opcode uint16) (bool, error) {
+	if c.state.SR&0x2000 == 0 {
+		return true, c.privilegeViolation()
+	}
+	register := uint8(opcode & 7)
+	if opcode&0x0008 == 0 {
+		c.state.InactiveSP = c.state.A[register]
+	} else {
+		c.state.A[register] = c.state.InactiveSP
+	}
+	return true, c.prefetch()
 }
 
 func (c *CPU) genericSwap(register uint8) (bool, error) {

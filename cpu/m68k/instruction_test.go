@@ -55,7 +55,7 @@ func TestMOVEQDataAndFlags(t *testing.T) {
 }
 
 func TestMOVEImmediateToSRIsPrivilegedAndTimed(t *testing.T) {
-	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
 		0x0400: 0x46fc, 0x0402: 0x2000, 0x0404: 0x4e71, 0x0406: 0x7000,
 	})
 	if err := cpu.Reset(); err != nil {
@@ -68,10 +68,21 @@ func TestMOVEImmediateToSRIsPrivilegedAndTimed(t *testing.T) {
 	if cpu.state.SR != 0x2000 || result.Cycles != 16 || len(result.Phases) != 3 || result.Phases[1].Kind != PhaseInternal || result.Phases[1].Cycles != 8 {
 		t.Fatalf("state=%+v result=%+v", cpu.state, result)
 	}
+	// 使用者模式執行特權指令是向量 8 例外，不是模擬器錯誤。
 	cpu.state.SR = 0
+	cpu.state.A[7] = 0x3000
+	cpu.state.InactiveSP = 0x2000
 	cpu.state.PC, cpu.state.IRD, cpu.state.IRC = 0x0400, 0x46fc, 0x2000
-	if _, err := cpu.Step(); err == nil {
-		t.Fatal("user-mode MOVE to SR did not fail closed")
+	bus.words[0x0020], bus.words[0x0022] = 0x0000, 0x0a00
+	bus.words[0x0a00], bus.words[0x0a02] = 0x4e71, 0x4e71
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.PC != 0x0a00 {
+		t.Fatalf("PC=$%06X，特權違例要進向量 8", cpu.state.PC)
+	}
+	if cpu.state.SR&0x2000 == 0 {
+		t.Fatalf("SR=$%04X，例外要進入監督者模式", cpu.state.SR)
 	}
 }
 

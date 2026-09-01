@@ -1,7 +1,6 @@
 package m68k
 
 import (
-	"fmt"
 	"math/bits"
 )
 
@@ -357,17 +356,14 @@ func (c *CPU) oriWordData(register uint8) error {
 
 func (c *CPU) moveImmediateToSR() error {
 	if c.state.SR&0x2000 == 0 {
-		return fmt.Errorf("privilege violation exception is not implemented")
+		return c.privilegeViolation()
 	}
 	stream := c.newInstructionStream()
 	value, err := stream.nextWord()
 	if err != nil {
 		return err
 	}
-	if value&0x2000 == 0 {
-		return fmt.Errorf("user stack pointer switch is not implemented")
-	}
-	c.state.SR = value
+	c.setStatusRegister(value)
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 8}); err != nil {
 		return err
 	}
@@ -641,7 +637,10 @@ func (c *CPU) divuWordAbsoluteLong(destination uint8) error {
 		return err
 	}
 	if divisor == 0 {
-		return fmt.Errorf("divide-by-zero exception is not implemented")
+		if err := stream.finish(); err != nil {
+			return err
+		}
+		return c.divideByZero()
 	}
 	dividend := c.state.D[destination]
 	quotient := dividend / uint32(divisor)
@@ -771,7 +770,10 @@ func (c *CPU) divuWordDisplacement(source, destination uint8) error {
 		return err
 	}
 	if divisor == 0 {
-		return fmt.Errorf("divide-by-zero exception is not implemented")
+		if err := stream.finish(); err != nil {
+			return err
+		}
+		return c.divideByZero()
 	}
 	dividend := c.state.D[destination]
 	quotient := dividend / uint32(divisor)
@@ -2245,7 +2247,10 @@ func (c *CPU) muluWordImmediate(destination uint8) error {
 func (c *CPU) divuWordData(source, destination uint8) error {
 	divisor := uint16(c.state.D[source])
 	if divisor == 0 {
-		return fmt.Errorf("divide-by-zero exception is not implemented")
+		if err := c.prefetch(); err != nil {
+			return err
+		}
+		return c.divideByZero()
 	}
 	dividend := c.state.D[destination]
 	quotient := dividend / uint32(divisor)
@@ -2277,7 +2282,10 @@ func (c *CPU) divuWordImmediate(destination uint8) error {
 		return err
 	}
 	if divisor == 0 {
-		return fmt.Errorf("divide-by-zero exception is not implemented")
+		if err := stream.finish(); err != nil {
+			return err
+		}
+		return c.divideByZero()
 	}
 	dividend := c.state.D[destination]
 	quotient := dividend / uint32(divisor)

@@ -32,13 +32,27 @@ const (
 	keysymLowerW   = 0x0077
 	keysymLowerX   = 0x0078
 	keysymLowerZ   = 0x007a
+	keysymDigit2   = 0x0032
+	keysymDigit6   = 0x0036
+	keysymLowerD   = 0x0064
+	keysymLowerF   = 0x0066
+	keysymLowerG   = 0x0067
+	keysymLowerI   = 0x0069
+	keysymLowerK   = 0x006b
+	keysymLowerO   = 0x006f
+	keysymLowerP   = 0x0070
+	keysymLowerR   = 0x0072
+	keysymLowerU   = 0x0075
+	keysymLowerY   = 0x0079
 )
 
-// 與 Ebitengine 前端相同的鍵位，讓兩個前端的操作方式一致。
-var keyBindings = []struct {
+type keyBinding struct {
 	keysym uint32
 	button uint16
-}{
+}
+
+// 與 Ebitengine 前端相同的鍵位，讓兩個前端的操作方式一致。
+var playerOneKeys = []keyBinding{
 	{keysymLowerZ, machine.ButtonA}, {keysymLowerX, machine.ButtonB},
 	{keysymReturn, machine.ButtonStart}, {keysymShiftR, machine.ButtonSelect},
 	{keysymUp, machine.ButtonUp}, {keysymDown, machine.ButtonDown},
@@ -47,12 +61,23 @@ var keyBindings = []struct {
 	{keysymLowerQ, machine.ButtonL}, {keysymLowerW, machine.ButtonR},
 }
 
+// P2 的鍵位參考 Bcan.ini 的預設值：方向 R/F/D/G、按鍵 U/I/K/Y/O/P、Start=2、Select=6。
+var playerTwoKeys = []keyBinding{
+	{keysymLowerU, machine.ButtonA}, {keysymLowerI, machine.ButtonB},
+	{keysymDigit2, machine.ButtonStart}, {keysymDigit6, machine.ButtonSelect},
+	{keysymLowerR, machine.ButtonUp}, {keysymLowerF, machine.ButtonDown},
+	{keysymLowerD, machine.ButtonLeft}, {keysymLowerG, machine.ButtonRight},
+	{keysymLowerK, machine.ButtonX}, {keysymLowerY, machine.ButtonY},
+	{keysymLowerO, machine.ButtonL}, {keysymLowerP, machine.ButtonR},
+}
+
 func main() {
 	iplPath := flag.String("ipl", "", "path to word-swapped 4096-byte internal_68k.bin")
 	keyPath := flag.String("key", "", "path to 16-byte umc6650.bin")
 	soundBIOS1Path := flag.String("sound-bios1", "", "path to 8192-byte internal_6502_1.bin")
 	soundBIOS2Path := flag.String("sound-bios2", "", "path to 8192-byte internal_6502_2.bin")
-	romPath := flag.String("rom", "", "path to word-swapped cartridge ROM")
+	romPath := flag.String("rom", "", "path to a raw cartridge dump or a cartridge ZIP")
+	savePath := flag.String("save", "", "32768-byte cartridge battery file, loaded at start and written on exit")
 	scale := flag.Int("scale", 3, "integer window scale")
 	frames := flag.Uint64("frames", 0, "exit after this many emulated frames (0 runs until the window closes)")
 	screenshot := flag.String("screenshot", "", "write the final emulated framebuffer as PNG")
@@ -72,7 +97,7 @@ func main() {
 
 	system, err := machine.NewSystem(
 		loadWordSwapped(*iplPath, machine.IPLSize),
-		loadWordSwapped(*romPath, 0),
+		loadCartridge(*romPath).Bytes,
 		loadLinear(*keyPath, 16),
 	)
 	if err != nil {
@@ -96,9 +121,11 @@ func main() {
 	}
 	defer stopAudio()
 
+	loadCartridgeSave(system, *savePath)
 	if err := system.Reset(); err != nil {
 		fail(fmt.Sprintf("reset: %v", err))
 	}
+	defer writeCartridgeSave(system, *savePath)
 
 	window, err := x11.New("Super A'Can Emulator", umc6618.Width, umc6618.Height, *scale)
 	if err != nil {
@@ -116,7 +143,8 @@ func main() {
 		if !window.Poll() || window.KeysymPressed(keysymEscape) {
 			break
 		}
-		system.SoundBus.SetPad(0, padState(window))
+		system.SoundBus.SetPad(0, padState(window, playerOneKeys))
+		system.SoundBus.SetPad(1, padState(window, playerTwoKeys))
 		if _, err := system.RunFrame(2_000_000); err != nil {
 			fail(err.Error())
 		}
@@ -143,9 +171,9 @@ func main() {
 	}
 }
 
-func padState(window *x11.Window) uint16 {
+func padState(window *x11.Window, bindings []keyBinding) uint16 {
 	state := machine.PadReleased
-	for _, binding := range keyBindings {
+	for _, binding := range bindings {
 		if window.KeysymPressed(binding.keysym) {
 			state |= binding.button
 		}
@@ -227,6 +255,19 @@ func loadWordSwapped(path string, expectedSize int) []byte {
 	return image.Bytes
 }
 
+// loadCartridge 接受 raw 卡帶與 ZIP（單一成員或雙部分）。
+func loadCartridge(path string) media.Image {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		fail(fmt.Sprintf("read %s: %v", path, err))
+	}
+	image, err := media.DecodeCartridge(path, raw)
+	if err != nil {
+		fail(err.Error())
+	}
+	return image
+}
+
 func loadLinear(path string, expectedSize int) []byte {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -242,4 +283,35 @@ func loadLinear(path string, expectedSize int) []byte {
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, "acan-x11:", message)
 	os.Exit(1)
+}
+
+// loadCartridgeSave 在檔案存在時載入電池記憶體；不存在視為全新卡帶，不是錯誤。
+func loadCartridgeSave(system *machine.System, path string) {
+	if path == "" {
+		return
+	}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		fail(fmt.Sprintf("read save %s: %v", path, err))
+	}
+	if err := system.Bus.LoadCartridgeSave(payload); err != nil {
+		fail(err.Error())
+	}
+}
+
+// writeCartridgeSave 以先寫暫存檔再改名的方式落地，避免中途失敗留下半套存檔。
+func writeCartridgeSave(system *machine.System, path string) {
+	if path == "" {
+		return
+	}
+	temporary := path + ".tmp"
+	if err := os.WriteFile(temporary, system.Bus.CartridgeSave(), 0o644); err != nil {
+		fail(fmt.Sprintf("write save %s: %v", temporary, err))
+	}
+	if err := os.Rename(temporary, path); err != nil {
+		fail(fmt.Sprintf("rename save %s: %v", path, err))
+	}
 }

@@ -14,6 +14,10 @@ type State struct {
 	PC uint32
 	SR uint16
 
+	// InactiveSP 是目前沒有映射到 A7 的那個堆疊指標：監督者模式時是 USP，
+	// 使用者模式時是 SSP。68000 依 SR 的 S 位元切換兩者。
+	InactiveSP uint32
+
 	IRD uint16 // current instruction word
 	IRC uint16 // next prefetched word
 
@@ -1087,6 +1091,11 @@ func (c *CPU) Step() (StepResult, error) {
 		// 逐一列舉的 decoder 沒有這個編碼時，交給一般化 effective-address 執行層；
 		// 兩邊都不認識才 fail-closed，不得靜默當成 NOP。
 		handled, err := c.executeGeneric(c.state.IRD)
+		if !handled && err == nil {
+			// 68000 明確定義為非法的編碼要產生例外；我們還沒實作的編碼維持
+			// fail-closed，兩者不可混為一談。
+			handled, err = c.illegalInstruction(c.state.IRD)
+		}
 		if err != nil {
 			return result, fmt.Errorf("m68k opcode $%04X at $%06X: %w", c.state.IRD, c.state.PC, err)
 		}
@@ -1112,9 +1121,6 @@ func (c *CPU) acceptedInterrupt() uint8 {
 }
 
 func (c *CPU) serviceInterrupt(level uint8) error {
-	if c.state.SR&0x2000 == 0 {
-		return fmt.Errorf("user-mode interrupt stack switching is not implemented")
-	}
 	oldSR, oldPC := c.state.SR, c.state.PC
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 12}); err != nil {
 		return err
@@ -1136,7 +1142,7 @@ func (c *CPU) serviceInterrupt(level uint8) error {
 	if err := c.writeWord(c.state.A[7], oldSR, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.SR = oldSR&0xf8ff | 0x2000 | uint16(level)<<8
+	c.setStatusRegister(oldSR&0xf8ff | 0x2000 | uint16(level)<<8)
 	target, err := c.readLong(uint32(24+level)*4, FCSupervisorData)
 	if err != nil {
 		return err

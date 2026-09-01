@@ -9,10 +9,7 @@ import "errors"
 // 本檔在自動計費的 bus transaction（每次 4 cycle）之外，補上該表要求的內部 cycle。
 // 這些值尚未與 Moira 做逐指令差分，屬 `strong-inference`，不是實機量測。
 
-var (
-	errUnsupportedOperand = errors.New("m68k: operand not writable")
-	errPrivilege          = errors.New("m68k: privileged instruction in user mode")
-)
+var errUnsupportedOperand = errors.New("m68k: operand not writable")
 
 // executeGeneric 回傳 handled=false 表示本層不認識這個 opcode，
 // 由呼叫端 fail-closed，不得靜默當成 NOP。
@@ -255,7 +252,7 @@ func (c *CPU) genericImmediateToStatus(opcode uint16, operation uint16, size Wid
 		return false, nil
 	}
 	if size == WidthWord && c.state.SR&0x2000 == 0 {
-		return true, errPrivilege
+		return true, c.privilegeViolation()
 	}
 	stream := c.newInstructionStream()
 	immediate, err := stream.nextWord()
@@ -267,14 +264,16 @@ func (c *CPU) genericImmediateToStatus(opcode uint16, operation uint16, size Wid
 		mask = 0xffff
 	}
 	value := immediate & mask
+	updated := c.state.SR
 	switch operation {
 	case 0:
-		c.state.SR |= value
+		updated |= value
 	case 1:
-		c.state.SR &= value | ^mask
+		updated &= value | ^mask
 	case 5:
-		c.state.SR ^= value
+		updated ^= value
 	}
+	c.setStatusRegister(updated)
 	if err := c.internal(12); err != nil {
 		return true, err
 	}
@@ -487,7 +486,7 @@ func (c *CPU) genericCompareEor(opcode uint16) (bool, error) {
 	}
 	if opcode&0x0100 != 0 {
 		if opcode&0x0038 == 0x0008 {
-			return false, nil // CMPM 已由既有 decoder 處理
+			return c.genericCompareMemory(opcode)
 		}
 		return c.genericBinary(opcode, binaryEor)
 	}
@@ -692,6 +691,31 @@ func (c *CPU) genericCompareAddress(opcode uint16) (bool, error) {
 	return true, stream.finish()
 }
 
+// genericCompareMemory 實作 CMPM (Ay)+,(Ax)+：兩個運算元都後遞增，不影響 X。
+func (c *CPU) genericCompareMemory(opcode uint16) (bool, error) {
+	size, ok := sizeFromField(opcode >> 6 & 3)
+	if !ok {
+		return false, nil
+	}
+	destinationRegister := uint8(opcode >> 9 & 7)
+	sourceRegister := uint8(opcode & 7)
+
+	source := c.state.A[sourceRegister]
+	c.state.A[sourceRegister] += operandStride(sourceRegister, size)
+	sourceValue, err := c.readSized(source, size)
+	if err != nil {
+		return true, err
+	}
+	destination := c.state.A[destinationRegister]
+	c.state.A[destinationRegister] += operandStride(destinationRegister, size)
+	destinationValue, err := c.readSized(destination, size)
+	if err != nil {
+		return true, err
+	}
+	c.compareSized(destinationValue, sourceValue, size)
+	return true, c.prefetch()
+}
+
 func (c *CPU) genericExchange(opcode uint16) (bool, error) {
 	x := uint8(opcode >> 9 & 7)
 	y := uint8(opcode & 7)
@@ -787,8 +811,10 @@ func (c *CPU) genericDivide(opcode uint16, signed bool) (bool, error) {
 	divisor := uint16(value)
 	dividend := c.state.D[destination]
 	if divisor == 0 {
-		// 除以零是 vector 5 例外；在補上完整例外路徑之前 fail-closed。
-		return true, errors.New("m68k: divide by zero")
+		if err := stream.finish(); err != nil {
+			return true, err
+		}
+		return true, c.divideByZero()
 	}
 	if signed {
 		quotient := int32(dividend) / int32(int16(divisor))

@@ -166,10 +166,12 @@ func TestAutovectoredInterruptStacksStateAndRefillsQueue(t *testing.T) {
 }
 
 func TestUnknownOpcodeFailsClosed(t *testing.T) {
+	// $0108 是 MOVEP，尚未實作。$FFFF 之類的 line-A／line-F 編碼在 68000 上有
+	// 定義好的例外行為，不屬於「未實作」，見 TestLineFEncodingTakesException。
 	log := &eventLog{}
 	bus := &testBus{log: log, words: map[uint32]uint16{
 		4: 0, 6: 0x0400,
-		0x0400: 0xffff,
+		0x0400: 0x0108,
 	}}
 	cpu := New(bus, log)
 	if err := cpu.Reset(); err != nil {
