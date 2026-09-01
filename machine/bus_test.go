@@ -194,3 +194,38 @@ func TestHostDMAUsesAtomicControlAndMachineBusTransactions(t *testing.T) {
 		t.Fatalf("triggers=%d", b.HostDMA().Channel(0).Triggers)
 	}
 }
+
+func TestUM6619HostReadPortsExposeSoundRAMLatches(t *testing.T) {
+	bus := testMachineBus(t)
+	// $E90004/05 讀 sound RAM $040C/$040D；$E9000C/0D 讀 $040A。
+	if err := bus.Write8(0xe8040c, 0x12); err != nil {
+		t.Fatal(err)
+	}
+	if err := bus.Write8(0xe8040d, 0x34); err != nil {
+		t.Fatal(err)
+	}
+	if err := bus.Write8(0xe8040a, 0x5a); err != nil {
+		t.Fatal(err)
+	}
+	value, err := bus.Read16(0xe90004)
+	if err != nil || value != 0x1234 {
+		t.Fatalf("$E90004=$%04X err=%v, want $1234", value, err)
+	}
+	flag, err := bus.Read8(0xe9000c)
+	if err != nil || flag != 0x5a {
+		t.Fatalf("$E9000C=$%02X err=%v, want $5A", flag, err)
+	}
+	high, err := bus.Read8(0xe9000d)
+	if err != nil || high != 0x5a {
+		t.Fatalf("$E9000D=$%02X err=%v, want $5A", high, err)
+	}
+}
+
+func TestSoundCycleCounterPortIsReadable(t *testing.T) {
+	bus := testMachineBus(t)
+	bus.SetSoundCycleSource(func() uint64 { return 0x1_0000 + 0x2345 })
+	value, err := bus.Read16(0xe90018)
+	if err != nil || value != uint16((0x1_0000+0x2345)%0xffff) {
+		t.Fatalf("$E90018=$%04X err=%v", value, err)
+	}
+}

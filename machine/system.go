@@ -74,6 +74,7 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 		system.acknowledgeIRQ(level)
 	})
 	soundBus.SetIRQ6Handler(func() { system.soundIRQ6 = true })
+	bus.SetSoundCycleSource(func() uint64 { return system.M65C02.State().Cycles })
 	timeline.OnAdvance = system.advanceDevices
 	soundTimeline.OnAdvance = system.SoundBus.Audio().Advance
 	bus.setControlObserver(system.controlChanged)

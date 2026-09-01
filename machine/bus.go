@@ -40,6 +40,8 @@ type Bus struct {
 	observer        func(Transaction)
 	controlObserver func(oldValue, newValue uint16) error
 	sound           *SoundBus
+	// soundCycles 讀取音效 CPU 的累計週期，供 $E90018/19 使用。
+	soundCycles     func() uint64
 }
 
 func NewBus(ipl, rom, key []byte) (*Bus, error) {
@@ -115,6 +117,9 @@ func (b *Bus) Control() uint16          { return b.control }
 
 func (b *Bus) attachSound(sound *SoundBus) { b.sound = sound }
 
+// SetSoundCycleSource 提供 $E90018/19 讀回的音效 CPU 週期計數。
+func (b *Bus) SetSoundCycleSource(source func() uint64) { b.soundCycles = source }
+
 // SetObserver installs an optional synchronous observer for complete CPU bus
 // transactions. A 16-bit access produces one notification, even though plain
 // RAM storage is backed by bytes.
@@ -171,6 +176,26 @@ func (b *Bus) read8(address uint32) (uint8, error) {
 			}
 		}
 		return b.soundRAM[address&0xffff&b.soundRAMMask], nil
+	case address == 0xe90004:
+		// UM6619 主機端讀取埠：65C02 交出的取樣 DMA 請求位址，實體在 sound RAM
+		// $040C/$040D。證據：MAME host_um6619_map，與 Bcan 的讀取閂位置一致。
+		return b.soundRAM[0x040c&b.soundRAMMask], nil
+	case address == 0xe90005:
+		return b.soundRAM[0x040d&b.soundRAMMask], nil
+	case address == 0xe9000c, address == 0xe9000d:
+		// DMA 請求旗標，實體在 sound RAM $040A；兩個位元組讀到同一個來源。
+		return b.soundRAM[0x040a&b.soundRAMMask], nil
+	case address == 0xe90018, address == 0xe90019:
+		// 音效 CPU 的累計週期對 $FFFF 取餘數。Formosa Duel 用它捲動雨層，
+		// 也就是把它當亂數源；語意為 MAME-derived。
+		value := uint16(0)
+		if b.soundCycles != nil {
+			value = uint16(b.soundCycles() % 0xffff)
+		}
+		if address&1 != 0 {
+			return uint8(value), nil
+		}
+		return uint8(value >> 8), nil
 	case address == 0xe9001c:
 		return uint8(b.control >> 8), nil
 	case address == 0xe9001d:
