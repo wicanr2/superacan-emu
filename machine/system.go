@@ -56,6 +56,7 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 	}
 	timeline := &Timeline{}
 	soundBus := newSoundBus(&bus.soundRAM)
+	soundBus.setRAMWriteHook(bus.tagSoundWrite)
 	bus.attachSound(soundBus)
 	soundTimeline := &SoundTimeline{}
 	system := &System{

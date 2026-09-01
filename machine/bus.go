@@ -20,6 +20,12 @@ type Bus struct {
 	rom      []byte
 	ipl      [IPLSize]byte
 	soundRAM [65536]byte
+	// soundRAMMask models how many address lines actually reach the sound SRAM.
+	// $ffff is the 64 KiB model shared by MAME, Bcan and this core; $7fff is the
+	// diagnostic 32 KiB model implied by APU.sch (U11 only receives A0..A14).
+	soundRAMMask uint32
+	soundTag     [32768]uint8
+	soundClashes map[uint16]uint32
 	workRAM  [65536]byte
 	sram     [SRAMSize]byte
 
@@ -46,7 +52,7 @@ func NewBus(ipl, rom, key []byte) (*Bus, error) {
 	if len(key) != umc6650.KeySize {
 		return nil, fmt.Errorf("machine: UMC6650 key size %d, want %d", len(key), umc6650.KeySize)
 	}
-	b := &Bus{rom: append([]byte(nil), rom...), lockout: umc6650.New(key), video: umc6618.New(), frc: frc.New()}
+	b := &Bus{rom: append([]byte(nil), rom...), lockout: umc6650.New(key), video: umc6618.New(), frc: frc.New(), soundRAMMask: 0xffff}
 	b.dma = hostdma.New(b)
 	copy(b.ipl[:], ipl)
 	b.video.SetDMAAccess(
@@ -55,6 +61,49 @@ func NewBus(ipl, rom, key []byte) (*Bus, error) {
 	)
 	return b, nil
 }
+
+// SetSoundRAMAlias selects the sound SRAM address model. The default (false)
+// keeps the 64 KiB space every existing implementation uses. Enabling it drops
+// A15 for RAM accesses only, modelling the single 32K x 8 UM62256 that APU.sch
+// shows on the board, while $0400-$04FF I/O decode keeps using the full 65C02
+// address. It is a diagnostic switch for that open hardware question, not a
+// confirmed contract.
+func (b *Bus) SetSoundRAMAlias(enabled bool) {
+	if enabled {
+		b.soundRAMMask = 0x7fff
+	} else {
+		b.soundRAMMask = 0xffff
+	}
+	if b.sound != nil {
+		b.sound.setRAMMask(uint16(b.soundRAMMask))
+	}
+}
+
+func (b *Bus) SoundRAMAlias() bool { return b.soundRAMMask == 0x7fff }
+
+// tagSoundWrite records which half of the 65C02 address space last wrote each
+// physical cell. Under the 32 KiB alias model a cell written through both halves
+// means two live uses share storage, which the 64 KiB model keeps apart.
+func (b *Bus) tagSoundWrite(address uint16) {
+	if b.soundRAMMask != 0x7fff {
+		return
+	}
+	cell := address & 0x7fff
+	tag := uint8(1)
+	if address >= 0x8000 {
+		tag = 2
+	}
+	previous := b.soundTag[cell]
+	if previous != 0 && previous != tag {
+		if b.soundClashes == nil {
+			b.soundClashes = make(map[uint16]uint32)
+		}
+		b.soundClashes[cell]++
+	}
+	b.soundTag[cell] = tag
+}
+
+func (b *Bus) SoundRAMClashes() map[uint16]uint32 { return b.soundClashes }
 
 func (b *Bus) Lockout() *umc6650.Device { return b.lockout }
 func (b *Bus) Video() *umc6618.Device   { return b.video }
@@ -121,7 +170,7 @@ func (b *Bus) read8(address uint32) (uint8, error) {
 				return uint8(value >> 8), nil
 			}
 		}
-		return b.soundRAM[address&0xffff], nil
+		return b.soundRAM[address&0xffff&b.soundRAMMask], nil
 	case address == 0xe9001c:
 		return uint8(b.control >> 8), nil
 	case address == 0xe9001d:
@@ -220,7 +269,8 @@ func (b *Bus) Write8(address uint32, value uint8) error {
 func (b *Bus) write8(address uint32, value uint8) error {
 	switch {
 	case address >= 0xe80000 && address < 0xe90000:
-		b.soundRAM[address&0xffff] = value
+		b.tagSoundWrite(uint16(address&0xffff))
+		b.soundRAM[address&0xffff&b.soundRAMMask] = value
 		if b.sound != nil && address&0xff00 == 0x0400 {
 			b.sound.WriteFrom68K(uint16(address&0xffff), value)
 		}

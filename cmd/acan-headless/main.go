@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
 	"github.com/wicanr2/superacan-emu/chip/umc6619"
@@ -33,6 +34,7 @@ func main() {
 	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
 	watch := flag.String("watch", "", "comma-separated hexadecimal bus addresses/ranges")
 	watchLimit := flag.Uint64("watch-limit", 64, "maximum matching bus transactions to retain")
+	soundRAMAlias := flag.Bool("sound-ram-alias", false, "diagnostic: model the sound SRAM as a single 32 KiB device (drop A15 for RAM accesses)")
 	press := flag.String("press", "", "P1 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
 	press2 := flag.String("press2", "", "P2 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
 	flag.Parse()
@@ -59,6 +61,7 @@ func main() {
 	if err != nil {
 		fail(err.Error())
 	}
+	system.Bus.SetSoundRAMAlias(*soundRAMAlias)
 	if *soundBIOS1Path != "" {
 		if err := system.LoadSoundBIOS(0, loadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize).Bytes); err != nil {
 			fail(err.Error())
@@ -157,11 +160,11 @@ func main() {
 	dma0, dma1 := system.Bus.HostDMA().Channel(0), system.Bus.HostDMA().Channel(1)
 	vramSHA := system.Bus.Video().VRAMSHA256()
 	framebufferSHA := system.Bus.Video().FramebufferSHA256()
-	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_bios=%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X frc=$%04X/$%04X,pending:%t,supported:%t dma_triggers=0:%d,1:%d irq_ack=7:%d,6:%d,5:%d,4:%d,3:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
+	fmt.Printf("ipl_sha256=%s rom_sha256=%s steps=%d pc=$%06X opcode=$%04X cycles=%d overlays=low:%t,high:%t sound_bios=%t sound_ram_alias=%t sound_steps=%d sound_pc=$%04X sound_cycles=%d sound_samples=%d audio_nonzero=%d audio_sha256=%x sound_irq=$%02X sound_reset=%t video_frame=%d scanline=%d video_flags=$%04X frc=$%04X/$%04X,pending:%t,supported:%t dma_triggers=0:%d,1:%d irq_ack=7:%d,6:%d,5:%d,4:%d,3:%d vram_nonzero=%d vram_sha256=%s framebuffer_nonblack=%d framebuffer_sha256=%s\n",
 		hex.EncodeToString(ipl.RawSHA256[:]), hex.EncodeToString(rom.RawSHA256[:]),
 		system.Instructions, state.PC, result.Opcode, state.Cycles,
 		system.Bus.LowOverlayEnabled(), system.Bus.HighOverlayEnabled(),
-		*soundBIOS1Path != "", system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundBus.Audio().SampleCount(), audioNonzero, audioHash.Sum(nil), system.SoundBus.IRQStatus(), system.SoundResetAsserted(),
+		*soundBIOS1Path != "", system.Bus.SoundRAMAlias(), system.SoundInstructions, soundState.PC, soundState.Cycles, system.SoundBus.Audio().SampleCount(), audioNonzero, audioHash.Sum(nil), system.SoundBus.IRQStatus(), system.SoundResetAsserted(),
 		system.Bus.Video().Frame(), system.Bus.Video().Scanline(), system.Bus.Video().VideoFlags(),
 		system.Bus.FRC().Control(), system.Bus.FRC().Frequency(), system.Bus.FRC().Pending(), system.Bus.FRC().SupportedMode(),
 		dma0.Triggers, dma1.Triggers,
@@ -169,6 +172,25 @@ func main() {
 		system.IRQAcknowledgements[3],
 		system.Bus.Video().NonzeroVRAMBytes(), hex.EncodeToString(vramSHA[:]),
 		system.Bus.Video().NonblackPixels(), hex.EncodeToString(framebufferSHA[:]))
+	if clashes := system.Bus.SoundRAMClashes(); len(clashes) > 0 {
+		cells := make([]int, 0, len(clashes))
+		for cell := range clashes {
+			cells = append(cells, int(cell))
+		}
+		sort.Ints(cells)
+		total := uint32(0)
+		for _, cell := range cells {
+			total += clashes[uint16(cell)]
+		}
+		fmt.Printf("sound_ram_clash_cells=%d sound_ram_clash_writes=%d\n", len(cells), total)
+		for i, cell := range cells {
+			if i >= 24 {
+				fmt.Printf("sound_ram_clash ... %d more cells\n", len(cells)-i)
+				break
+			}
+			fmt.Printf("sound_ram_clash $%04X (also $%04X) writes=%d\n", cell, cell|0x8000, clashes[uint16(cell)])
+		}
+	}
 	for _, record := range observed {
 		direction := "R"
 		if record.Write {

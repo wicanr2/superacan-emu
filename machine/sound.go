@@ -9,6 +9,7 @@ import (
 // shared with the 68000 $E80000 window; $0400-$04FF is decoded as controller I/O.
 type SoundBus struct {
 	ram       *[65536]byte
+	ramMask   uint16
 	audio     *umc6619.Device
 	irqEnable uint8
 	irqStatus uint8
@@ -20,11 +21,12 @@ type SoundBus struct {
 	latch     [2]uint8
 	latchFull [2]bool
 	onIRQ6    func()
+	onRAMWrite func(uint16)
 }
 
 func newSoundBus(ram *[65536]byte) *SoundBus {
-	bus := &SoundBus{ram: ram, audio: umc6619.New(), pads: [2]uint16{0xffff, 0xffff}}
-	bus.audio.SetRAMReader(func(address uint16) uint8 { return ram[address] })
+	bus := &SoundBus{ram: ram, ramMask: 0xffff, audio: umc6619.New(), pads: [2]uint16{0xffff, 0xffff}}
+	bus.audio.SetRAMReader(func(address uint16) uint8 { return ram[address&bus.ramMask] })
 	bus.audio.SetIRQHandler(func(mask uint8, asserted bool) {
 		if asserted {
 			bus.irqStatus |= mask
@@ -36,6 +38,8 @@ func newSoundBus(ram *[65536]byte) *SoundBus {
 }
 
 func (b *SoundBus) Audio() *umc6619.Device { return b.audio }
+func (b *SoundBus) setRAMMask(mask uint16)  { b.ramMask = mask }
+func (b *SoundBus) setRAMWriteHook(hook func(uint16)) { b.onRAMWrite = hook }
 func (b *SoundBus) IRQAsserted() bool      { return b.irqStatus&b.irqEnable != 0 }
 func (b *SoundBus) IRQStatus() uint8       { return b.irqStatus }
 func (b *SoundBus) SetPad(player int, activeLow uint16) {
@@ -77,7 +81,7 @@ func (b *SoundBus) WriteFrom68K(address uint16, value uint8) {
 
 func (b *SoundBus) Read8(address uint16) (uint8, error) {
 	if address < 0x0400 || address > 0x04ff {
-		return b.ram[address], nil
+		return b.ram[address&b.ramMask], nil
 	}
 	switch address {
 	case 0x0402, 0x0403:
@@ -119,7 +123,10 @@ func (b *SoundBus) Read8(address uint16) (uint8, error) {
 
 func (b *SoundBus) Write8(address uint16, value uint8) error {
 	if address < 0x0400 || address > 0x04ff {
-		b.ram[address] = value
+		if b.onRAMWrite != nil {
+			b.onRAMWrite(address)
+		}
+		b.ram[address&b.ramMask] = value
 		return nil
 	}
 	switch address {

@@ -1,5 +1,26 @@
 # 工作歷程
 
+## 2026-09-01：sound RAM 32 KiB alias 假說的 A/B 實驗
+
+- 問題：`APU.sch` 的 U11 只接 `SNDRAM_A0..A14`（32 KiB），但 65C02 位址空間、68k
+  `$E80000` 視窗與 MAME／Bcan／本核心都用 64 KiB。上半區是否只是下半區的 alias 未定案。
+- 新增診斷開關：`Bus.SetSoundRAMAlias` 與 headless `--sound-ram-alias`（預設關閉），
+  只在 RAM 存取丟掉 A15，`$0400-$04FF` 的 I/O 解碼仍用完整 65C02 位址；另加一個對撞
+  偵測器，記錄同一實體 cell 先後被上下半區寫入的次數。
+- 結果（各 1200 幀，完整 BIOS）：Boom Zoo、Monopoly、Speedy Dragon、Formosa Duel 的
+  68000／65C02 指令數、`vram_sha256`、`framebuffer_sha256` 與 IRQ ack 計數在兩種模式下
+  完全相同。唯一差異是 Boom Zoo 的音訊：`audio_nonzero` 453046 → 453000、
+  `audio_sha256` 不同（約 0.01% 樣本）。
+- 對撞偵測：Monopoly、Speedy、Formosa 為 0；Boom Zoo 恰好兩個 cell
+  `$040A`／`$040B`（各一次），也就是 65C02→68k mailbox 旗標與該遊戲複製到 `$8400`
+  起的歌曲位址表在 alias 模型下會共用同一塊儲存。
+- 判讀：現有可驗證路徑幾乎無法區分 32 KiB alias 與 64 KiB 兩種模型；唯一可量測的
+  分歧點就是 Boom Zoo 的 `$840A/$840B`。要定案需以 Bcan 或實機在同一狀態下比對
+  「寫 `$8400+n` 之後 `$E9000C`／`$E8040A` 讀到什麼」，本輪不下結論。
+- 驗證：本輪 `go test` 在同一 base commit 的乾淨 clone 內執行（`chip`、`machine`、
+  `cpu`、`cmd` 全綠）；本工作區當時有另一工作階段未完成的 `cpu/m68k/*.go`，
+  整包編譯不過，故未在此工作區跑測試，也未碰觸那些檔案。
+
 ## 2026-09-01：FRC period 對齊固定版 MAME 的實際行為
 
 - 來源：`../acan` 知識庫稽核期間逐行比對固定 commit `6ae579a` 的 `update_frc_state`。
