@@ -1,5 +1,14 @@
 # 工作歷程
 
+## 2026-09-01：`$F001F0` 契約修正（bit 3 在 ROZ 層有作用）
+
+- 由 `../acan` 稽核工作階段以 IDA 逐指令追出 Bcan 的資料流後，前一則「pixel mode 不進入
+  renderer」的記述作廢：pixel mode 與 gfx mode 都會進 renderer snapshot（`+190`／`+191`），
+  各有唯一讀取點。gfx mode 用與 MAME 相同的三張 region 表（本專案 `tilemapRegion()` 已一致）；
+  bit 3 只在 ROZ 層生效，條件是 `pixel_mode == $08` 且 ROZ 為 8bpp region。
+- `docs/sound-ram-model.md` 已改寫該節，並把「ROZ bit 3 路徑」列為待實作項，附三步驟
+  （先量測命中率 → F003 同畫面差分 → 實作並記錄 hash）。sound RAM 的 64 KiB 契約不受影響。
+
 ## 2026-09-01：FRC 的 ROM 用法與 IRQ3 消費者
 
 - 來源：`../acan` 稽核工作階段以 Capstone 反組譯 Speedy Dragon、Formosa Duel、
