@@ -203,6 +203,8 @@ PokeWorkRAM{Addr,Width,Value}                     Quit{}
 
 ### 4.7 存檔、擷取、狀態列
 
+擷取格式的可行性分析與三個候選見 [`docs/capture-formats.md`](capture-formats.md)。
+
 | Bcan 功能 | Go 版做法 | 分類 | 理由 |
 |---|---|---|---|
 | 十個存檔槽（0–9） | 同等，並顯示縮圖與時間 | 同等 | 縮圖直接取自 `ACANGOS1` payload 內已保存的 framebuffer，不另存 PNG |
@@ -1366,17 +1368,29 @@ S3 覆蓋選單、S4 存檔槽、toast 與錯誤列、D1 確認對話。
 
 ---
 
-## 15. 待決策
+## 15. 決策紀錄
 
-以下每項都會改變上面的設計，需要拍板。旁邊列的是做決定所需的資訊。
+2026-09-01 拍板四項，兩項因為新事實重開，兩項仍待決。
+
+### 已決定
+
+| 編號 | 決策 | 結果 | 依據與後果 |
+|---|---|---|---|
+| D2 | 字型：嵌入或讀系統 | **嵌入 `bitmapfont/v4`** | 六份來源授權（Baekmuk、OFL-1.1 ×3、Public Domain、M+ Bitmap）都允許隨軟體散布；代價是 2.5 MB 資料，發行包要附授權文字與 Baekmuk 商標標示。見 [`docs/ui-font.md`](ui-font.md) |
+| D3 | 法文與西班牙文是否要做 | **要做** | `basicfont.Face7x13.Ranges` 實測只有 `U+0020`–`U+007F` 與替換字元，這兩種語言與中文擋在同一個閘門；D2 一嵌入就一起解決。五種語言全做 |
+| D4 | 金手指是否進第一個發行版 | **進，但加約束** | 啟用時畫面常駐標記，該工作階段的 frame／audio 雜湊不得作硬體證據。P6 的驗收條件要包含這兩點 |
+| D6 | macOS 前端走哪條路 | **purego** | `oto/v3` 在 darwin 兩個架構的 `CGO_ENABLED=0` 建置都成功；Ebitengine 的 `internal/cocoa` 與 Metal 驅動也已是純 Go。缺的只剩視窗與輸入層，見 [`docs/platform-targets.md`](platform-targets.md) |
+
+### 因新事實重開
+
+| 編號 | 決策 | 新事實 | 待決的選項 |
+|---|---|---|---|
+| D1 | Android 在禁 cgo 下怎麼辦 | 原本寫成「工作量遠超過介面工作總和」，實測後不是工作量問題而是**沒有路**：`-buildmode=c-shared requires external (cgo) linking`，而 Android 應用的原生碼一定要是共享程式庫。同一份程式建成**執行檔**則成功——核心跑得動，不能成立的是應用程式形式 | (1) Android 對 cgo 開例外 (2) Android 退出發行範圍 (3) Go 跑核心、Java 寫介面的雙行程架構。三者代價見 [`docs/platform-targets.md`](platform-targets.md) |
+| D5 | 擷取做到哪一級 | 決定是「做完整錄影」。純 Go 有容器（`abema/go-mp4`）與 MJPEG（`image/jpeg`），沒有 H.264 與 AAC 編碼器；唯一避開 cgo 的 H.264 是 `y9o/go-openh264`，用 purego 在執行期載入 Cisco 的 OpenH264 | 甲：MP4／MJPEG＋PCM，純 Go 無執行期相依 乙：MP4／H.264，需執行期原生函式庫與 Cisco 授權處理 丙：甲為預設、乙為選配。見 [`docs/capture-formats.md`](capture-formats.md) |
+
+### 仍待決
 
 | 編號 | 決策 | 需要的資訊 | 若否決的後果 |
 |---|---|---|---|
-| D1 | Android 是否對禁 cgo 政策開例外 | **已量測**：`CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build ./cmd/acan` 失敗於 `internal/vibrate` 的 build constraints——Android 走 gomobile 路徑，不是一般 `go build`。事實已備齊，剩下政策決定 | 若不開例外且實測失敗，Android 需要自寫 NativeActivity 層，工作量遠超過本文所有介面工作的總和 |
-| D2 | CJK 字型：嵌入或讀系統字型 | **已查核**：`bitmapfont/v4` 的六份來源授權（Baekmuk、OFL-1.1 x3、Public Domain、M+ Bitmap）都允許隨軟體散布，條件是附授權文字與 Baekmuk 商標標示；資料 2.5 MB。讀系統字型在 Linux 桌面不保證有中文字型。見 [`docs/ui-font.md`](ui-font.md) | 兩者都否決＝介面只有英文；此時 §4.5 的「五種語言」整列變成不做 |
-| D3 | 法文與西班牙文是否要做 | **已量測**：`basicfont.Face7x13.Ranges` 確認只有 `U+0020`–`U+007F` 與替換字元，不含 Latin-1 重音字元。這兩種語言與中文擋在同一個閘門，見 [`docs/ui-font.md`](ui-font.md) | 只做英文與中文，Bcan 的五語言對齊降為三語言 |
-| D4 | 金手指是否進第一個發行版 | 使用者對「發行版帶作弊工具」與「發行版的執行結果可作證據」兩者的取捨 | 延後到 P6 之後，S3 的金手指項在第一版顯示為停用 |
-| D5 | 擷取做到哪一級 | GIF（無聲、30 fps）是否滿足需求；桌面使用者是否接受自備 ffmpeg | 只做 PNG 截圖，S3 的擷取項不出現 |
-| D6 | macOS 前端走哪條路 | **已量測**：`oto/v3` 在 darwin/arm64 與 darwin/amd64 的 `CGO_ENABLED=0` 建置都成功（走 purego 的 CoreAudio）。macOS 缺的只有視窗與繪圖層，音訊已解決 | 若失敗，macOS 需要純 Go 的 CoreAudio 綁定（purego 可行但未實作），或沿用 X11 前端的外部播放程序模式 |
 | D7 | UI 表面是否隨視窗自由縮放 | 每多一組支援的表面尺寸，`docs/verify-ui.md` 就多一組要維護的畫面雜湊 | 固定為少數幾個尺寸，視窗其餘部分留黑邊；維護成本低但桌面使用體驗較差 |
 | D8 | 桌面的 Esc 從「離開」改為「開啟選單」 | 現有 X11 前端使用者是否已依賴 Esc 直接離開 | 保留 Esc 離開，選單改用其他鍵；但 Android 的返回鍵語意會與桌面不一致 |

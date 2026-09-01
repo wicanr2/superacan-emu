@@ -203,6 +203,7 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - [`docs/bcan-ui-inventory.md`](docs/bcan-ui-inventory.md)：Bcan 0.0.8b 的介面功能盤點
 - [`docs/ui-font.md`](docs/ui-font.md)：介面字型涵蓋範圍與散布授權查核
 - [`docs/platform-targets.md`](docs/platform-targets.md)：三個發行平台的建置矩陣與 cgo 邊界
+- [`docs/capture-formats.md`](docs/capture-formats.md)：截圖與錄影在純 Go 下的可行格式
 - [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、

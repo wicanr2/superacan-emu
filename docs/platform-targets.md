@@ -82,3 +82,61 @@ darwin 的 oto 走 purego 呼叫 CoreAudio，不需要 cgo。這把 macOS 的缺
   `CGO_ENABLED=0` 建置，這個性質要有 CI 守著，不能只靠人記得。
 - `cmd/acan-headless` 在五個目標上都是無 cgo 的，核心回歸不依賴任何平台層。
 - 規劃中的 `ui` 套件是純 Go 自繪，不 import 任何前端套件，因此不受平台層決定影響。
+
+## 決定與其後果（2026-09-01 拍板）
+
+**全 binary 維持禁 cgo。** 發行的三個平台上，`CGO_ENABLED=0` 是硬條件，不只模擬核心。
+以下是這個決定在每個平台上實際造成的工作，數字皆為本輪實測。
+
+### Linux：已達成
+
+`cmd/acan-x11` 用 `jezek/xgb` 直接講 X11 協定，`CGO_ENABLED=0` 可建置，九款卡帶的
+指令數與 framebuffer SHA-256 與 headless 逐位元相同。剩下的缺口是音訊輸出仍靠外部
+播放程序，要改成直接操作 `/dev/snd` 或 PulseAudio 原生協定。
+
+### macOS：可行，缺的是視窗層
+
+Ebitengine v2.9.9 在 darwin 的 cgo 依賴幾乎只剩 GLFW。實測其樹內狀況：
+
+| 元件 | 是否 cgo | 規模 |
+|---|---|---|
+| `internal/cocoa`（NSWindow 等 Objective-C 呼叫） | 否，走 `purego/objc` | 367 行 Go |
+| `internal/graphicsdriver/metal`（含 `mtl` 綁定） | 否，走 `purego/objc` | 3,252 行 Go |
+| `internal/graphicsdriver/opengl/gl` | 有 `default_purego.go` 這條路 | — |
+| `internal/glfw` 的 Cocoa 視窗與輸入 | 是，Objective-C 原始碼 | `cocoa_window_darwin.m` 1,845 行 |
+| `internal/graphicsdriver/metal/displaylink_macos.go` | 是 | 208 行 |
+
+`oto/v3` 在 darwin/arm64 與 darwin/amd64 的 `CGO_ENABLED=0` 建置成功（purego 走
+CoreAudio），音訊不是問題。所以 macOS 的無 cgo 路徑是：用 `purego/objc` 自建
+NSApplication／NSWindow／CAMetalLayer，把 320×240 的 RGBA 緩衝送上去，並自己收鍵盤
+事件。要取代的不是整個 GLFW，只是「開一個視窗、貼一張圖、收按鍵」這一小塊；
+Ebitengine 的 `internal/cocoa` 與 `mtl` 是 Apache-2.0，可作呼叫慣例的參考來源，
+引用時依授權標示。
+
+### Android：在此決定下沒有可行路徑
+
+Android 應用程式的原生碼必須是被 Java runtime 載入的共享程式庫——不論走
+`ANativeActivity_onCreate`（NativeActivity）或 `JNI_OnLoad`（JNI），都要求
+`-buildmode=c-shared`。實測（golang 1.26.7，本輪）：
+
+```
+CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -buildmode=c-shared
+→ -buildmode=c-shared requires external (cgo) linking, but cgo is not enabled
+```
+
+同一句話在 linux/amd64 與 darwin/arm64 也成立，這是 Go 工具鏈的通則，不是 Android
+特例。對照組：同一份程式 `CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build` 產生
+**執行檔**是成功的——也就是說模擬核心本身能在 Android 上跑，不能成立的是「以應用程式
+形式存在」。
+
+`purego` v0.9.0 確實支援 Android（有 `dlfcn_android.go` 走 bionic 的 dlopen），但那解決的
+是「Go 呼叫原生函式庫」，不是「Java runtime 呼叫 Go」。方向相反，補不上這個缺口。
+
+剩下的三條路都要付代價，需要拍板：
+
+1. **Android 對 cgo 開例外。** 其他兩個平台維持禁令，用 CI 守住；Android 走
+   Ebitengine 既有的 gomobile 路徑。代價：發行包裡有一個帶 cgo 的 binary。
+2. **Android 退出發行範圍。** 只出 Linux 與 macOS。代價：功能範圍縮小。
+3. **拆成兩個行程。** Go 執行檔跑模擬核心，Java／Kotlin 應用負責畫面與輸入，兩者以
+   本機通道溝通。代價：Android 的介面要用 Java 再寫一次，`ui` 套件在該平台白做，
+   而且這條路沒有現成專案可抄。
