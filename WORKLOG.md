@@ -389,3 +389,18 @@
 - 仍未收斂：Sango Fighter 走到選角畫面但沒進對戰（Bcan 同輸入會進），The Son of Evil
   在 frame 3600 有單張雜訊畫面，Boom Zoo 標題與 Bcan 差 43.48%（調色盤值相同、落點不同）。
 
+## 2026-09-01：純 Go X11 前端補上禁 cgo 政策的最後一塊
+
+- 先量清楚缺口：`CGO_ENABLED=0` 下 headless 與 imgdiff 任何平台都能建置，`cmd/acan`
+  的 `js/wasm` 與 `windows/amd64` 也能建置，只有 `linux/amd64` 失敗。Ebitengine 的
+  `internal/glfw` 在 darwin 與 windows 走 purego，linbsd 才是 cgo；音訊的 `oto/v3`
+  同樣只有 unix driver 用 cgo。因此缺口只在 Linux 桌面，不是整個前端。
+- 新增 `frontend/x11` 與 `cmd/acan-x11`：以 `jezek/xgb` 建視窗、`GetKeyboardMapping`
+  取 keysym（不寫死 keycode）、ARGB framebuffer 整數倍放大後依 `MaximumRequestLength`
+  切條 `PutImage`。音訊重取樣成 48 kHz 16-bit stereo 後寫進外部播放程序的 stdin。
+- 八款 ROM 在 Xvfb 內以 X11 前端跑 1200 frame，68000 指令數與 framebuffer SHA-256
+  與 headless 及 Ebitengine 前端三者完全相同。
+- 用 `--layer-mask` 加新的 `--video-registers` 把 Sango Fighter 選單缺文字定位到 ROZ
+  圖層：字形正確但被畫到 `x≈300` 之後切掉。該 frame 的 ROZ 暫存器 scroll 全零、
+  `incxx`／`incyy` 都是 1:1。在能取得 oracle 同一瞬間的暫存器之前不動 renderer。
+
