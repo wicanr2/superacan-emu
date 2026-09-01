@@ -1370,7 +1370,7 @@ S3 覆蓋選單、S4 存檔槽、toast 與錯誤列、D1 確認對話。
 
 ## 15. 決策紀錄
 
-2026-09-01 拍板四項，兩項因為新事實重開，兩項仍待決。
+2026-09-01 拍板六項，兩項仍待決。
 
 ### 已決定
 
@@ -1379,14 +1379,9 @@ S3 覆蓋選單、S4 存檔槽、toast 與錯誤列、D1 確認對話。
 | D2 | 字型：嵌入或讀系統 | **嵌入 `bitmapfont/v4`** | 六份來源授權（Baekmuk、OFL-1.1 ×3、Public Domain、M+ Bitmap）都允許隨軟體散布；代價是 2.5 MB 資料，發行包要附授權文字與 Baekmuk 商標標示。見 [`docs/ui-font.md`](ui-font.md) |
 | D3 | 法文與西班牙文是否要做 | **要做** | `basicfont.Face7x13.Ranges` 實測只有 `U+0020`–`U+007F` 與替換字元，這兩種語言與中文擋在同一個閘門；D2 一嵌入就一起解決。五種語言全做 |
 | D4 | 金手指是否進第一個發行版 | **進，但加約束** | 啟用時畫面常駐標記，該工作階段的 frame／audio 雜湊不得作硬體證據。P6 的驗收條件要包含這兩點 |
+| D1 | Android 在禁 cgo 下怎麼辦 | **對 cgo 開例外** | 禁令範圍縮為「Linux 與 macOS 的發行 binary」。實測 `-buildmode=c-shared` 在任何平台都要求 cgo，而 Android 應用的原生碼一定要是共享程式庫，所以禁 cgo 之下沒有產出 Android 應用的路徑——這是工具鏈限制不是工作量。CI 只對 Linux 與 macOS 檢查，發行說明標出 Android 版含 cgo |
+| D5 | 錄影用哪個編碼 | **甲為預設、乙為選配** | 預設 MP4／MJPEG＋PCM，純 Go 無執行期相依；另開設定指向本機 OpenH264 換成 H.264。介面上是同一個「開始錄影」。見 [`docs/capture-formats.md`](capture-formats.md) |
 | D6 | macOS 前端走哪條路 | **purego** | `oto/v3` 在 darwin 兩個架構的 `CGO_ENABLED=0` 建置都成功；Ebitengine 的 `internal/cocoa` 與 Metal 驅動也已是純 Go。缺的只剩視窗與輸入層，見 [`docs/platform-targets.md`](platform-targets.md) |
-
-### 因新事實重開
-
-| 編號 | 決策 | 新事實 | 待決的選項 |
-|---|---|---|---|
-| D1 | Android 在禁 cgo 下怎麼辦 | 原本寫成「工作量遠超過介面工作總和」，實測後不是工作量問題而是**沒有路**：`-buildmode=c-shared requires external (cgo) linking`，而 Android 應用的原生碼一定要是共享程式庫。同一份程式建成**執行檔**則成功——核心跑得動，不能成立的是應用程式形式 | (1) Android 對 cgo 開例外 (2) Android 退出發行範圍 (3) Go 跑核心、Java 寫介面的雙行程架構。三者代價見 [`docs/platform-targets.md`](platform-targets.md) |
-| D5 | 擷取做到哪一級 | 決定是「做完整錄影」。純 Go 有容器（`abema/go-mp4`）與 MJPEG（`image/jpeg`），沒有 H.264 與 AAC 編碼器；唯一避開 cgo 的 H.264 是 `y9o/go-openh264`，用 purego 在執行期載入 Cisco 的 OpenH264 | 甲：MP4／MJPEG＋PCM，純 Go 無執行期相依 乙：MP4／H.264，需執行期原生函式庫與 Cisco 授權處理 丙：甲為預設、乙為選配。見 [`docs/capture-formats.md`](capture-formats.md) |
 
 ### 仍待決
 

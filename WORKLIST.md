@@ -19,25 +19,23 @@
 
 ## A. 決定
 
-2026-09-01 拍板：**全 binary 維持禁 cgo**、**嵌入 `bitmapfont/v4` 並做五種語言**、
-**錄影做完整功能**、**金手指進第一個發行版但加約束**。完整紀錄見
-[`docs/ui-design.md`](docs/ui-design.md) §15。
+2026-09-01 全部拍板，紀錄見 [`docs/ui-design.md`](docs/ui-design.md) §15：
 
-還沒定案的兩項，都是因為拍板後量到的新事實：
+- **cgo**：Linux 與 macOS 的發行 binary 維持 `CGO_ENABLED=0`；**Android 開例外**，走
+  Ebitengine 的 gomobile 路徑。禁 cgo 之下沒有產出 Android 應用的路徑（`-buildmode=
+  c-shared` 在任何平台都要求 cgo，而 Android 應用的原生碼一定要是共享程式庫），
+  這是工具鏈限制不是工作量。見 [`docs/platform-targets.md`](docs/platform-targets.md)。
+- **字型與語言**：嵌入 `bitmapfont/v4`，介面做英／法／西／繁中／簡中五種語言。
+  發行包附六份來源授權文字與 Baekmuk 商標標示。
+- **錄影**：預設 MP4／MJPEG＋PCM（純 Go、無執行期相依），另開設定指向本機的
+  OpenH264 換成 H.264。見 [`docs/capture-formats.md`](docs/capture-formats.md)。
+- **金手指**：進第一個發行版，但啟用時畫面常駐標記，且該工作階段的 frame／audio
+  雜湊不得作硬體證據。
 
-- [ ] **A1 Android 怎麼辦。** 禁 cgo 之下 Android 不是「工作量大」而是**沒有路**：
-  Android 應用的原生碼一定要是共享程式庫，而 `-buildmode=c-shared` 在任何平台都要求
-  cgo（本輪實測，含 android/arm64）。同一份程式建成執行檔則成功，所以模擬核心跑得動，
-  不能成立的是應用程式形式。三個選項：Android 對 cgo 開例外／Android 退出發行範圍／
-  Go 跑核心加 Java 寫介面的雙行程架構。代價見
-  [`docs/platform-targets.md`](docs/platform-targets.md)。
-- [ ] **A2 錄影用哪個編碼。** 純 Go 有容器（`abema/go-mp4`）與 MJPEG（`image/jpeg`），
-  沒有 H.264 與 AAC 編碼器。甲：MP4／MJPEG＋PCM，純 Go 無執行期相依，檔案較大且
-  瀏覽器不吃；乙：以 `y9o/go-openh264` 走 purego 在執行期載入 Cisco 的 OpenH264，
-  檔案小到處能播，代價是原生函式庫的取得與授權處理；丙：甲為預設、乙為選配。
-  見 [`docs/capture-formats.md`](docs/capture-formats.md)。
-- [ ] **A3 桌面 Esc 由「離開」改為「開啟選單」。** 會改變現行 X11 前端行為，要在發行
-  說明標出；不改則 Android 返回鍵語意與桌面不一致（若 A1 決定保留 Android）。
+僅剩一項小決定，不擋任何階段開工：
+
+- [ ] **A1 桌面 Esc 由「離開」改為「開啟選單」。** 會改變現行 X11 前端行為，要在發行
+  說明標出；不改則 Android 返回鍵語意與桌面不一致。
 
 ## B. 使用者介面：對齊 Bcan 的功能
 
@@ -55,12 +53,11 @@
   覆蓋選單、存檔槽、toast 與錯誤列、確認對話。
 - [ ] **P2** 啟動、主機韌體設定、卡帶瀏覽器、關於畫面。
 - [ ] **P3** 輸入綁定、熱鍵設定、JSON 設定檔（未知鍵忽略且寫回時保留）。
-- [ ] **P4** Android 觸控層：虛擬手把、自繪鍵盤、手勢、返回鍵、方向切換。前置 A1；
-  A1 若決定 Android 退出發行範圍，本階段整個不做。
+- [ ] **P4** Android 觸控層：虛擬手把、自繪鍵盤、手勢、返回鍵、方向切換。
 - [ ] **P5** 影像與音訊設定、診斷畫面；收尾「有界、可篩選的除錯介面」。
 - [ ] **P6** 金手指：搜尋、清單、`ACANCHT1` 讀寫與 `BCAN_CHT_1` 匯入。啟用時畫面
   常駐標記，該工作階段的雜湊不得作硬體證據——這兩點是驗收條件。
-- [ ] **P7** 擷取：PNG 截圖，加上依 A2 決定的錄影方案。錄影開著時 frame 雜湊必須
+- [ ] **P7** 擷取：PNG 截圖，加上 MP4／MJPEG＋PCM 錄影與 OpenH264 選配。錄影開著時 frame 雜湊必須
   與未錄影時相同，編碼跟不上時丟編碼工作而不是模擬幀並記錄丟棄數。
 - [ ] **P8** 多語言：英／法／西／繁中／簡中，嵌入 `bitmapfont/v4`，發行包附六份
   來源授權文字與 Baekmuk 商標標示。
@@ -81,7 +78,7 @@
   Refine）、清單管理（新增並鎖定、鎖定／解鎖、刪除、更新值與名稱）、每遊戲一個檔案。
   這是除錯／作弊工具，不是硬體行為，要在文件與程式碼標明。
 - [ ] 截圖：PNG，直接取自 UM6618 顯示孔徑，不套濾鏡、不含疊加層。
-- [ ] 錄影：依 A2 的決定實作。
+- [ ] 錄影：MP4 容器（`abema/go-mp4`）、MJPEG 視訊、PCM 音訊；OpenH264 為選配。
 - [ ] 狀態列與 toast 訊息，含可隱藏操作訊息但錯誤仍顯示。
 - [ ] 診斷面板：frame／指令數／圖層遮罩／視訊暫存器；只讀不寫。同時收尾
   「把一次性環境變數 trace 整理成有界、可篩選的除錯介面」。
@@ -101,10 +98,12 @@
   `purego/objc` 自建 NSApplication／NSWindow／CAMetalLayer，貼上 320×240 RGBA 並收
   鍵盤事件。完成條件：實機啟動、輸入、音訊、存讀檔 smoke 全過，且不修改模擬核心來
   遷就平台。
-- [ ] Android 平台層。**前置 A1**；在禁 cgo 之下目前沒有可行路徑，不是排期問題。
+- [ ] Android 平台層：走 Ebitengine 的 gomobile 路徑（cgo 例外），觸控輸入、虛擬手把、
+  生命週期（暫停／恢復）、存檔落地、螢幕旋轉與返回鍵行為。完成條件同 macOS，
+  另加建置需要 Android NDK 的說明。
 - [ ] 三個平台的可重現發行包與第三方授權清單；只含程式，不含 ROM／BIOS／遊戲畫面。
-- [ ] CI 守住「發行的每個 binary 在其目標上 `CGO_ENABLED=0` 可建置」，不靠人記得。
-  範圍是整個 binary 不只模擬核心，這是拍板後的政策。
+- [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
+  Android 不受此檢查；模擬核心則在五個目標上都要通過。
 
 ## D. 模擬正確性
 

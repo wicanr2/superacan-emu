@@ -132,11 +132,12 @@ CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -buildmode=c-shared
 `purego` v0.9.0 確實支援 Android（有 `dlfcn_android.go` 走 bionic 的 dlopen），但那解決的
 是「Go 呼叫原生函式庫」，不是「Java runtime 呼叫 Go」。方向相反，補不上這個缺口。
 
-剩下的三條路都要付代價，需要拍板：
+決定（2026-09-01）：**Android 對 cgo 開例外。**
 
-1. **Android 對 cgo 開例外。** 其他兩個平台維持禁令，用 CI 守住；Android 走
-   Ebitengine 既有的 gomobile 路徑。代價：發行包裡有一個帶 cgo 的 binary。
-2. **Android 退出發行範圍。** 只出 Linux 與 macOS。代價：功能範圍縮小。
-3. **拆成兩個行程。** Go 執行檔跑模擬核心，Java／Kotlin 應用負責畫面與輸入，兩者以
-   本機通道溝通。代價：Android 的介面要用 Java 再寫一次，`ui` 套件在該平台白做，
-   而且這條路沒有現成專案可抄。
+禁令的適用範圍因此是「Linux 與 macOS 的發行 binary」，Android 走 Ebitengine 既有的
+gomobile 路徑。理由是另外兩條路的代價都落在錯的地方：退出發行範圍等於為了一條政策
+砍掉一個平台；雙行程架構會讓 Android 的介面要用 Java 再寫一次，`ui` 套件在該平台
+白做，而且沒有現成專案可抄。
+
+這個例外要寫進 CI，而不是靠人記得：Linux 與 macOS 的目標必須 `CGO_ENABLED=0` 建置
+通過，Android 不受此檢查。發行說明要標出 Android 版含 cgo，建置需要 Android NDK。
