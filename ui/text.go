@@ -170,3 +170,33 @@ const (
 	textLayerROZ          = "ROZ"
 	textLayerWindow       = "window"
 )
+
+// P6 的文案。
+const (
+	textCheatTitle           = "金手指"
+	textCheatRange           = "範圍"
+	textCheatRangeValue      = "Work RAM $FC0000–$FCFFFF（64 KiB，固定）"
+	textCheatWidth           = "寬度"
+	textCheatCompare         = "比較"
+	textCheatValue           = "數值"
+	textCheatNewSearch       = "開始新搜尋"
+	textCheatRefine          = "縮小範圍"
+	textCheatClear           = "清除"
+	textCheatCandidates      = "候選位址：%d（顯示 %d）"
+	textCheatRefines         = " · 第 %d 次縮小 · 快照取自 frame 邊界"
+	textCheatPrevious        = "前次 %d"
+	textCheatTruncNote       = "候選超過 4096 時只顯示前 4096 筆；請再縮小一次範圍。"
+	textCheatEnable          = "啟用金手指"
+	textCheatEnableHint      = "X 切換 · Tab 切到搜尋"
+	textCheatColumnLock      = "鎖"
+	textCheatColumnName      = "名稱"
+	textCheatColumnAddress   = "位址"
+	textCheatColumnWidth     = "寬度"
+	textCheatColumnValue     = "值"
+	textCheatColumnFormat    = "格式"
+	textCheatEmpty           = "清單是空的。到搜尋頁找出位址再加入。"
+	textCheatLockNote        = "鎖定項在每個 frame 邊界寫入一次 Work RAM。"
+	textCheatEvidenceWarning = "啟用期間的指令數與畫面雜湊不可作為硬體證據。"
+	textCheatActive          = "※ 已啟用記憶體寫入"
+	textCheatMarker          = "CHEAT"
+)

@@ -105,9 +105,9 @@ func render(t *testing.T, key string, u *UI, surface Surface) string {
 // 記錄於 docs/verify-ui.md。畫面一改動這些值就會變，那正是它們的用途：
 // 版面的變更必須是刻意的。
 var wantHashes = map[string]string{
-	"S3/960x720/compact":       "91362729769dac8a31c026ed32fc7c415f19e22dcf9d02da4288f7a6920d78a0",
-	"S3/1280x720/touch":        "bca89c7a0fa269f7c44fe2309d326b8ee4204d2df66aede794ed5aa1444ccc46",
-	"S3+focus/960x720/compact": "12d7e53a0d45961940ef0a270b3c807280403a9ccb04f7f71fbbf05ed8da8c0d",
+	"S3/960x720/compact":       "d7e517a28d1f22967b35e4da9fae6bfe9f9c6a1f2807f32d30389d9ab6788eeb",
+	"S3/1280x720/touch":        "24ca210356411cd6c141e763936463605608c6a7dfaa90cd7804dea1229d85bf",
+	"S3+focus/960x720/compact": "ac8a5528b14ef9197fdeb607a2d151bbbd50b3eec978929ee2bec036289c0326",
 	"S4/960x720/compact":       "8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc",
 	"S4/1280x720/touch":        "ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0",
 	"D1/960x720/compact":       "e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6",
@@ -125,6 +125,9 @@ var wantHashes = map[string]string{
 	"S5.3/960x720/compact":        "0e30efc0f5565c5a01d61f61d574795ff0afb17337a3890958668ac38bb3c488",
 	"S5.4/960x720/compact":        "5930228c39dd004be79506b4c391b4a64bb55d783d3847df4d4879365cbb1b82",
 	"S7/960x720/compact":          "4fac08f514b33776b9447e0256384f30177655357c835640ec134745541c5f13",
+	"S6.1/960x720/compact":        "69aae92d12377cd4551dc95fee6db21c94e866ad26ff30cf482b8da05f8cda89",
+	"S6.2/960x720/compact":        "2a9a1b920de23e41add79372579ba9de3123e4f2f6e3b3a04690c5c33326c23c",
+	"S2cheat/960x720/compact":     "00c5f434b6f9d487dc216dcb6e1b2880749249992c49747ed83b03a2e165aec0",
 	"S9/960x720/compact":       "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
 }
 

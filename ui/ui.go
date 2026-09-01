@@ -20,6 +20,7 @@ type UI struct {
 	about     AboutInfo
 	audio     AudioStatsSource
 	diag      DiagnosticsSource
+	cheat     CheatSource
 	mask      uint32
 	mode      Mode
 	haltNote  string
@@ -55,6 +56,7 @@ type Options struct {
 	About       AboutInfo
 	AudioStats  AudioStatsSource
 	Diagnostics DiagnosticsSource
+	Cheats      CheatSource
 	Theme    *Theme
 	Font     *Font
 }
@@ -85,6 +87,7 @@ func New(options Options) *UI {
 		about:    options.About,
 		audio:    options.AudioStats,
 		diag:     options.Diagnostics,
+		cheat:    options.Cheats,
 		mask:     AllLayers,
 	}
 }
@@ -285,6 +288,9 @@ func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
 			u.modal.draw(u, c)
 		}
 	}
+	// 金手指標記畫在覆蓋層之外：一旦這個工作階段寫過 Work RAM，
+	// 不論選單開不開，畫面上都必須看得出來。
+	u.drawCheatMarker(c)
 	u.drawErrorBar(c)
 	u.drawToasts(c)
 }

@@ -445,3 +445,85 @@ func TestDiagnosticsLayerMaskEmitsIntentAndWarns(t *testing.T) {
 		t.Fatalf("要以 warn 提醒雜湊不可對帳，得到 %+v", u.toasts)
 	}
 }
+
+// fixedCheats 固定金手指狀態，讓 S6 的畫面可重現。
+type fixedCheats struct {
+	enabled bool
+	wrote   bool
+}
+
+func (f fixedCheats) Cheats() CheatState {
+	return CheatState{
+		Enabled: f.enabled, Wrote: f.wrote, Started: true, Refines: 3, Total: 37,
+		Entries: []CheatEntry{
+			{Name: "生命值", Address: 0xfc1a20, Width: 16, Value: 99, Format: "dec", Locked: true},
+			{Name: "金錢", Address: 0xfc3e88, Width: 16, Value: 9999, Format: "bcd"},
+			{Name: "關卡", Address: 0xfc02c4, Width: 8, Value: 3, Format: "hex", Locked: true},
+		},
+		Candidates: []CheatCandidate{
+			{Address: 0xfc1a20, Value: 99, Previous: 100},
+			{Address: 0xfc1a22, Value: 99, Previous: 100},
+			{Address: 0xfc3e88, Value: 99, Previous: 99},
+		},
+	}
+}
+
+func newCheatUI(t *testing.T, enabled, wrote bool) *UI {
+	t.Helper()
+	u := New(Options{
+		Surface: surfaceCases[0].surface, Config: DefaultConfig(), Slots: fixedSlots{},
+		Library: fixedLibrary{}, Firmware: fixedFirmware{complete: true}, About: fixedAbout,
+		AudioStats: fixedAudioStats{}, Diagnostics: fixedDiagnostics{},
+		Cheats: fixedCheats{enabled: enabled, wrote: wrote},
+	})
+	u.Update(0)
+	return u
+}
+
+func TestCheatScreensRender(t *testing.T) {
+	u := newCheatUI(t, true, true)
+	u.Open()
+	u.push(&cheatSearchScreen{width: 1, value: "99"})
+	checkHash(t, "S6.1/"+surfaceCases[0].name, render(t, "S6.1/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+
+	u = newCheatUI(t, true, true)
+	u.Open()
+	u.push(&cheatListScreen{})
+	checkHash(t, "S6.2/"+surfaceCases[0].name, render(t, "S6.2/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+}
+
+// 啟用寫入時畫面上必須有常駐標記，而且覆蓋層關著也看得到。
+func TestCheatMarkerIsVisibleWithoutOverlay(t *testing.T) {
+	off := newCheatUI(t, false, false)
+	clean := render(t, "S2clean/"+surfaceCases[0].name, off, surfaceCases[0].surface)
+
+	on := newCheatUI(t, true, true)
+	if on.Visible() {
+		t.Fatal("這個情境不該有覆蓋層")
+	}
+	marked := render(t, "S2cheat/"+surfaceCases[0].name, on, surfaceCases[0].surface)
+	if clean == marked {
+		t.Fatal("啟用金手指之後畫面必須看得出來")
+	}
+	checkHash(t, "S2cheat/"+surfaceCases[0].name, marked)
+}
+
+// 清單上的鎖定切換只送 intent，而且要提醒雜湊不可作為證據。
+func TestCheatLockEmitsIntentAndWarns(t *testing.T) {
+	u := newCheatUI(t, true, false)
+	u.Open()
+	u.push(&cheatListScreen{})
+	u.TakeIntents()
+	u.Handle(Action{Kind: ActConfirm})
+	intents := u.TakeIntents()
+	if len(intents) != 1 {
+		t.Fatalf("得到 %#v", intents)
+	}
+	command, ok := intents[0].(Cheat)
+	if !ok || command.Command != CheatToggleLock || command.Index != 0 {
+		t.Fatalf("得到 %#v", intents[0])
+	}
+	if len(u.toasts) != 1 || u.toasts[0].severity != SeverityWarn {
+		t.Fatalf("要以 warn 提醒證據效力，得到 %+v", u.toasts)
+	}
+}

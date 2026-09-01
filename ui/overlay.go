@@ -22,7 +22,7 @@ func (s *overlayScreen) rows(u *UI) []menuRow {
 		{label: textResetMachine, chevron: true, action: func(u *UI) {
 			u.push(&resetScreen{})
 		}},
-		{label: textCheats, chevron: true, disabled: true, reason: textStageCheats},
+		{label: textCheats, chevron: true, action: func(u *UI) { u.push(&cheatListScreen{}) }},
 		{label: textSettings, chevron: true, action: func(u *UI) { u.push(&settingsScreen{}) }},
 		{label: textDiagnostics, chevron: true, action: func(u *UI) { u.push(&diagnosticsScreen{}) }},
 		{label: textScreenshot, hotkey: textScreenshotHK, action: func(u *UI) {

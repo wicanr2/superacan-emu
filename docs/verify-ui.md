@@ -134,6 +134,29 @@ acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
 診斷畫面的數字直接讀 machine（`TestDiagnosticsReadMachineDirectly`），不另外累計，
 所以它顯示的 68000 指令數就是 headless 報出來的那一個。
 
+## 金手指的界線
+
+金手指是 C5「UI 不改寫晶片狀態」的例外，所以界線要由測試守著，不是由文件宣告：
+
+- **越界拒絕**（`TestPokeRejectsOutOfRangeAddresses`）：`$F40000`、`$FBFFFF`、
+  `$FD0000` 三個位址各發一次 `PokeWorkRAM`，三次都被**入口**拒絕、記憶體不變、
+  計數器不動。拒絕發生在 session 而不是 UI：UI 沒有寫入能力這件事要在那一層成立。
+- **關閉時無寫入**（`TestNoPokesWhenCheatsAreDisabled`）：清單裡有鎖定項但金手指
+  關閉時，跑三十個 frame 之後 `PokeCount()` 仍是 0。這是 C10 的前提——回歸基準
+  必須在金手指關閉下取得。
+- **只在 frame 邊界寫入**（`TestLockedCheatsWriteOncePerFrame`）：五個 frame 寫五次。
+- **搜尋可重現**（`cheat.TestSearchNarrowsReproducibly`）：同一組快照序列跑兩次得到
+  同一組候選；快照一律在 frame 邊界取，兩次快照之間的比較才有定義。
+- **上限行為**（`cheat.TestSearchReportsTruncation`）：候選超過 4096 時只回 4096 筆
+  並回報截斷，畫面上也說明「請再縮小一次範圍」——使用者要知道自己看到的不是全部。
+- **標記可見**（`TestCheatMarkerIsVisibleWithoutOverlay`）：啟用之後畫面雜湊與未啟用
+  時不同，而且覆蓋層關著也看得到。
+
+`BCAN_CHT_1` 匯入的欄位順序是 **hypothesis**：從 `Bcan.exe` 只能確定檔案開頭是
+`; Bcan per-game cheat file` 與 `BCAN_CHT_1`，以及欄位清單（Name／Address／Width／
+Value／Format），逐欄順序沒有出現在字串表裡。實作採「名稱優先」，第一欄看起來像
+位址時自動改用「位址優先」，兩者都不成立的行以警告回報並跳過，不猜。
+
 ## 設定檔與重新綁定
 
 設定檔的四條規則各自對應一種失敗，四條都有測試：型別不符只讓那個欄位回到預設

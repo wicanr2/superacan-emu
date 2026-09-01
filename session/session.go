@@ -56,6 +56,7 @@ type Session struct {
 	haltNote  string
 
 	config ui.Config
+	cheat  cheatState
 	frame  *image.RGBA
 	paused bool
 	pacing bool
@@ -101,7 +102,7 @@ func New(options Options) *Session {
 	s.UI = ui.New(ui.Options{
 		Surface: options.Surface, Config: options.Config, Slots: s,
 		Library: library, Firmware: options.FirmwareSet, About: options.About,
-		AudioStats: s, Diagnostics: s,
+		AudioStats: s, Diagnostics: s, Cheats: s,
 	})
 	if options.System == nil {
 		s.UI.SetMode(ui.ModeShell, "")
@@ -164,6 +165,8 @@ func (s *Session) Advance(now time.Duration) (bool, error) {
 		return false, nil
 	}
 	s.applyPads(false)
+	// 鎖定的金手指在 RunFrame 之前套用一次，不在指令中途插入。
+	s.applyCheats()
 	if _, err := s.System.RunFrame(MaxFrameInstructions); err != nil {
 		// fail-closed：停下來、保留狀態、把原因擺在畫面上，不假裝成功也不繼續跑。
 		s.halt = classifyHalt(err)
@@ -308,6 +311,8 @@ func (s *Session) apply(intent ui.Intent) error {
 		return s.capture(value.Kind)
 	case ui.PokeWorkRAM:
 		return s.poke(value)
+	case ui.Cheat:
+		return s.applyCheat(value)
 	case ui.Quit:
 		s.quit = true
 		if s.OnQuit != nil {
@@ -427,8 +432,11 @@ func (s *Session) poke(value ui.PokeWorkRAM) error {
 		return fmt.Errorf("session: 沒有卡帶可以寫入")
 	}
 	if !value.Valid() {
+		// 越界的寫入由入口拒絕並記錄，不是被 UI 攔下：UI 沒有寫入能力這件事
+		// 要在這一層成立，不能只靠上層自律。
 		return fmt.Errorf("session: $%06X 不在 Work RAM 範圍內", value.Addr)
 	}
+	s.cheat.pokes++
 	bus := s.System.Bus
 	switch value.Width {
 	case 1:
