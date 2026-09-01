@@ -184,6 +184,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
   依賴版本、88-frame smoke 與目前畫面限制
 - [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)：Bcan 0.0.8b 畫面 oracle 管線、
   可比與不可比的部分、5 位元調色盤展開的證據
+- [`docs/cpu-generic-execution.md`](docs/cpu-generic-execution.md)：68000／65C02 一般化
+  執行層的結構、時間模型與已定案的勘誤
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：

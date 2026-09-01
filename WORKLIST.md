@@ -58,11 +58,14 @@
 - [ ] 在靜止畫面（標題選單）上完成逐像素差分並分類每一處差異。目前被 CPU 擋住：
   Boom Zoo 第 1,695 個 frame 遇 `$D06A` 停止，走不到標題。完成條件：至少一款 ROM
   的靜止畫面差異能逐項標成 renderer 缺陷、oracle 侷限或硬體 unknown。
-- [ ] 決定 68000 ISA 的收斂方式。目前 `cpu/m68k` 是 233 個「操作×大小×定址模式」的
-  個別 case，每遇到一個新組合就要新增一條；這條路線沒有終點。完成條件：先產出
-  一般化 effective-address／operand 執行層的設計，再决定是否重寫，不再逐一補 case。
-- [ ] 補齊尚未由現有 ROM 與合成測試覆蓋的 W65C02 ISA／NMI／WAI 邊界，並將 3:1 排程
-  收斂成可驗證的 cycle 邊界。
+- [x] 收斂 68000 與 65C02 的 ISA 結構：改為一般化 effective-address 執行層與 256 項
+  指令表，既有逐一 case 仍優先且行為不變。八款 ROM 由各自停在不同編碼變成全部完成
+  3600 frames。設計與時間模型見 `docs/cpu-generic-execution.md`。
+- [ ] 把既有 233 條逐一 case 逐步遷移到一般化層並刪除，遷移過程每步都要維持測試綠燈。
+  完成條件：`Decode` 只保留無法一般化的編碼，兩套路徑不再並存。
+- [ ] 補上 68000 的例外路徑：TRAP、TRAPV、CHK、除以零、位址錯誤與匯流排錯誤、
+  privilege violation、MOVE USP、RESET、STOP。目前這些一律 fail-closed。
+- [ ] 將 65C02 的 3:1 排程收斂成可驗證的 cycle 邊界；ISA 覆蓋已由 256 項指令表完成。
 - [x] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ 來源，並接上
   Ebitengine 主機音訊佇列；實機音訊播放與未知 envelope 仍分列驗收／證據缺口。
 

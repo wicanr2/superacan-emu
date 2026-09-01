@@ -6,7 +6,8 @@
 #   /work/bcan        可寫的 Bcan 工作目錄（Bcan.exe、Bcan.ini、bios/、ROMS/、snap/）
 #   /work/wineprefix  WINEPREFIX
 #
-# 用法：bcan-oracle.sh <ROM 檔名> <截圖張數> <每張間隔秒數> <輸出前綴>
+# 用法：bcan-oracle.sh <ROM 檔名> <截圖張數> <每張間隔秒數> <輸出前綴> [每輪要按的鍵]
+# 第五個參數是 xdotool 鍵名，每次截圖前送一次；Bcan.ini 預設 p1_start=49 對應鍵盤 "1"。
 #
 # 已知環境限制（實測，非推測）：
 # - Xvfb 下沒有視窗管理員時 Wine 收不到 xdotool 的鍵盤事件，必須先跑 openbox。
@@ -14,7 +15,7 @@
 # - Bcan 沒有以 argv 載入 ROM 的路徑；只能走檔案對話框。
 set -eu
 
-ROM="$1"; SHOTS="$2"; INTERVAL="$3"; OUT="$4"
+ROM="$1"; SHOTS="$2"; INTERVAL="$3"; OUT="$4"; KEY="${5:-}"
 export PATH=/usr/lib/wine:$PATH
 export WINEDEBUG="${WINEDEBUG:--all}"
 DISPLAY_NUM="${DISPLAY_NUM:-77}"
@@ -44,6 +45,10 @@ for index in $(seq 1 "$SHOTS"); do
     sleep "$INTERVAL"
     WID=$(xdotool search --name "^Bcan" | head -1)
     xdotool windowactivate --sync "$WID"
+    if [ -n "$KEY" ]; then
+        xdotool key "$KEY"
+        sleep 1
+    fi
     xdotool key F8
     sleep 1
     printf 'shot %s at t=%s s\n' "$index" "$((index * INTERVAL))"

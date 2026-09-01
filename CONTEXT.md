@@ -30,10 +30,10 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | module | `github.com/wicanr2/superacan-emu`，Go 1.26、Ebitengine v2.9.9 | `go.sum` 已固定；machine core 不 import Ebitengine |
 | 68000 phase API | scheduler-before-bus、24-bit address、FC、byte／word transaction | API 已測；尚未有整機 scheduler consumer |
 | 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
-| 68000 opcode | 三款 ROM 已各完成 1200 frames；最高 19,272,069 條指令；已有 autovector、RTE、exception 與實際 IRQ 路徑 | 官方 ISA／timing 表；未以合成測試覆蓋完整 ISA matrix |
-| W65C02 | 純 Go 執行兩套 sound driver、IRQ 與 UMC6619 控制；三款 ROM 皆產生非零音訊 | 3:1 shared scheduler；未以合成測試覆蓋完整 ISA matrix |
+| 68000 opcode | 一般化 effective-address 執行層覆蓋全部 12 種定址模式與主要指令族；八款 ROM 各完成 3600 frames，最高 56,747,720 條指令 | 時間取自 PRM 指令時間表（`strong-inference`）；未與 Moira 做逐指令差分 |
+| W65C02 | 256 項指令表覆蓋完整 65C02 指令集與 W65C02S 未指派編碼的 NOP 行為；八款 ROM 皆產生非零音訊 | 3:1 shared scheduler；`$DB`（STP）維持 fail-closed |
 | media | word-swap、大小驗證、原始 SHA-256 manifest | BIOS／ROM 不入版控 |
-| machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
+| machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650、UM6619 主機端讀取埠 | `$E90004/05`、`$E9000C/0D`、`$E90018/19` 為 MAME-derived，與 Bcan 讀取閂位置一致 |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
 | UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 開場與 Bcan 截圖同區域已可逐像素對照；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，靜態畫面的定案差分待 CPU 走到標題選單 |
