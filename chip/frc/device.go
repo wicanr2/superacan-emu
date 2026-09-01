@@ -63,7 +63,13 @@ func (d *Device) schedule() {
 	if d.control&0xff00 != 0xa200 {
 		return
 	}
-	period := int64(uint32(d.control&0x00ff)<<16 | uint32(d.frequency))
+	// MAME writes `((m_frc_control & 0xff << 16) | m_frc_frequency)`. C++ operator
+	// precedence makes that `m_frc_control & 0x00ff0000`, which is always 0 for the
+	// 16-bit control register, so the pinned oracle's effective period is the
+	// frequency register alone. Its case-by-case timings (magipool $a201/$0104 etc.)
+	// were calibrated against that effective value, so we follow it rather than the
+	// 24-bit combination the expression appears to intend.
+	period := int64(d.frequency)
 	var cycles int64
 	switch d.control & 0x000f {
 	case 0:

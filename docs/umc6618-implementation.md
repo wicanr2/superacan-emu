@@ -14,6 +14,9 @@
   scanline，register 4 與 `$1F0` 分別讀回 video flags 與遮罩後的 pixel／gfx mode。
 - video clock 由 machine Timeline 的 68000 cycle 推進，不依賴 Ebitengine frame callback。
   目前採 software-observed 256-wide 684 cycles／line、320-wide 728 cycles／line、262 lines／frame。
+  這兩個值繼承固定版 MAME 的 `htotal 455／divider 8`（320）與 `342／10`（256），因此 320 模式
+  的幀率是 56.3 Hz、256 模式是 59.96 Hz。真實硬體不太可能在切換水平模式時改變行掃描率，
+  但目前沒有實機量測可據以修正，故保留 MAME-derived 值並記錄此疑點。
 
 ## 真實 Boom Zoo 證據
 

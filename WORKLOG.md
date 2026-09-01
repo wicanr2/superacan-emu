@@ -1,5 +1,22 @@
 # 工作歷程
 
+## 2026-09-01：FRC period 對齊固定版 MAME 的實際行為
+
+- 來源：`../acan` 知識庫稽核期間逐行比對固定 commit `6ae579a` 的 `update_frc_state`。
+- 訂正：MAME 的 period 運算式 `((m_frc_control & 0xff << 16) | m_frc_frequency)` 依 C++
+  運算子優先序等於 `control & 0x00ff0000`，對 16 位元的 control 恆為 0，因此該 oracle 的
+  實際 period 只有 frequency，其逐 case 時間感也是照這個值校出來的。`chip/frc` 原本實作
+  字面上的 24 位組合，在 mode 1／mode `$F` 會比 oracle 慢兩個數量級
+  （magipool `$a201`／`$0104`：0x104 → 0x10104）。
+- 變更：`chip/frc/device.go` 改用 `period = frequency`，並在程式旁註明來源與理由；
+  `chip/frc` 與 `machine` 的三個相關測試期望值同步更新；`docs/frc-timer.md` 改寫該條契約。
+- 另記：`docs/umc6618-implementation.md` 補上 320／256 模式的行時序繼承自 MAME 的
+  `455/8` 與 `342/10`，因此兩模式幀率分別是 56.3 Hz 與 59.96 Hz。此疑點缺實機量測，
+  維持 MAME-derived 值不改。
+- 驗證：`superacan-ebitengine:go1.26.7-v1` 容器內 `go test ./...` 全綠；frontend 與
+  `cmd/acan` 首次編譯需下載 Ebitengine 模組，該次開放網路，`go.mod`／`go.sum` 未變動。
+- 邊界：本輪由 `../acan` 稽核工作階段代改，只動 FRC 契約與兩份文件，未碰其他子系統。
+
 ## 2026-08-31：接手與文件基線
 
 - 目標：接手 Super A'Can 模擬器，讀取 `../acan` 與對應 Kimi session，建立模擬器專用

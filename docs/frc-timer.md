@@ -8,8 +8,11 @@ acknowledge 後才由該邊界重新開始完整週期。
 目前週期規則固定標示為 **MAME-derived／unknown-hardware**：
 
 - 只有 `(control & $ff00) == $a200` 啟用。
-- 24 位 period 為 `((control & $ff) << 16) | frequency`；mode nibble 本身因此也是
-  period 高位的一部分，不能拆開計算。
+- period 取 `frequency` 暫存器本身。MAME 的來源寫成
+  `((m_frc_control & 0xff << 16) | m_frc_frequency)`，但依 C++ 運算子優先序等於
+  `control & 0x00ff0000`，對 16 位元的 control 恆為 0；因此該固定版 oracle 的實際
+  period 只有 frequency，其逐 case 的時間感（magipool `$a201`／`$0104` 等）也是照這個
+  值校出來的。不採用該式面上看起來的 24 位組合。
 - `control & $f == 0`：固定 10,738,635 個 68000 cycles（MAME 的 1 Hz HACK）。
 - mode 1：`1024 * period` cycles。
 - mode `$f`：`8192 * period` cycles。

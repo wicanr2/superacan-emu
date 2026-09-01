@@ -164,7 +164,7 @@ func TestFRCWordTransactionsConfigureDeviceOnce(t *testing.T) {
 	if frequency, _ := b.Read16(0xe90016); frequency != 2 {
 		t.Fatalf("frequency=$%04X", frequency)
 	}
-	if b.FRC().RemainingCycles() != 1024*0x010002 {
+	if b.FRC().RemainingCycles() != 1024*2 {
 		t.Fatalf("remaining=%d", b.FRC().RemainingCycles())
 	}
 }

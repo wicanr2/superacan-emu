@@ -192,7 +192,7 @@ func TestFRCIRQ3UsesSharedTimelineAndHoldAcknowledge(t *testing.T) {
 	}
 	_ = system.Bus.Write16(0xe90016, 1)
 	_ = system.Bus.Write16(0xe90014, 0xa201)
-	want := int64(1024 * 0x010001)
+	want := int64(1024 * 1)
 	if err := system.Timeline.Advance(m68k.Phase{Kind: m68k.PhaseInternal, Cycles: 4}); err != nil {
 		t.Fatal(err)
 	}

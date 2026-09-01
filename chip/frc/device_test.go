@@ -6,7 +6,7 @@ func TestModeOneRaisesLevelUntilAcknowledgeAndReschedules(t *testing.T) {
 	d := New()
 	d.WriteFrequency(2)
 	d.WriteControl(0xa201)
-	want := int64(1024 * 0x010002)
+	want := int64(1024 * 2)
 	if !d.Active() || !d.SupportedMode() || d.RemainingCycles() != want {
 		t.Fatalf("initial device=%+v", *d)
 	}
@@ -32,7 +32,7 @@ func TestKnownModesAndUnknownModeFailClosed(t *testing.T) {
 	}
 	d.WriteFrequency(3)
 	d.WriteControl(0xa20f)
-	if d.RemainingCycles() != 8192*0x0f0003 {
+	if d.RemainingCycles() != 8192*3 {
 		t.Fatalf("mode F cycles=%d", d.RemainingCycles())
 	}
 	d.WriteControl(0xa202)
