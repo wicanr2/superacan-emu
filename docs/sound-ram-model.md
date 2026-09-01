@@ -47,15 +47,28 @@ snapshot+190、gfx mode 進 snapshot+191**。全 `.text` 掃描顯示兩者各�
 - `chip/umc6618` 保存 `pixelMode = value & 0x1f` 並在 register `$1F0` 讀回，renderer
   不使用 bit 3／bit 4，與上表一致。
 
-## 待實作：ROZ 的 pixel-mode bit 3 路徑
+## ROZ 的 pixel-mode bit 3 路徑：不實作
 
-`chip/umc6618` 目前保存 `pixelMode = value & 0x1f` 並在 `$1F0` 讀回，
-`tilemapRegion()` 用 `pixelMode & 7` 查與 Bcan／MAME 相同的三張表——這部分已符合契約。
-**尚未實作的是 bit 3 的 ROZ 分支**。要補的話依此順序：
+`chip/umc6618` 保存 `pixelMode = value & 0x1f` 並在 `$1F0` 讀回，`tilemapRegion()` 以
+`pixelMode & 7` 查與 Bcan／MAME 相同的三張表——這部分已符合契約。
 
-1. 先在 headless 加一個純記錄探針，統計八款 ROM 執行期間 `(pixel_mode == 8) && ROZ 8bpp`
-   同時成立的幀數。若沒有任何遊戲命中，這條路徑就不影響現有驗證集，可延後。
-2. F003（The Son of Evil）寫 `$0009` 且使用 ROZ，是最可能命中的候選；先取它的
-   Bcan 同畫面截圖與本專案輸出做差分，確認差異確實落在 ROZ 層。
-3. 實作後標為 `confirmed-Bcan`，並記錄改前改後的 framebuffer hash。硬體是否如此仍未知，
-   不得標成 `confirmed-hardware`。
+Bcan 另有一條只在 ROZ 層生效的 bit 3 分支（條件：`(reg$1F0 & 0x18) == 0x08` 且
+`(roz_mode & 3) == 3`，即 ROZ 為 8bpp）。**本專案不實作它**，理由是實測該條件不可達：
+
+| ROM（1200 幀） | pixel bit 3 | ROZ 致能 | ROZ 8bpp | 三者同時成立 |
+|---|---:|---:|---:|---:|
+| Boom Zoo | 191 | 191 | 0 | 0 |
+| Monopoly | 192 | 355 | 0 | 0 |
+| Speedy Dragon | 191 | 781 | 0 | 0 |
+| Formosa Duel | 191 | 191 | 0 | 0 |
+| Sango Fighter | 192 | 191 | 0 | 0 |
+| Journey to the Laugh | 191 | 191 | 0 | 0 |
+| Super Taiwanese Baseball League | 191 | 1052 | 0 | 0 |
+| The Son of Evil | 231 | 1136 | 759 | 0 |
+
+The Son of Evil 延長到 6000 幀後為 `pixel bit 3 = 317`、`ROZ 8bpp = 4274`、同時成立 0 幀。
+bit 3 只出現在八款共用的 A'Can 開機 logo 段落，而該段 ROZ 是 1bpp，與分支要求互斥。
+
+要重新評估這個決定，需要先出現「能讓兩個條件同時成立」的具名遊戲路徑；屆時再依
+Bcan 的規則實作並做同畫面差分。量測用的探針沒有進版控，重建方式見
+`../acan/docs/f003-video-mode.md` §7.5。

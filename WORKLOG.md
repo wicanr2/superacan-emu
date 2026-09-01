@@ -1,5 +1,13 @@
 # 工作歷程
 
+## 2026-09-01：ROZ bit 3 分支確認不實作
+
+- 以純記錄探針量測 Bcan ROZ bit 3 分支的條件（`(reg$1F0 & 0x18) == 0x08` 且 ROZ 8bpp）：
+  八款 ROM 各 1200 幀、The Son of Evil 另跑 6000 幀，同時成立的幀數皆為 0。
+- bit 3 只出現在八款共用的開機 logo 段落（各約 191 幀），該段 ROZ 為 1bpp，與分支要求的
+  8bpp 互斥。因此 `docs/sound-ram-model.md` 由「待實作」改為「不實作」，並附量測表。
+- 探針未進版控；`chip/umc6618` 與 `cmd/acan-headless` 沒有因此變更。
+
 ## 2026-09-01：`$F001F0` 契約修正（bit 3 在 ROZ 層有作用）
 
 - 由 `../acan` 稽核工作階段以 IDA 逐指令追出 Bcan 的資料流後，前一則「pixel mode 不進入
