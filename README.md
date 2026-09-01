@@ -198,7 +198,11 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
   執行層的結構、時間模型與已定案的勘誤
 - [`docs/x11-frontend.md`](docs/x11-frontend.md)：純 Go X11 前端的契約、驗證與限制
 - [`docs/save-state.md`](docs/save-state.md)：存檔版面、交易式載入契約與涵蓋範圍
-- [`docs/ui-plan.md`](docs/ui-plan.md)：使用者介面的架構決定、畫面清單與分階段交付
+- [`docs/ui-design.md`](docs/ui-design.md)：使用者介面設計——Bcan 功能對照、畫面線框、
+  三平台差異化、互動模型、文案與分階段驗收條件
+- [`docs/bcan-ui-inventory.md`](docs/bcan-ui-inventory.md)：Bcan 0.0.8b 的介面功能盤點
+- [`docs/ui-font.md`](docs/ui-font.md)：介面字型涵蓋範圍與散布授權查核
+- [`docs/platform-targets.md`](docs/platform-targets.md)：三個發行平台的建置矩陣與 cgo 邊界
 - [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、

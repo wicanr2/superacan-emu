@@ -55,6 +55,25 @@ XQuartz 才有 X server，Android 根本沒有。這兩個目標的「成功」�
 選項 1 的代價是砍掉 Android，選項 3 的代價是白做。**這一項需要使用者拍板**，
 在拍板之前不動現有程式。
 
+## `oto/v3` 在 darwin 是無 cgo 的
+
+單獨建置 `github.com/ebitengine/oto/v3`（`CGO_ENABLED=0`）：
+
+| 目標 | 結果 |
+|---|---|
+| darwin/arm64 | 成功 |
+| darwin/amd64 | 成功 |
+| linux/amd64 | 失敗 |
+| android/arm64 | 失敗 |
+
+darwin 的 oto 走 purego 呼叫 CoreAudio，不需要 cgo。這把 macOS 的缺口縮小了：
+**macOS 缺的只是視窗與繪圖層，音訊已經有無 cgo 的路徑。** Ebitengine 在 darwin
+失敗的位置是 `internal/graphicsdriver/opengl/graphics_macos.go` 用到 `glfw.Window`，
+而 glfw 的 darwin 實作在禁 cgo 下沒有編進來。
+
+因此選項 1（維持全禁）在 macOS 上要做的是「以 purego 建立 Cocoa 視窗並把 RGBA
+緩衝貼上去」，不必連音訊一起自己寫。這比原先估的小，但仍是一個新的平台層。
+
 ## 不受影響的部分
 
 不論選哪一個，這些都成立：
