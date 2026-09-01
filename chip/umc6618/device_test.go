@@ -105,6 +105,33 @@ func TestROZPerLineParameterTables(t *testing.T) {
 	}
 }
 
+func TestROZBitmapModeFollowsPixelModeBit3(t *testing.T) {
+	device := New()
+	device.WriteRegister(0xc0, 0x0423) // 32 tile 寬、wrap、8bpp region
+	device.WriteRegister(0xc1, 0x0003) // bitmap 模式的 palette bank
+	device.WriteRegister(0xca, 0x0800) // tilemap map base（word index $1000）
+	device.WriteVRAM16(0x2000+(3*32+2)*2, 0x0005)
+	device.WriteVRAM8(5*64+1*8+2, 0x77)
+	device.WriteVRAM8(4*256+18, 0x42)
+
+	device.WriteRegister(0xf8, 0x0001)
+	if pixel := device.rozPixel(18, 25); pixel != 0x77 {
+		t.Fatalf("bit 3 清除時未走 tilemap 路徑：$%X", pixel)
+	}
+	device.WriteRegister(0xf8, 0x0009)
+	if pixel := device.rozPixel(18, 4); pixel != 0x0342 {
+		t.Fatalf("bit 3 設起時未走 bitmap 路徑：$%X", pixel)
+	}
+	device.WriteRegister(0xcb, 0x0040) // 基底 = 4 × $40 = $100
+	if pixel := device.rozPixel(18, 4); pixel != 0x0300 {
+		t.Fatalf("bitmap 基底未跟隨 $F00196：$%X", pixel)
+	}
+	device.WriteVRAM8(0x100+4*256+18, 0x11)
+	if pixel := device.rozPixel(18, 4); pixel != 0x0311 {
+		t.Fatalf("bitmap 基底位移後取值錯誤：$%X", pixel)
+	}
+}
+
 func TestIRQStatusReadAndSingleSpriteDMATrigger(t *testing.T) {
 	device := New()
 	device.SetScanline(240)

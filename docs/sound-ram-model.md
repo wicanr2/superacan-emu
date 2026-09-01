@@ -33,9 +33,10 @@ snapshot+190、gfx mode 進 snapshot+191**。全 `.text` 掃描顯示兩者各�
   layer2 恆為 2），再由 `{8,4,2,1,1,0,0,0}` 換成 bpp——與 MAME `get_tilemap_region()` 一致。
 - pixel mode 只在 ROZ 區塊被讀：`v263 = (ROZ region == 0) && (pixel_mode == 8)`，其中
   ROZ region 由 `(roz_mode & 3)` 經 `{4,2,1,0}` 取得（即 `{1bpp,2bpp,4bpp,8bpp}`）。
-  該旗標為真時，ROZ 改走 24-bit 逐行取值、**不加**全域 ROZ scroll 基底，並在每個像素多做
-  一次以 ROZ tile bank（raw `$196`）為基底、搭配 ROZ tile mode（raw `$182`）低 4 bit
-  palette bank 的 VRAM 遮罩查表，未通過就跳過該像素。
+  該旗標為真時，ROZ 整層改成**線性 bitmap**：跳過 tilemap 與 tile 圖形，直接以
+  `addr = ((8 × (x + width × y)) >> 3 + 4 × $F00196) & 0x1FFFF` 逐像素讀 VRAM，
+  palette bank 取自 ROZ tile mode（raw `$182`）低 4 bit，像素值 0 為透明；
+  逐行參數則改走 24-bit 取值且**不加**全域 ROZ scroll 基底。
 
 完整指令佐證見 `../acan/docs/f003-video-mode.md` §7。
 
@@ -44,31 +45,24 @@ snapshot+190、gfx mode 進 snapshot+191**。全 `.text` 掃描顯示兩者各�
 - `machine.Bus` 預設 `soundRAMMask = 0xffff`，符合上表契約。
   `SetSoundRAMAlias(true)` 與 headless `--sound-ram-alias` 只作為 32 KiB 假說的診斷開關
   保留，附帶上下半區對撞偵測；預設關閉，不影響任何驗證路徑。
-- `chip/umc6618` 保存 `pixelMode = value & 0x1f` 並在 register `$1F0` 讀回，renderer
-  不使用 bit 3／bit 4，與上表一致。
+- `chip/umc6618` 保存 `pixelMode = value & 0x1f` 並在 register `$1F0` 讀回；
+  `tilemapRegion()` 以 `pixelMode & 7` 查表，`rozBitmapPixel()` 實作 bit 3 的 bitmap 路徑。
 
-## ROZ 的 pixel-mode bit 3 路徑：不實作
+## ROZ 的 pixel-mode bit 3 路徑：已實作並逐像素對過
 
-`chip/umc6618` 保存 `pixelMode = value & 0x1f` 並在 `$1F0` 讀回，`tilemapRegion()` 以
-`pixelMode & 7` 查與 Bcan／MAME 相同的三張表——這部分已符合契約。
+條件為 `(reg$1F0 & 0x18) == 0x08` 且 `(roz_mode & 3) == 3`（ROZ 為 8bpp）。成立時
+`rozPixel()` 轉呼叫 `rozBitmapPixel()`：
 
-Bcan 另有一條只在 ROZ 層生效的 bit 3 分支（條件：`(reg$1F0 & 0x18) == 0x08` 且
-`(roz_mode & 3) == 3`，即 ROZ 為 8bpp）。**本專案不實作它**，理由是實測該條件不可達：
+```text
+bit   = 8 × (x + 8 × 版面 tile 欄數 × y)
+addr  = ((bit >> 3) + 4 × registers[0xcb]) & (VRAMSize - 1)
+pixel = VRAM[addr] + (registers[0xc1] & 0x0f) << 8
+```
 
-| ROM（1200 幀） | pixel bit 3 | ROZ 致能 | ROZ 8bpp | 三者同時成立 |
-|---|---:|---:|---:|---:|
-| Boom Zoo | 191 | 191 | 0 | 0 |
-| Monopoly | 192 | 355 | 0 | 0 |
-| Speedy Dragon | 191 | 781 | 0 | 0 |
-| Formosa Duel | 191 | 191 | 0 | 0 |
-| Sango Fighter | 192 | 191 | 0 | 0 |
-| Journey to the Laugh | 191 | 191 | 0 | 0 |
-| Super Taiwanese Baseball League | 191 | 1052 | 0 | 0 |
-| The Son of Evil | 231 | 1136 | 759 | 0 |
+流通 ROM 走不到這條路徑——八款各 1200 幀（The Son of Evil 另延長到 6000 幀）中三個條件
+從未同時成立，bit 3 只出現在共用的開機 logo 段落而該段 ROZ 是 1bpp。驗證因此改用知識庫
+的自製卡帶 `acan/homebrew/bit3probe/`：它讓 ROZ 停在 8bpp region 並每 300 幀切換
+`$F001F0`，兩個相位的畫面與 Bcan 0.0.8b 的 F8 截圖**逐像素相同**（兩張 SHA-256 皆一致，
+相異像素 0／76800）。
 
-The Son of Evil 延長到 6000 幀後為 `pixel bit 3 = 317`、`ROZ 8bpp = 4274`、同時成立 0 幀。
-bit 3 只出現在八款共用的 A'Can 開機 logo 段落，而該段 ROZ 是 1bpp，與分支要求互斥。
-
-要重新評估這個決定，需要先出現「能讓兩個條件同時成立」的具名遊戲路徑；屆時再依
-Bcan 的規則實作並做同畫面差分。量測用的探針沒有進版控，重建方式見
-`../acan/docs/f003-video-mode.md` §7.5。
+原理、指令位址與基底倍率的對照實驗見 `../acan/docs/f003-video-mode.md` §7.3、§7.6。

@@ -1,5 +1,19 @@
 # 工作歷程
 
+## 2026-09-01：ROZ bit 3 改為實作 bitmap 路徑，並移除多餘的整層翻轉
+
+- 知識庫的自製卡帶 `acan/homebrew/bit3probe/` 讓 bit 3 分支變成可達路徑，因此推翻同日
+  稍早「不實作」的決定。`rozPixel()` 在 `(reg$1F0 & 0x18) == 0x08` 且 ROZ 為 8bpp region
+  時改呼叫新的 `rozBitmapPixel()`：VRAM 當線性點陣圖，基底 `4 × $F00196`、遮罩
+  `VRAMSize-1`、palette bank 取 `$F00182` 低 4 bit、像素值 0 透明。
+- 驗證：同一顆卡帶在本專案與 Bcan 0.0.8b 的兩個相位畫面**逐像素相同**（相異 0／76800，
+  SHA-256 一致）。單元測試 `TestROZBitmapModeFollowsPixelModeBit3` 另外釘住基底倍率。
+- 一併移除 `rozPixel()` 的整層 X/Y flip。ROZ 的 mode bit 1/0 是 region 選擇，Bcan 的 ROZ
+  迴圈只用 `& 3`、`& 0x20`、`& 0xF00`、`& 0x40`，沒有翻轉；原本那兩行是初版從 tilemap
+  路徑帶過來的。1bpp（region 4）路徑提前返回，不受影響。
+- 待辦：The Son of Evil 有長時間的 ROZ 8bpp 畫面，翻轉移除後應與 Bcan 做一次同畫面差分，
+  確認改善而非只是換一種錯法。
+
 ## 2026-09-01：ROZ bit 3 分支確認不實作
 
 - 以純記錄探針量測 Bcan ROZ bit 3 分支的條件（`(reg$1F0 & 0x18) == 0x08` 且 ROZ 8bpp）：

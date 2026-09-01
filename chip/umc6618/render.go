@@ -291,13 +291,10 @@ func (d *Device) rozPixel(x, y uint32) uint16 {
 		value := d.readSwapped(uint32(tile*8) + (y & 7))
 		return uint16(value >> uint(7-(x&7)) & 1)
 	}
-	xs, ys := tilemapDimensions(mode)
-	if mode&2 != 0 {
-		x = uint32(xs*8-1) - x
-	}
-	if mode&1 != 0 {
-		y = uint32(ys*8-1) - y
-	}
+	// ROZ 的 mode bit 1/0 是 region 選擇，不是 tilemap 那種全層 X/Y flip：
+	// Bcan 的 ROZ 迴圈只用 `& 3`（region）、`& 0x20`（wrap）、`& 0xF00`（尺寸）
+	// 與 `& 0x40`，沒有任何整層翻轉。
+	xs, _ := tilemapDimensions(mode)
 	entry := d.vramWord((uint32(d.registers[0xca]) << 1) + uint32((int(y)>>3)*xs+(int(x)>>3)))
 	palette := int(entry >> 12)
 	if d.registers[0xc1]&0x0200 != 0 {
