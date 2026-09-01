@@ -51,9 +51,16 @@
 - [x] 固定 Ebitengine v2.9.9，建立 `cmd/acan` 視窗入口、P1 鍵盤、RGBA framebuffer、
   48 kHz 音訊、`--frames` 有界 smoke 與 PNG 輸出；三款 ROM 1200-frame Xvfb 路徑
   均得到可辨識畫面，指令數與 framebuffer hash 完全吻合 headless 基準。
-- [ ] 以同畫面 oracle 做像素差分並修正優先度與邊界行為。主要 oracle 改為 Bcan 0.0.8b
-  （證據等級 `confirmed-Bcan`，高於 archived C++ 與 MAME-derived）；archived C++ 只作
-  次要對照。完成條件：至少一款 ROM 的靜態畫面能逐像素比對並分類每一處差異。
+- [x] 建立 Bcan 0.0.8b 畫面 oracle 管線：`docker/bcan-oracle.Dockerfile`、
+  `docker/bcan-oracle.sh`、`acan-headless --screenshot-dir/--screenshot-every` 與
+  `cmd/acan-imgdiff`。第一輪已定位並修正 5 位元調色盤展開，見
+  `docs/bcan-oracle-diff.md`。
+- [ ] 在靜止畫面（標題選單）上完成逐像素差分並分類每一處差異。目前被 CPU 擋住：
+  Boom Zoo 第 1,695 個 frame 遇 `$D06A` 停止，走不到標題。完成條件：至少一款 ROM
+  的靜止畫面差異能逐項標成 renderer 缺陷、oracle 侷限或硬體 unknown。
+- [ ] 決定 68000 ISA 的收斂方式。目前 `cpu/m68k` 是 233 個「操作×大小×定址模式」的
+  個別 case，每遇到一個新組合就要新增一條；這條路線沒有終點。完成條件：先產出
+  一般化 effective-address／operand 執行層的設計，再决定是否重寫，不再逐一補 case。
 - [ ] 補齊尚未由現有 ROM 與合成測試覆蓋的 W65C02 ISA／NMI／WAI 邊界，並將 3:1 排程
   收斂成可驗證的 cycle 邊界。
 - [x] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ 來源，並接上

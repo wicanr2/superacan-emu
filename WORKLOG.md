@@ -287,3 +287,29 @@
 - 畫面正確性的主要 oracle 由 archived C++ 改為 Bcan 0.0.8b。理由是證據優先序：Bcan 是
   `confirmed-Bcan` 等級的固定版本二進位，archived C++ 與 MAME driver 同屬更低一級。
 
+## 2026-09-01：Bcan 畫面 oracle 管線與 5 位元調色盤展開
+
+- 建立可重現的 oracle 管線：`docker/bcan-oracle.Dockerfile`（Ubuntu 24.04、wine64 9.0、
+  Xvfb、openbox、xdotool、ImageMagick、Mesa）與 `docker/bcan-oracle.sh`。Bcan 0.0.8b 的
+  F8 截圖直接取自 UM6618 顯示孔徑，輸出固定 320×240 PNG，與本專案的 framebuffer
+  可逐像素比較。版權輸入全部外部掛載，不進映像也不進版控。
+- 環境限制實測：Xvfb 無視窗管理員時 Wine 收不到 xdotool 鍵盤事件（需 openbox）；
+  Ctrl+O 無效，開檔必須點選單；Bcan 沒有 argv 載入 ROM 的路徑。
+- 工具面新增 `acan-headless --screenshot-dir/--screenshot-every`（單次執行輸出多張取樣
+  幀）與 `cmd/acan-imgdiff`（逐像素比對、目錄搜尋最接近幀、差異遮罩、`--width` 限制
+  比較欄數）。
+- 第一個定案差異：5 位元調色盤分量展開。同一像素 Bcan 輸出 `21/10/73`，本專案輸出
+  `20/10/70`，反推分量 R=4、G=2、B=14；Bcan 等於 `v<<3 | v>>2`，MAME 宣告的
+  `palette_device::xBGR_555` 亦同。已改為 `expand5` 並補上不依賴商業 ROM 的回歸測試。
+  Boom Zoo 開場同一張 oracle 截圖差異由 42.51%／平均 13.09 降到 15.03%／10.54。
+- 256 模式的右側 64 欄兩邊語意不同（本專案輸出黑、Bcan 填滿 320 欄），實測 frame 600
+  的 6,119 個差異像素落在 `x ≥ 256`。這是孔徑處理差異不是圖層錯誤，比較一律加
+  `--width 256`；硬體真相仍列 unknown，不依 Bcan 截圖改寫 renderer。
+- 1200-frame framebuffer SHA-256 三款全部更新，指令數不變：Speedy Dragon
+  `d3e533…5b7d67`、Formosa Duel `085626…404d587`、Boom Zoo `3784f8…94155562`。
+- 阻擋項：Boom Zoo 在第 1,695 個 frame（第 24,181,668 條指令、PC `$007D2E`）遇未實作
+  opcode `$D06A`（`ADD.W (d16,A2),D0`）停止，走不到靜止的標題選單，因此還無法做
+  沒有動畫相位干擾的定案差分。
+- 同時盤點到 `cpu/m68k` 目前是 233 個「操作×大小×定址模式」個別 case 的結構，逐一
+  補 case 沒有終點；已列入 worklist 要求先做一般化 EA 執行層的設計再決定重寫。
+

@@ -182,6 +182,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
   palette、VRAM、scanline 與真實卡帶交易證據
 - [`docs/ebitengine-frontend.md`](docs/ebitengine-frontend.md)：GUI／machine deadline 邊界、
   依賴版本、88-frame smoke 與目前畫面限制
+- [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)：Bcan 0.0.8b 畫面 oracle 管線、
+  可比與不可比的部分、5 位元調色盤展開的證據
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
 	"github.com/wicanr2/superacan-emu/chip/umc6619"
@@ -25,6 +26,8 @@ func main() {
 	steps := flag.Uint64("instructions", 1, "number of 68000 instructions to execute")
 	frames := flag.Uint64("frames", 0, "run this many completed hardware frames instead of --instructions")
 	screenshot := flag.String("screenshot", "", "write the final framebuffer as PNG")
+	screenshotDir := flag.String("screenshot-dir", "", "write one PNG per sampled frame into this existing directory")
+	screenshotEvery := flag.Uint64("screenshot-every", 1, "with --screenshot-dir, sample every Nth completed frame")
 	wavPath := flag.String("wav", "", "write resampled 48000 Hz signed 16-bit stereo WAV")
 	layerMask := flag.Uint("layer-mask", uint(umc6618.AllLayers), "diagnostic render mask: tilemaps=1/2/4 sprite=8 ROZ=16 windows=32")
 	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
@@ -128,6 +131,16 @@ func main() {
 			if _, err = system.RunFrame(2_000_000); err != nil {
 				break
 			}
+			if *screenshotDir != "" && *screenshotEvery > 0 && (frame+1)%*screenshotEvery == 0 {
+				video := system.Bus.Video()
+				name := filepath.Join(*screenshotDir, fmt.Sprintf("frame-%06d.png", frame+1))
+				if writeErr := writePNG(name, video.Framebuffer()); writeErr != nil {
+					fail(writeErr.Error())
+				}
+				sum := video.FramebufferSHA256()
+				fmt.Printf("sample frame=%d nonblack=%d framebuffer_sha256=%s file=%s\n",
+					frame+1, video.NonblackPixels(), hex.EncodeToString(sum[:]), name)
+			}
 		}
 		result.Opcode = system.M68K.State().IRD
 	}
@@ -173,17 +186,8 @@ func main() {
 		fail(err.Error())
 	}
 	if *screenshot != "" {
-		output, createErr := os.Create(*screenshot)
-		if createErr != nil {
-			fail(fmt.Sprintf("create screenshot: %v", createErr))
-		}
-		encodeErr := presentation.EncodePNG(output, umc6618.Width, umc6618.Height, system.Bus.Video().Framebuffer())
-		closeErr := output.Close()
-		if encodeErr != nil {
-			fail(fmt.Sprintf("encode screenshot: %v", encodeErr))
-		}
-		if closeErr != nil {
-			fail(fmt.Sprintf("close screenshot: %v", closeErr))
+		if writeErr := writePNG(*screenshot, system.Bus.Video().Framebuffer()); writeErr != nil {
+			fail(writeErr.Error())
 		}
 	}
 	if *wavPath != "" {
@@ -229,4 +233,21 @@ func loadLinear(path string, expectedSize int) media.Image {
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, "acan-headless:", message)
 	os.Exit(1)
+}
+
+// writePNG 把單張 framebuffer 寫成 PNG，錯誤訊息帶檔名以便回查。
+func writePNG(name string, framebuffer []uint32) error {
+	output, err := os.Create(name)
+	if err != nil {
+		return fmt.Errorf("create screenshot %s: %w", name, err)
+	}
+	encodeErr := presentation.EncodePNG(output, umc6618.Width, umc6618.Height, framebuffer)
+	closeErr := output.Close()
+	if encodeErr != nil {
+		return fmt.Errorf("encode screenshot %s: %w", name, encodeErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close screenshot %s: %w", name, closeErr)
+	}
+	return nil
 }

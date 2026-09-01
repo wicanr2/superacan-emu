@@ -36,7 +36,7 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
-| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 已非黑且 hash 可重現；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，oracle 畫面差分尚未完成 |
+| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 開場與 Bcan 截圖同區域已可逐像素對照；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，靜態畫面的定案差分待 CPU 走到標題選單 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置 | 1,300,000 條 68k／1,524,044 條 65C02；雙 overlay 關閉 |
 | Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 三款 ROM 各 1200 frames，指令數與 framebuffer hash 均吻合 headless；目前需 cgo，違反已定案的禁 cgo 政策，待改為純 Go 呈現層 |
 | bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |
@@ -81,6 +81,9 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 - 65C02 reset 必須在 CLK 核心實際消耗 cycle 時保持有效，直到向量讀取序列開始；
   IRQ 來源是 level-held 且各有專屬 ack，`$0411` 只回報狀態。
 - Speedy Dragon 實際第二音效驅動上傳路徑與舊靜態猜測不同；目前路徑已可播放。
+- 調色盤 5 位元分量展開為 `v<<3 | v>>2`，`$1F` 對到 `$FF`。Bcan 截圖像素與 MAME 的
+  `palette_device::xBGR_555` 兩個 oracle 一致；先前的 `v<<3` 讓每個非黑顏色都偏暗最多 7。
+  1200-frame framebuffer SHA-256 基準因此全部更新，指令數不變。
 
 ## 尚未升格為硬體事實
 
@@ -97,6 +100,8 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 18,515,145、Formosa Duel 19,272,069、Boom Zoo 17,370,088 條 68000 指令，均有可辨識
 framebuffer；三款亦有非零音訊資料。下一個交付閘門是像素層級的正確性：以 Bcan 0.0.8b
 作同畫面 oracle，逐項定位 UM6618 圖層、優先度與調色差異，取代目前「畫面可辨識」這種
-只到構圖層級的證據。平行未完成的是禁 cgo 政策落地（純 Go 桌面呈現層）與實機音訊、
+只到構圖層級的證據。管線與第一輪結果見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。
+擋在嚴格差分前面的是 CPU：Boom Zoo 在第 1,695 個 frame 因未實作 opcode `$D06A` 停止，
+還走不到適合逐像素定案的靜止標題選單。平行未完成的是禁 cgo 政策落地（純 Go 桌面呈現層）與實機音訊、
 鍵盤驗收；之後才進入 Linux 發行包與 macOS 工具鏈。尚未被遊戲覆蓋的 ISA／硬體模式
 保留明確證據限制。

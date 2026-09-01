@@ -447,15 +447,21 @@ func (d *Device) RenderFrameLayers(layerMask uint8) {
 			color := uint32(0xff000000)
 			if x < width {
 				entry := d.palette[indexed[y*Width+x]&0xff]
-				r := uint32(entry&0x1f) << 3
-				g := uint32(entry>>5&0x1f) << 3
-				b := uint32(entry>>10&0x1f) << 3
+				r := expand5(uint32(entry & 0x1f))
+				g := expand5(uint32(entry >> 5 & 0x1f))
+				b := expand5(uint32(entry >> 10 & 0x1f))
 				color |= r<<16 | g<<8 | b
 			}
 			d.framebuffer[y*Width+x] = color
 		}
 	}
 }
+
+// expand5 把調色盤的 5 位元分量展開成 8 位元，複製高 3 位到低位，
+// 使 $1F 對到 $FF 而不是 $F8。證據：Bcan 0.0.8b 的 320x240 截圖對同一 palette
+// 值輸出 $21/$10/$73（confirmed-Bcan），與 MAME supracan driver 宣告的
+// palette_device::xBGR_555（pal5bit）一致；兩個 oracle 同時支持此展開。
+func expand5(value uint32) uint32 { return value<<3 | value>>2 }
 
 func (d *Device) Framebuffer() []uint32 { return d.framebuffer[:] }
 

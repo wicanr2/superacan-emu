@@ -25,9 +25,9 @@
 
   | ROM | 68000 指令 | framebuffer SHA-256 |
   |---|---:|---|
-  | Speedy Dragon | 18,515,145 | `c49af07407d6de2f32894ac6fc6f646e9baf6bc0f560e7f61da19d6c42c07794` |
-  | Formosa Duel | 19,272,069 | `5e5e2f585abfa42790a9b36302ba729319cf469e5a2e01e1f02079aec7363477` |
-  | Boom Zoo | 17,370,088 | `fe17ad3c89b2ad8c3a6dbde1821b119d5b2a02677366132f6a67a09170fb7aa5` |
+  | Speedy Dragon | 18,515,145 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
+  | Formosa Duel | 19,272,069 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
+  | Boom Zoo | 17,370,088 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
 
 - 三張 PNG 分別可辨識道路角色、標題／START 與房間場景，不再是早期 88-frame 的
   錯誤重複圖樣。

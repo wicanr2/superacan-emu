@@ -30,7 +30,7 @@ func TestRenderWindowAndBlankedWideArea(t *testing.T) {
 
 	device.RenderFrame()
 	frame := device.Framebuffer()
-	if frame[0] != 0xfff80000 || frame[1] != 0xfff80000 {
+	if frame[0] != 0xffff0000 || frame[1] != 0xffff0000 {
 		t.Fatalf("window pixels=$%08X,$%08X", frame[0], frame[1])
 	}
 	if frame[2] != 0xff000000 || frame[256] != 0xff000000 {
@@ -38,6 +38,29 @@ func TestRenderWindowAndBlankedWideArea(t *testing.T) {
 	}
 	if count := device.NonblackPixels(); count != Height*2 {
 		t.Fatalf("nonblack pixels=%d", count)
+	}
+}
+
+func TestPaletteFiveBitExpansionReplicatesHighBits(t *testing.T) {
+	device := New()
+	device.WriteRegister(4, 0x0002) // window 0 覆蓋整條掃描線
+	device.WriteRegister(0xe8, 0x0001)
+	device.WriteRegister(0xe9, 0x0100)
+	device.WriteVRAM16(0x0400, 0)
+	device.WriteVRAM16(0x0402, 2)
+
+	// R=17、G=0、B=14：非飽和值才能分辨 value<<3 與 value<<3|value>>2。
+	device.WritePalette(1, 0x3811)
+	device.RenderFrame()
+	if pixel := device.Framebuffer()[0]; pixel != 0xff8c0073 {
+		t.Fatalf("unsaturated pixel=$%08X, want $FF8C0073", pixel)
+	}
+
+	// R=31 必須展開成 $FF，不是 $F8。
+	device.WritePalette(1, 0x001f)
+	device.RenderFrame()
+	if pixel := device.Framebuffer()[0]; pixel != 0xffff0000 {
+		t.Fatalf("saturated pixel=$%08X, want $FFFF0000", pixel)
 	}
 }
 

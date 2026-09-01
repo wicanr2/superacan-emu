@@ -26,6 +26,10 @@ Monopoly 原先在第 95,188 條、PC `$002416` 因尚未實作 opcode `$0C79` �
 逐行表仍會產生圖樣，證明問題不只在三張 scaling table，而在 1bpp ROZ 基本 HACK／
 混色或優先度契約。
 
+本節的 framebuffer SHA-256 產生於 5 位元調色盤展開修正之前，現行程式不會重現這些
+值；分層像素數與圖層觀察結論不受影響。展開規則與新基準見
+[`docs/bcan-oracle-diff.md`](bcan-oracle-diff.md)。
+
 ## 勘誤與證據界線
 
 - deprecated C++ renderer 的 `ACAN_LAYERMASK` 預設值是 `0xF`，後來新增 ROZ bit `0x10`
