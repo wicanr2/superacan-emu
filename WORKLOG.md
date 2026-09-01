@@ -482,16 +482,30 @@
 - 新增 `docker/go.sh`：Go 工具鏈在容器內跑，模組來源是主機下載快取的唯讀
   `file://` proxy，解壓與建置快取寫在容器外的工作目錄，不動主機的 `~/go/pkg/mod`。
 
+- 新增 `session` 套件把核心與介面接起來：`ui.Snapshot` 與 `ui.SlotSource` 的實作、
+  Intent 執行、遊戲畫面與覆蓋層的合成。它相依 machine 與 ui 但不相依任何前端，
+  所以三個前端共用同一條流程，而流程本身在沒有視窗的容器裡就能驗證。
+- `--ui-script` 用抽象事件名（`menu`、`down`、`confirm`…）而不是按鍵餵事件，
+  headless 與 X11 兩個入口共用同一份解析。Boom Zoo 實跑：frame 600 開選單存到
+  槽 0、frame 904 讀回，結束時 `video_frame=896`（600＋296）而不是 1200——
+  讀檔沒生效的話這個數字會是 1200。
+- 腳本以主機迴圈次數計時而不是模擬 frame 數。第一版用 frame 數當索引，
+  覆蓋層一開模擬時間就停住，腳本永遠等不到下一個事件，整個程式卡死到逾時。
+- X11 前端接上覆蓋層：`PresentRGBA` 走不放大的送圖路徑，原本的放大路徑保留給
+  沒有覆蓋層的一般情況。Xvfb 內跑完 900 frame 並產生存檔；覆蓋層沒開時三款卡帶
+  各跑 1200 frame，指令數與 framebuffer SHA-256 與 headless 完全相同。
+- 互動鍵位暫定 F1 開選單。Esc 改成「開啟選單」還沒拍板（WORKLIST A1），
+  在那之前 Esc 維持「離開」。
+
 ### 本輪收尾
 
-- HEAD：`faafac3`。
-- 驗證：`docker/go.sh test ./...` 全綠（含 `ui` 的六組畫面雜湊與 `machine` 的
-  存檔拒絕理由一致性測試）；`docker/go.sh vet ./...` 無輸出。九款卡帶各跑
-  1200 frame 全部完成，68000 指令數與 framebuffer SHA-256 記入
-  `docs/verify-ui.md` 作為後續介面階段的 C10 對照。
-- 未證實：`ui` 尚未接上任何前端，兩個前端「叫出選單並完成存讀檔」的手動 smoke
-  還沒做；`touch` 版面只有 1280×720 的渲染，沒有在真實 Android 上看過。
-- 下一個最小行動：P2（S0 無卡帶啟動、S0.1 主機韌體設定、S1 卡帶瀏覽器、S8 關於），
-  並在其中一個前端接上 `ui` 完成第一次 smoke。
-- Docker 清理：本輪全部使用 `docker run --rm`，沒有留下本專案容器；主機的
-  `~/go/pkg/mod` 只以唯讀掛載，未寫入。
+- HEAD：`abea6c1`。
+- 驗證：`docker/go.sh test ./...` 全綠；`docker/go.sh vet ./...` 無輸出；
+  `CGO_ENABLED=0` 建置 `cmd/acan-x11` 通過；Xvfb 內的覆蓋層腳本 smoke 通過；
+  三款卡帶在 X11 前端的 1200-frame 結果與 headless 逐位元相同。
+  九款卡帶的 1200-frame 基準記在 `docs/verify-ui.md`。
+- 未證實：`touch` 版面只有離線渲染，沒有在真實 Android 上看過；Ebitengine 前端
+  還沒接上覆蓋層；音訊輸出仍靠外部播放程序。
+- 下一個最小行動：P2（S0 無卡帶啟動、S0.1 主機韌體設定、S1 卡帶瀏覽器、S8 關於）。
+- Docker 清理：本輪一個逾時的 Xvfb 容器被 `docker stop` 停掉（是本輪自己建立的），
+  其餘全部 `--rm`；沒有留下本專案容器，主機的 `~/go/pkg/mod` 只以唯讀掛載。
