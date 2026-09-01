@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -20,6 +21,7 @@ func main() {
 	soundBIOS2Path := flag.String("sound-bios2", "", "path to 8192-byte internal_6502_2.bin")
 	romPath := flag.String("rom", "", "path to a raw cartridge dump or a cartridge ZIP")
 	savePath := flag.String("save", "", "32768-byte cartridge battery file, loaded at start and written on exit")
+	statePath := flag.String("state", "", "save state file; F5 writes it and F7 restores it")
 	scale := flag.Int("scale", 3, "initial integer window scale")
 	frames := flag.Uint64("frames", 0, "exit after this many emulated frames (0 runs until window close)")
 	screenshot := flag.String("screenshot", "", "write the final emulated framebuffer as PNG")
@@ -60,6 +62,9 @@ func main() {
 	ebiten.SetTPS(60)
 	game := frontend.NewGame(system)
 	game.MaxFrames = *frames
+	game.SaveState = func() error { return writeSaveState(system, *statePath) }
+	game.LoadState = func() error { return readSaveState(system, *statePath) }
+	game.OnStatus = func(message string) { fmt.Fprintln(os.Stderr, "acan:", message) }
 	var audioOutput *frontend.Audio
 	if *hostAudio {
 		audioOutput, err = frontend.NewAudio(system)
@@ -168,4 +173,31 @@ func writeCartridgeSave(system *machine.System, path string) {
 	if err := os.Rename(temporary, path); err != nil {
 		fail(fmt.Sprintf("rename save %s: %v", path, err))
 	}
+}
+
+// writeSaveState 與 readSaveState 是熱鍵路徑：失敗只回報，不中斷正在進行的遊戲。
+func writeSaveState(system *machine.System, path string) error {
+	if path == "" {
+		return fmt.Errorf("no --state path given")
+	}
+	var encoded bytes.Buffer
+	if err := system.SaveState(&encoded); err != nil {
+		return err
+	}
+	temporary := path + ".tmp"
+	if err := os.WriteFile(temporary, encoded.Bytes(), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(temporary, path)
+}
+
+func readSaveState(system *machine.System, path string) error {
+	if path == "" {
+		return fmt.Errorf("no --state path given")
+	}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return system.LoadState(bytes.NewReader(payload))
 }

@@ -197,6 +197,7 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - [`docs/cpu-generic-execution.md`](docs/cpu-generic-execution.md)：68000／65C02 一般化
   執行層的結構、時間模型與已定案的勘誤
 - [`docs/x11-frontend.md`](docs/x11-frontend.md)：純 Go X11 前端的契約、驗證與限制
+- [`docs/save-state.md`](docs/save-state.md)：存檔版面、交易式載入契約與涵蓋範圍
 - [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、

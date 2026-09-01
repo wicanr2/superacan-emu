@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/wicanr2/superacan-emu/cpu/m65c02"
@@ -21,6 +22,9 @@ type System struct {
 	Instructions        uint64
 	SoundInstructions   uint64
 	IRQAcknowledgements [8]uint64
+	// IPLSHA256 與 ROMSHA256 是建構時餵進來的位元組的雜湊，用來把存檔綁定媒體身分。
+	IPLSHA256 [32]byte
+	ROMSHA256 [32]byte
 	// Trace 為 nil 時完全不記錄；開啟後只保留最近 N 條指令。
 	Trace               *InstructionRing
 	soundReset          bool
@@ -65,6 +69,7 @@ func NewSystem(ipl, rom, key []byte) (*System, error) {
 	soundTimeline := &SoundTimeline{}
 	system := &System{
 		Bus: bus, Timeline: timeline,
+		IPLSHA256: sha256.Sum256(ipl), ROMSHA256: sha256.Sum256(rom),
 		M68K:     m68k.New(bus, timeline),
 		M65C02:   m65c02.New(soundBus, soundTimeline),
 		SoundBus: soundBus, SoundTimeline: soundTimeline,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -25,6 +26,8 @@ func main() {
 	soundBIOS2Path := flag.String("sound-bios2", "", "path to 8192-byte internal_6502_2.bin")
 	romPath := flag.String("rom", "", "path to a raw cartridge dump or a cartridge ZIP")
 	savePath := flag.String("save", "", "32768-byte cartridge battery file, loaded at start and written on exit")
+	loadStatePath := flag.String("load-state", "", "restore this save state before running")
+	saveStatePath := flag.String("save-state", "", "write a save state when the run finishes")
 	steps := flag.Uint64("instructions", 1, "number of 68000 instructions to execute")
 	frames := flag.Uint64("frames", 0, "run this many completed hardware frames instead of --instructions")
 	screenshot := flag.String("screenshot", "", "write the final framebuffer as PNG")
@@ -125,6 +128,17 @@ func main() {
 	loadCartridgeSave(system, *savePath)
 	if err := system.Reset(); err != nil {
 		fail(fmt.Sprintf("reset: %v", err))
+	}
+	if *loadStatePath != "" {
+		file, openErr := os.Open(*loadStatePath)
+		if openErr != nil {
+			fail(fmt.Sprintf("open save state %s: %v", *loadStatePath, openErr))
+		}
+		loadErr := system.LoadState(file)
+		_ = file.Close()
+		if loadErr != nil {
+			fail(loadErr.Error())
+		}
 	}
 	var result m68k.StepResult
 	if *frames == 0 {
@@ -239,6 +253,19 @@ func main() {
 		}
 	}
 	writeCartridgeSave(system, *savePath)
+	if *saveStatePath != "" {
+		var encoded bytes.Buffer
+		if stateErr := system.SaveState(&encoded); stateErr != nil {
+			fail(stateErr.Error())
+		}
+		temporary := *saveStatePath + ".tmp"
+		if writeErr := os.WriteFile(temporary, encoded.Bytes(), 0o644); writeErr != nil {
+			fail(fmt.Sprintf("write save state %s: %v", temporary, writeErr))
+		}
+		if renameErr := os.Rename(temporary, *saveStatePath); renameErr != nil {
+			fail(fmt.Sprintf("rename save state %s: %v", *saveStatePath, renameErr))
+		}
+	}
 	if *wavPath != "" {
 		output, createErr := os.Create(*wavPath)
 		if createErr != nil {

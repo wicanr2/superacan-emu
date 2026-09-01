@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"errors"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
 	"github.com/wicanr2/superacan-emu/machine"
@@ -8,6 +10,8 @@ import (
 )
 
 const DefaultFrameInstructionBound uint64 = 2_000_000
+
+var errNoStateFile = errors.New("no save state file configured")
 
 type keyBinding struct {
 	key    ebiten.Key
@@ -50,8 +54,17 @@ type Game struct {
 	InstructionBound uint64
 	MaxFrames        uint64
 	CompletedFrames  uint64
-	frame            *ebiten.Image
-	pixels           []byte
+
+	// SaveState 與 LoadState 由入口注入，讓呈現層不必知道檔案系統。
+	// 兩者都是熱鍵路徑：失敗只回報，不中斷正在進行的遊戲。
+	SaveState func() error
+	LoadState func() error
+	OnStatus  func(message string)
+
+	frame       *ebiten.Image
+	pixels      []byte
+	savePressed bool
+	loadPressed bool
 }
 
 func NewGame(system *machine.System) *Game {
@@ -62,6 +75,7 @@ func NewGame(system *machine.System) *Game {
 }
 
 func (g *Game) Update() error {
+	g.handleStateHotkeys()
 	g.System.SoundBus.SetPad(0, machine.PadState(pressedButtons(playerOneKeys[:])))
 	g.System.SoundBus.SetPad(1, machine.PadState(pressedButtons(playerTwoKeys[:])))
 	if _, err := g.System.RunFrame(g.InstructionBound); err != nil {
@@ -73,6 +87,39 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	}
 	return nil
+}
+
+// handleStateHotkeys 取按下的那一瞬間，按著不放不會重複觸發。
+func (g *Game) handleStateHotkeys() {
+	save := ebiten.IsKeyPressed(ebiten.KeyF5)
+	if save && !g.savePressed {
+		g.report("save state", g.invoke(g.SaveState))
+	}
+	g.savePressed = save
+
+	load := ebiten.IsKeyPressed(ebiten.KeyF7)
+	if load && !g.loadPressed {
+		g.report("load state", g.invoke(g.LoadState))
+	}
+	g.loadPressed = load
+}
+
+func (g *Game) invoke(action func() error) error {
+	if action == nil {
+		return errNoStateFile
+	}
+	return action()
+}
+
+func (g *Game) report(action string, err error) {
+	if g.OnStatus == nil {
+		return
+	}
+	if err != nil {
+		g.OnStatus(action + ": " + err.Error())
+		return
+	}
+	g.OnStatus(action + " ok")
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {

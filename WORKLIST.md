@@ -76,12 +76,12 @@
   目前 UID/GID 擁有。
 - [ ] 審查全部未提交程式變更，移除或隔離 `ACAN_STAGING` 等一次性探針。
   完成條件：核心正常路徑沒有遊戲專屬特判，`git diff --check` 通過。
-- [ ] 收緊 save state 格式與載入交易。
-  完成條件：ROM 不符、截斷、版本錯誤、payload 損壞一律拒絕且不改變現行狀態；
-  記錄 BIOS 身分或明確說明限制；衍生狀態載入後可確定重建。
-- [ ] 建立 save-state 決定性回歸。
-  完成條件：至少 Boom Zoo 與另一套音效驅動遊戲，各做連續執行對照「存檔→新行程
-  載入→相同額外幀」，比較 frame、audio 與關鍵 CPU／bus 狀態 hash。
+- [x] Go 主線的 save state 與交易式載入。格式 `ACANGOS1` 綁定 IPL 與卡帶 SHA-256，
+  版本、標頭長度、payload 長度與 payload 雜湊逐項驗證，全部通過才一次套用；
+  四種壞檔都有測試守著。見 `docs/save-state.md`。
+- [x] save-state 決定性回歸。Boom Zoo 在 frame 600 存檔、另一個行程載入後續跑
+  600 frame，指令數與 framebuffer SHA-256 與連續跑 1200 frame 完全相同。
+- [ ] 把決定性回歸擴到第二套音效驅動的遊戲，並比對同一取樣視窗的音訊雜湊。
 - [x] 重跑最小相容性矩陣。八款 raw ROM 全部完成 3600-frame 有界執行與 5400-frame
   帶輸入路徑，見 `docs/verify-rom-matrix.md`。
 - [ ] P2 至少完成一條實際雙人選單或遊戲流程，不只讀值 dump。

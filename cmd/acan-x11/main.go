@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -26,6 +27,8 @@ const (
 	keysymReturn   = 0xff0d
 	keysymShiftR   = 0xffe2
 	keysymEscape   = 0xff1b
+	keysymF5       = 0xffc2
+	keysymF7       = 0xffc4
 	keysymLowerA   = 0x0061
 	keysymLowerQ   = 0x0071
 	keysymLowerS   = 0x0073
@@ -78,6 +81,7 @@ func main() {
 	soundBIOS2Path := flag.String("sound-bios2", "", "path to 8192-byte internal_6502_2.bin")
 	romPath := flag.String("rom", "", "path to a raw cartridge dump or a cartridge ZIP")
 	savePath := flag.String("save", "", "32768-byte cartridge battery file, loaded at start and written on exit")
+	statePath := flag.String("state", "", "save state file; F5 writes it and F7 restores it")
 	scale := flag.Int("scale", 3, "integer window scale")
 	frames := flag.Uint64("frames", 0, "exit after this many emulated frames (0 runs until the window closes)")
 	screenshot := flag.String("screenshot", "", "write the final emulated framebuffer as PNG")
@@ -139,10 +143,20 @@ func main() {
 	defer ticker.Stop()
 
 	var completed uint64
+	var savePressed, loadPressed bool
 	for {
 		if !window.Poll() || window.KeysymPressed(keysymEscape) {
 			break
 		}
+		// 熱鍵取按下的那一瞬間，按著不放不會重複觸發。
+		if pressed := window.KeysymPressed(keysymF5); pressed && !savePressed {
+			reportStateResult("save", writeSaveState(system, *statePath))
+		}
+		savePressed = window.KeysymPressed(keysymF5)
+		if pressed := window.KeysymPressed(keysymF7); pressed && !loadPressed {
+			reportStateResult("load", readSaveState(system, *statePath))
+		}
+		loadPressed = window.KeysymPressed(keysymF7)
 		system.SoundBus.SetPad(0, padState(window, playerOneKeys))
 		system.SoundBus.SetPad(1, padState(window, playerTwoKeys))
 		if _, err := system.RunFrame(2_000_000); err != nil {
@@ -283,6 +297,41 @@ func loadLinear(path string, expectedSize int) []byte {
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, "acan-x11:", message)
 	os.Exit(1)
+}
+
+// writeSaveState 與 readSaveState 是熱鍵路徑：失敗只回報，不中斷正在進行的遊戲。
+func writeSaveState(system *machine.System, path string) error {
+	if path == "" {
+		return fmt.Errorf("no --state path given")
+	}
+	var encoded bytes.Buffer
+	if err := system.SaveState(&encoded); err != nil {
+		return err
+	}
+	temporary := path + ".tmp"
+	if err := os.WriteFile(temporary, encoded.Bytes(), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(temporary, path)
+}
+
+func readSaveState(system *machine.System, path string) error {
+	if path == "" {
+		return fmt.Errorf("no --state path given")
+	}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return system.LoadState(bytes.NewReader(payload))
+}
+
+func reportStateResult(action string, err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "acan-x11: %s state: %v\n", action, err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "acan-x11: %s state ok\n", action)
 }
 
 // loadCartridgeSave 在檔案存在時載入電池記憶體；不存在視為全新卡帶，不是錯誤。
