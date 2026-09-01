@@ -38,7 +38,7 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
 | UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 開場與 Bcan 截圖同區域已可逐像素對照；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，靜態畫面的定案差分待 CPU 走到標題選單 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置 | 1,300,000 條 68k／1,524,044 條 65C02；雙 overlay 關閉 |
-| Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 三款 ROM 各 1200 frames，指令數與 framebuffer hash 均吻合 headless；目前需 cgo，違反已定案的禁 cgo 政策，待改為純 Go 呈現層 |
+| Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 八款 ROM 各 1200 frames，指令數與 framebuffer SHA-256 均吻合 headless；`CGO_ENABLED=0` 可建 js/wasm 與 windows，Linux 桌面仍需 cgo |
 | bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |
 | archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |
 
@@ -98,10 +98,17 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 
 目前 machine core 的最低相容性閘門已由三款 ROM 各 1200 frames 通過：Speedy Dragon
 18,515,145、Formosa Duel 19,272,069、Boom Zoo 17,370,088 條 68000 指令，均有可辨識
-framebuffer；三款亦有非零音訊資料。下一個交付閘門是像素層級的正確性：以 Bcan 0.0.8b
-作同畫面 oracle，逐項定位 UM6618 圖層、優先度與調色差異，取代目前「畫面可辨識」這種
-只到構圖層級的證據。管線與第一輪結果見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。
-擋在嚴格差分前面的是 CPU：Boom Zoo 在第 1,695 個 frame 因未實作 opcode `$D06A` 停止，
-還走不到適合逐像素定案的靜止標題選單。平行未完成的是禁 cgo 政策落地（純 Go 桌面呈現層）與實機音訊、
+framebuffer；三款亦有非零音訊資料。
+
+2026-09-01 後續：CPU 改為一般化 effective-address 執行層之後，`Bcan008b/ROMS` 下的
+八款 raw ROM 全部完成 3600-frame 有界執行，帶輸入的 5400-frame 路徑也全部完成，人工
+檢查可看到實際遊戲畫面而不只是標題。八款的 Ebitengine GUI 與 headless 在 1200 frame
+的指令數與 framebuffer SHA-256 完全一致。完整矩陣見
+[`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)。
+
+下一個交付閘門是像素層級的正確性：以 Bcan 0.0.8b 作同畫面 oracle，逐項定位 UM6618
+圖層、優先度與調色差異，取代目前「畫面可辨識、可操作」這種只到構圖層級的證據。
+Boom Zoo 標題畫面目前與 Bcan 差 43.48%（`--width 256`），調色盤數值兩邊相同，差異在
+像素落點。管線見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。平行未完成的是禁 cgo 政策落地（純 Go 桌面呈現層）與實機音訊、
 鍵盤驗收；之後才進入 Linux 發行包與 macOS 工具鏈。尚未被遊戲覆蓋的 ISA／硬體模式
 保留明確證據限制。

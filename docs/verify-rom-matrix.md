@@ -42,19 +42,36 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 | Formosa Duel | 對戰選角畫面：兩張人物照、姓名框與下方棋盤 |
 | Journey to the Laugh | 實際遊戲場景：油桶、管線、平台與 HUD |
 | Monopoly | 標題畫面：立體字標與 START GAME／LOAD GAME |
-| Sango Fighter | 停在只有兩張相同人物立繪的畫面，缺背景與 UI（見下） |
+| Sango Fighter | 龍紋開場圖 → 選角畫面（兩名不同武將立繪）|
 | Speedy Dragon | 實際遊戲場景：角色、草地、磚牆與天空 |
 | Super Taiwanese Baseball League | 實際比賽畫面：球場、守備球員與打者 |
 | The Son of Evil | 開場圖版 → 遊戲中對話：人物立繪、地圖與文字框 |
 
+## Ebitengine 前端與 headless 的一致性
+
+同一組輸入以 `cmd/acan` 在 Xvfb 執行 1200 frame（`--audio=false`），八款的 68000
+指令數與 framebuffer SHA-256 與 headless 完全相同，證明 GUI 沒有另走簡化排程：
+
+| ROM | 68000 指令 | framebuffer SHA-256 |
+|---|---:|---|
+| Boom Zoo | 17,369,003 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
+| Formosa Duel | 19,270,779 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
+| Journey to the Laugh | 17,778,132 | `42285d489bd74a5c5fd0d66700ed7e7c8b2b83f4855612d7dec4db07c30b146e` |
+| Monopoly | 11,827,355 | `c254c50d5f85dd6ede60b82c8b2a07ca2ca8ccd41e9bfbe65a1c45299083d582` |
+| Sango Fighter | 11,634,924 | `412213dac64ec07ef8db6ee69f4a90a351880f11c3229b378647d05f559bd505` |
+| Speedy Dragon | 18,513,698 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
+| Super Taiwanese Baseball League | 17,572,195 | `e28f1c411a389ecd46206d8006e1e9b54f62a75047bcb2e64b7f12763f094023` |
+| The Son of Evil | 16,727,440 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
+
 ## 已知落差
 
-- **Sango Fighter 停在選角畫面**：畫面上只有兩張相同立繪，背景與 UI 沒有出現，且
-  frame 3600 與 5400 的內容相同。待與 Bcan 同畫面差分後才判定是輸入路徑、圖層
-  還是遊戲邏輯問題。
-- **The Son of Evil 有單張雜訊畫面**：frame 3600 取樣到整片隨機像素，前後的 frame 都
-  正常。尚未定位是換場中的暫態還是特定 pixel mode 的解碼問題；該遊戲會使用
-  `$F001F0` 的 bit 3，而 MAME 只保存該位元、渲染路徑並未讀取。
+- **Sango Fighter 尚未進到對戰**：改用 START／A／B 交替輸入之後可以走到選角畫面，
+  但沒有進入實際對戰；Bcan 在同樣的 START 序列下會進到對戰場景。差別可能在輸入
+  序列本身（需要方向鍵選人再確認），也可能在輸入路徑，尚未定位。
+- **The Son of Evil 有單張雜訊畫面**：frame 3600 取樣到整片隨機像素，frame 1200 的
+  開場圖版與 frame 5400 的遊戲中對話都正常。尚未定位是換場中的暫態還是特定 pixel
+  mode 的解碼問題；該遊戲會使用 `$F001F0` 的 bit 3，而 MAME 只保存該位元、渲染路徑
+  並未讀取。
 - 畫面正確性只到「可辨識、可操作」這一級。像素級對帳見
   [`docs/bcan-oracle-diff.md`](bcan-oracle-diff.md)；Boom Zoo 標題畫面與 Bcan 的差異
   目前是 43.48%（`--width 256`），調色盤數值兩邊相同，差異在像素落點。

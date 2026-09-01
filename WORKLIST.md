@@ -82,9 +82,9 @@
 - [ ] 建立 save-state 決定性回歸。
   完成條件：至少 Boom Zoo 與另一套音效驅動遊戲，各做連續執行對照「存檔→新行程
   載入→相同額外幀」，比較 frame、audio 與關鍵 CPU／bus 狀態 hash。
-- [ ] 重跑最小相容性矩陣。
-  完成條件：Boom Zoo、Monopoly、Speedy Dragon 的 IPL、畫面、音訊、P1 路徑無回歸；
-  P2 至少完成一條實際雙人選單或遊戲流程，不只讀值 dump。
+- [x] 重跑最小相容性矩陣。八款 raw ROM 全部完成 3600-frame 有界執行與 5400-frame
+  帶輸入路徑，見 `docs/verify-rom-matrix.md`。
+- [ ] P2 至少完成一條實際雙人選單或遊戲流程，不只讀值 dump。
 
 ## 硬體證據缺口
 
@@ -108,16 +108,19 @@
 ## 平台與發行
 
 - [x] 決定 cgo 邊界。2026-09-01 定案：**整個發行 binary 禁止 cgo，前端不例外**。
-- [ ] 讓桌面前端在 `CGO_ENABLED=0` 建置成功。已證實 Ebitengine v2.9.9 的
+- [x] 盤點禁 cgo 政策的實際缺口。`CGO_ENABLED=0` 下 headless 與 imgdiff 在任何平台
+  都能建置，`cmd/acan` 的 `js/wasm` 與 `windows/amd64` 目標也能建置；只有
+  `linux/amd64` 失敗。
+- [ ] 讓 Linux 桌面前端在 `CGO_ENABLED=0` 建置成功。Ebitengine v2.9.9 的
   `internal/glfw` 只在 darwin／windows 走 purego，linbsd 路徑是 cgo；`oto/v3`
-  的 `driver_unix.go` 同樣是 cgo。因此落地需要純 Go 的視窗／輸入（候選：
-  `jezek/xgb`，已是現有 indirect 依賴）與純 Go 的音訊輸出（候選：直接操作
-  `/dev/snd` 或改走外部播放行程）。完成條件：`CGO_ENABLED=0 go build ./...`
-  通過，且三款 ROM 的 1200-frame framebuffer SHA-256 與 headless 基準不變。
-- [ ] 在達成上一項之前，`cmd/acan` 只作開發用 GUI，不得列入發行包。
+  的 `driver_unix.go` 同樣是 cgo。落地需要純 Go 的視窗／輸入（候選：`jezek/xgb`，
+  已是現有 indirect 依賴）與純 Go 的音訊輸出（候選：直接操作 `/dev/snd` 或改走
+  外部播放行程）。完成條件：`CGO_ENABLED=0 go build ./...` 通過，且八款 ROM 的
+  1200-frame framebuffer SHA-256 與 headless 基準不變。
+- [ ] 在達成上一項之前，Linux 版 `cmd/acan` 只作開發用 GUI，不得列入發行包。
 - [ ] 在有實體音效裝置的 Linux 驗收 48 kHz 播放、鍵盤操作、延遲與 underrun。
-- [x] Speedy Dragon、Formosa Duel、Boom Zoo 各完成 1200-frame GUI 正常路徑，並與
-  headless 指令數及 framebuffer hash 對照一致。
+- [x] 八款 ROM 各完成 1200-frame GUI 正常路徑，指令數與 framebuffer SHA-256 與
+  headless 完全一致；結果見 `docs/verify-rom-matrix.md`。
 
 - [ ] 里程碑 5 收斂後規劃 macOS 編譯。
   完成條件：選定可重現工具鏈、SDL2 來源、支援架構與最低 macOS 版本，產物在 macOS

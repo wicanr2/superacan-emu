@@ -362,3 +362,30 @@
 - 同時盤點到 `cpu/m68k` 目前是 233 個「操作×大小×定址模式」個別 case 的結構，逐一
   補 case 沒有終點；已列入 worklist 要求先做一般化 EA 執行層的設計再決定重寫。
 
+## 2026-09-01：CPU 一般化執行層與八款 ROM 全部可執行
+
+- 先量完整缺口再動手：八款商業 ROM 同時執行，每一款停在不同的未實作 opcode，橫跨七個
+  指令族。逐一補 case 沒有終點，因此改成先解析 effective address、再由指令族共用讀寫
+  路徑。68000 新增 `ea.go` 與四個 generic 檔，65C02 改以 256 項指令表覆蓋完整指令集。
+  兩邊都只在既有逐一 case 判定為未知時才進入，既有已釘住的行為與時序不變。
+- 一般化層上線後暴露出三個獨立缺陷，都靠證據定位而不是猜：
+  - `$E90004/05`、`$E9000C/0D` 原本落到 open-bus 回 `$FF`，Formosa Duel 的 IRQ handler
+    因此永遠認為有取樣 DMA 請求，把 `$FFFF` 當請求位址寫進 `$FFE094`，主程式組出
+    `A6=$00E8FFFF` 撞上奇數位址。依 acan 位址表接上 sound RAM `$040C/$040D` 與 `$040A`。
+  - 位址暫存器被截成 24 位元。The Son of Evil 在 `$08729C` 的
+    `MOVE.W (A4)+,(A5)+` 配 `CMPA.L #$FFFFA122,A5` 因此永遠不相等，整台機器停在該迴圈，
+    VRAM 一個位元組都沒寫入，畫面全黑卻不報錯。遮罩改為只在 bus 存取與跳躍目標套用。
+  - 暫存器位移的長字時間應為 8 + 2n，先前沿用位元組與字的 6 + 2n。
+- 新增有界的 `machine.InstructionRing` 與 `--trace-instructions`：停止時印出最近 N 條指令
+  的 PC、opcode 與週期。上面兩個缺陷都是靠它把停止點回推到真正的原因。
+- 結果：八款 raw ROM 全部完成 3600-frame 有界執行；帶 START／A／B 輸入的 5400-frame
+  路徑也全部完成，人工檢查看到實際遊戲畫面（Journey to the Laugh 的平台場景、
+  Speedy Dragon 的關卡、Super Taiwanese Baseball League 的比賽畫面、The Son of Evil 的
+  遊戲中對話）。八款的 Ebitengine GUI 與 headless 在 1200 frame 的指令數與 framebuffer
+  SHA-256 完全一致。
+- cgo 缺口盤點：`CGO_ENABLED=0` 下 headless 與 imgdiff 任何平台都能建置，`cmd/acan` 的
+  `js/wasm` 與 `windows/amd64` 也能建置，只有 `linux/amd64` 失敗。禁 cgo 政策的缺口
+  因此只剩 Linux 桌面的視窗／輸入與音訊輸出層。
+- 仍未收斂：Sango Fighter 走到選角畫面但沒進對戰（Bcan 同輸入會進），The Son of Evil
+  在 frame 3600 有單張雜訊畫面，Boom Zoo 標題與 Bcan 差 43.48%（調色盤值相同、落點不同）。
+

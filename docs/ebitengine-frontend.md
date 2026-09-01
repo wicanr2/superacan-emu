@@ -37,12 +37,21 @@
 
 ## 平台邊界與剩餘驗證
 
-- cgo 政策已定案（2026-09-01）：整個發行 binary 禁止 cgo，前端不例外。現行
-  `cmd/acan` 不符合此政策，只能作開發用 GUI，不得列入發行包。
-- 依賴實測：Ebitengine v2.9.9 的 `internal/glfw` 只在 darwin 與 windows 使用 purego，
-  linbsd 路徑是 cgo；`oto/v3@v3.4.0` 的 `driver_unix.go` 亦為 cgo。因此 Linux
-  桌面在 `CGO_ENABLED=0` 無法編譯，`CGO_ENABLED=1` 可編譯。落地禁 cgo 政策需要
-  另建純 Go 的視窗／輸入與音訊輸出層，machine／CPU／chip 不受影響。
+- cgo 政策已定案（2026-09-01）：整個發行 binary 禁止 cgo，前端不例外。
+- 目標平台實測（`CGO_ENABLED=0`）：
+
+  | 目標 | 結果 |
+  |---|---|
+  | `cmd/acan-headless`、`cmd/acan-imgdiff`（任何平台）| 建置成功 |
+  | `cmd/acan` `js/wasm` | 建置成功 |
+  | `cmd/acan` `windows/amd64` | 建置成功 |
+  | `cmd/acan` `linux/amd64` | 失敗 |
+
+  也就是說禁 cgo 政策在瀏覽器與 Windows 目標上已經成立，缺口只在 Linux 桌面：
+  Ebitengine v2.9.9 的 `internal/glfw` 只有 darwin 與 windows 走 purego，linbsd 路徑
+  是 cgo；`oto/v3@v3.4.0` 的 `driver_unix.go` 亦為 cgo。補上 Linux 需要純 Go 的
+  視窗／輸入與音訊輸出層，machine／CPU／chip 不受影響。
+- 在 Linux 桌面補上純 Go 後端之前，Linux 版 `cmd/acan` 只作開發用 GUI，不列入發行包。
 - Xvfb smoke 使用 `--audio=false`，證明 GUI 與 headless 共用同一 machine 結果；實體 ALSA
   裝置的人耳播放、延遲與 underrun 仍需 Linux 實機驗收。
 - `SetTPS(60)` 是主機更新請求；硬體 frame 邊界仍由 cycle scheduler 決定。不得用
