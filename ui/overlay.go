@@ -27,6 +27,16 @@ func (s *overlayScreen) rows(u *UI) []menuRow {
 		{label: textDiagnostics, chevron: true, action: func(u *UI) { u.push(&diagnosticsScreen{}) }},
 		{label: textScreenshot, hotkey: textScreenshotHK, action: func(u *UI) {
 			u.emit(Capture{Kind: CaptureScreenshot})
+			u.toast(textScreenshotSaved, SeverityInfo)
+		}},
+		{label: captureLabel(u), hotkey: textCaptureHK, value: captureValue(u), action: func(u *UI) {
+			if u.diagnostics(nil).Recording {
+				u.emit(Capture{Kind: CaptureClipStop})
+				u.toast(textCaptureStopped, SeverityInfo)
+				return
+			}
+			u.emit(Capture{Kind: CaptureClipStart})
+			u.toast(textCaptureStarted, SeverityInfo)
 		}},
 		{label: textEjectCart, gapBefore: true, action: func(u *UI) {
 			u.emit(UnloadCartridge{})
@@ -86,6 +96,21 @@ func (s *overlayScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	end := drawMenuRows(u, c, x, y+titleH+1, width, rows, s.focus)
 	c.rect(x, end, width, 1, u.theme.Border)
 	c.rowText(x+m.RowPadX, end+1, footerH, m.SmallSize, u.theme.TextDim, statusLine(snap))
+}
+
+func captureLabel(u *UI) string {
+	if u.diagnostics(nil).Recording {
+		return textCaptureStop
+	}
+	return textCaptureStart
+}
+
+func captureValue(u *UI) string {
+	facts := u.diagnostics(nil)
+	if !facts.Recording {
+		return ""
+	}
+	return fmt.Sprintf(textCaptureFrames, facts.CaptureFrames)
 }
 
 func statusLine(snap Snapshot) string {

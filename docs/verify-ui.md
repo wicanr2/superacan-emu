@@ -134,6 +134,20 @@ acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
 診斷畫面的數字直接讀 machine（`TestDiagnosticsReadMachineDirectly`），不另外累計，
 所以它顯示的 68000 指令數就是 headless 報出來的那一個。
 
+## 擷取
+
+- **截圖等同硬體輸出**（`TestScreenshotMatchesHardwareOutput`）：介面走的路徑與
+  `--screenshot` 走的 `presentation.EncodePNG` 解出來的像素逐點相同。
+- **外部接收端的位元組數 = 幀數 × 320 × 240 × 4**（`TestCaptureSinkReceivesRawFrames`）。
+- **錄影不影響時序**（`TestCaptureDoesNotChangeTiming`）：開著錄影跑二十個 frame，
+  指令數與 framebuffer 雜湊與沒錄影時相同。
+- **沒按停止就結束也要是完整檔案**（`TestShutdownFinalisesAnOpenClip`）：AVI 的長度
+  欄位在收尾才回填，少了這一步會得到資料完整但標頭全是 0 的檔案。真機第一次錄影
+  就踩到這個，現在入口 defer `Session.Shutdown()`。
+
+真機驗證：X11 前端跑 120 frame 並從選單開始錄影，得到 1.58 MB 的 AVI，
+`RIFF` 大小欄位與檔案長度相符、`dwTotalFrames` 115、第一幀的 JPEG SOI 是 `FFD8`。
+
 ## 金手指的界線
 
 金手指是 C5「UI 不改寫晶片狀態」的例外，所以界線要由測試守著，不是由文件宣告：

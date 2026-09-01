@@ -199,4 +199,11 @@ const (
 	textCheatEvidenceWarning = "啟用期間的指令數與畫面雜湊不可作為硬體證據。"
 	textCheatActive          = "※ 已啟用記憶體寫入"
 	textCheatMarker          = "CHEAT"
+	textCaptureStart         = "開始錄影"
+	textCaptureStop          = "停止錄影"
+	textCaptureHK            = "F9"
+	textCaptureFrames        = "%d 幀"
+	textCaptureStarted       = "已開始錄影。"
+	textCaptureStopped       = "已停止錄影。"
+	textScreenshotSaved      = "已寫出截圖。"
 )

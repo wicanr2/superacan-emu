@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"image"
+	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -107,4 +109,24 @@ func mustRead(path string) []byte {
 		return nil
 	}
 	return raw
+}
+
+// startCaptureSink 把原始 RGBA 幀送給一個外部程序。這條路存在的理由是純 Go 沒有
+// H.264 編碼器：想要小檔案的使用者可以自備 ffmpeg，內建的 AVI/MJPEG 則不需要
+// 任何外部工具。
+func startCaptureSink(target interface{ SetCaptureSink(io.Writer) }, command string) (func(), error) {
+	process := exec.Command("sh", "-c", command)
+	pipe, err := process.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	process.Stderr = os.Stderr
+	if err := process.Start(); err != nil {
+		return nil, err
+	}
+	target.SetCaptureSink(pipe)
+	return func() {
+		_ = pipe.Close()
+		_ = process.Wait()
+	}, nil
 }

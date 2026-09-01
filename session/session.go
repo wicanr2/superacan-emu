@@ -41,6 +41,8 @@ type Session struct {
 	Library *Library
 	// ConfigPath 不為空時，介面每次改設定都會原子寫回這個檔案。
 	ConfigPath string
+	// CaptureDir 是自動命名的錄影檔要放的目錄。
+	CaptureDir string
 	// ScriptFrontend 是腳本送出的原始按鍵要掛在哪個前端名下。
 	ScriptFrontend string
 	// FrontendName 與 AudioStatsFunc 供診斷與音訊畫面顯示主機端的事實。
@@ -56,7 +58,8 @@ type Session struct {
 	haltNote  string
 
 	config ui.Config
-	cheat  cheatState
+	cheat   cheatState
+	clip    captureState
 	frame  *image.RGBA
 	paused bool
 	pacing bool
@@ -174,6 +177,7 @@ func (s *Session) Advance(now time.Duration) (bool, error) {
 		s.UI.SetMode(ui.ModeHalt, s.haltNote)
 		return false, err
 	}
+	s.captureFrame()
 	return true, nil
 }
 
@@ -248,6 +252,8 @@ func (s *Session) Diagnostics() ui.DiagnosticsFacts {
 	facts.SoundClash = len(s.System.Bus.SoundRAMClashes())
 	facts.IPL = s.System.IPLSHA256
 	facts.Cartridge = s.System.ROMSHA256
+	facts.Recording = s.Recording()
+	facts.CaptureFrames = s.CaptureFrames()
 	return facts
 }
 
@@ -410,19 +416,6 @@ func (s *Session) deleteSlot(slot int) error {
 		return err
 	}
 	return nil
-}
-
-func (s *Session) capture(kind ui.CaptureKind) error {
-	if kind != ui.CaptureScreenshot {
-		return fmt.Errorf("session: 錄影尚未實作")
-	}
-	if s.System == nil {
-		return fmt.Errorf("session: 沒有畫面可以截圖")
-	}
-	if s.Screenshot == nil {
-		return fmt.Errorf("session: 這個前端沒有提供截圖輸出")
-	}
-	return s.Screenshot(snapshot{s}.Framebuffer())
 }
 
 // poke 是金手指的寫入路徑。範圍檢查在這裡再做一次：ui.PokeWorkRAM.Valid 是

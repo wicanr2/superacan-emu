@@ -19,6 +19,9 @@ type DiagnosticsFacts struct {
 	CGOEnabled   bool
 	IPL          [32]byte
 	Cartridge    [32]byte
+	// Recording 與 CaptureFrames 讓覆蓋選單顯示擷取狀態。
+	Recording     bool
+	CaptureFrames int
 }
 
 // DiagnosticsSource 由入口提供。

@@ -209,6 +209,9 @@ func main() {
 		}
 		result.Opcode = system.M68K.State().IRD
 		if overlay != nil {
+			if shutdownErr := overlay.Shutdown(); shutdownErr != nil {
+				fail(shutdownErr.Error())
+			}
 			composed := composeFrame(overlay, surface)
 			sum := sha256.Sum256(composed.Pix)
 			visible, reason := overlay.Halt()

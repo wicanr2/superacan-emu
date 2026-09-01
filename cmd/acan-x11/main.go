@@ -9,6 +9,7 @@ import (
 	"image"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
@@ -76,6 +77,8 @@ func main() {
 	stateRoot := flag.String("state-root", "", "root directory for per-cartridge save-state directories")
 	saveDir := flag.String("save-dir", "", "directory holding per-cartridge battery files")
 	configPath := flag.String("config", "", "settings file; defaults to the platform config directory, \"none\" disables it")
+	captureDir := flag.String("capture-dir", ".", "directory for screenshots and clips")
+	captureSink := flag.String("capture-sink", "", "shell command receiving raw 320x240 RGBA frames on stdin instead of writing an AVI")
 	maxTicks := flag.Uint64("max-ticks", 0, "exit after this many host loop iterations regardless of pause state; for scripted smoke runs")
 	flag.Parse()
 
@@ -127,12 +130,17 @@ func main() {
 	}
 
 	stopAudio := func() {}
+	var overlayRef *session.Session
 	attachAudio := func(system *machine.System) {
 		if *audioSink == "" {
 			return
 		}
 		stopAudio()
-		stop, err := startAudioSink(system, *audioSink)
+		stop, err := startAudioSink(system, *audioSink, func(pcm []byte) {
+			if overlayRef != nil {
+				overlayRef.PushCapturePCM(pcm)
+			}
+		})
 		if err != nil {
 			fail(fmt.Sprintf("audio sink: %v", err))
 		}
@@ -204,12 +212,28 @@ func main() {
 		FirmwareSet: session.DescribeFirmwareSet(*iplPath, *keyPath, *soundBIOS1Path, *soundBIOS2Path),
 		About:       session.About(buildVersion, buildDate),
 	})
+	overlayRef = overlay
+	// 錄影檔的長度欄位在收尾時才回填；沒有收尾的檔案播放器一幀也讀不出來。
+	defer func() {
+		if err := overlay.Shutdown(); err != nil {
+			fmt.Fprintf(os.Stderr, "capture: %v\n", err)
+		}
+	}()
 	overlay.StateRoot = *stateRoot
 	overlay.ConfigPath = settingsPath
+	overlay.CaptureDir = *captureDir
+	overlay.FrontendName = frontendName
+	if *captureSink != "" {
+		stopSink, sinkErr := startCaptureSink(overlay, *captureSink)
+		if sinkErr != nil {
+			fail(fmt.Sprintf("capture sink: %v", sinkErr))
+		}
+		defer stopSink()
+	}
 	overlay.ScriptFrontend = frontendName
 	overlay.Loader = newSystem
 	overlay.Screenshot = func(frame *image.RGBA) error {
-		return writeScreenshot(screenshotName(), current.Bus.Video().Framebuffer())
+		return writeScreenshot(filepath.Join(*captureDir, screenshotName()), current.Bus.Video().Framebuffer())
 	}
 	input := newOverlayInput()
 	script, err := session.ParseScript(*uiScript)
@@ -343,10 +367,16 @@ func padState(window *x11.Window, bindings []keyBinding) uint16 {
 
 // startAudioSink 把 UMC6619 的原生樣本重取樣成 48 kHz stereo，交給外部播放程序。
 // 佇列滿了就丟掉最舊的樣本，播放端的狀態不回饋到模擬器時間線。
-func startAudioSink(system *machine.System, command string) (func(), error) {
+func startAudioSink(system *machine.System, command string, clip func([]byte)) (func(), error) {
 	stream := presentation.NewPCM16StereoStream(48000 / 5)
+	// 播放與錄影共用同一份重取樣輸出，兩者不會不同步。
 	resampler := presentation.NewStereoResampler(umc6619.ClockHz, umc6619.CyclesPerSample, 48000,
-		func(left, right int16) { stream.Push(left, right) })
+		func(left, right int16) {
+			stream.Push(left, right)
+			if clip != nil {
+				clip([]byte{byte(left), byte(uint16(left) >> 8), byte(right), byte(uint16(right) >> 8)})
+			}
+		})
 	system.SoundBus.Audio().SetSampleSink(func(sample umc6619.Sample) {
 		resampler.Push(sample.Left, sample.Right)
 	})
