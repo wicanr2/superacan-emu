@@ -30,6 +30,13 @@ type Session struct {
 	Screenshot func(frame *image.RGBA) error
 	// OnQuit 在使用者要求離開時被呼叫。
 	OnQuit func()
+	// Loader 由入口提供：換卡帶要重建 machine.System，session 不做媒體載入，
+	// 因為韌體來源與命令列旗標是入口的事。回傳新的機器與顯示用名稱。
+	Loader func(path string) (*machine.System, string, error)
+	// StateRoot 是存檔槽的根目錄；換卡帶時 StateDir 依它重算。
+	StateRoot string
+	// Library 供瀏覽器列出卡帶，換卡帶後要重掃。
+	Library *Library
 
 	firmware  ui.FirmwareIDs
 	romSize   int64
@@ -53,6 +60,11 @@ type Options struct {
 	Firmware ui.FirmwareIDs
 	Surface  ui.Surface
 	Config   ui.Config
+
+	// 下面三項給 P2 的啟動、韌體與瀏覽器畫面用。
+	Library     *Library
+	FirmwareSet ui.FirmwareSource
+	About       ui.AboutInfo
 }
 
 // New 建立一個 session。UI 的 SlotSource 就是 session 自己：存檔槽的真相在檔案
@@ -68,15 +80,38 @@ func New(options Options) *Session {
 		pacing:    true,
 		pads:      [2]uint16{0xffff, 0xffff},
 	}
-	s.UI = ui.New(ui.Options{Surface: options.Surface, Config: options.Config, Slots: s})
+	s.Library = options.Library
+	var library ui.Library
+	if options.Library != nil {
+		library = options.Library
+	}
+	s.UI = ui.New(ui.Options{
+		Surface: options.Surface, Config: options.Config, Slots: s,
+		Library: library, Firmware: options.FirmwareSet, About: options.About,
+	})
+	if options.System == nil {
+		s.UI.SetMode(ui.ModeShell, "")
+	}
 	return s
 }
 
-// Snapshot 是給 UI 的唯讀視角。
-func (s *Session) Snapshot() ui.Snapshot { return snapshot{s} }
+// Shell 讓介面回到沒有卡帶的啟動畫面。
+func (s *Session) Shell() {
+	s.System = nil
+	s.halt, s.haltNote = ui.HaltNone, ""
+	s.UI.SetMode(ui.ModeShell, "")
+}
+
+// Snapshot 是給 UI 的唯讀視角。沒有卡帶時回傳 nil，畫面要能處理這個情況。
+func (s *Session) Snapshot() ui.Snapshot {
+	if s.System == nil {
+		return nil
+	}
+	return snapshot{s}
+}
 
 // Paused 回報模擬時間是否停住。覆蓋層開著時一定是停住的。
-func (s *Session) Paused() bool { return s.paused || s.UI.Visible() }
+func (s *Session) Paused() bool { return s.System == nil || s.paused || s.UI.Visible() }
 
 // Quitting 回報使用者是否要求離開。
 func (s *Session) Quitting() bool { return s.quit }
@@ -98,25 +133,37 @@ func (s *Session) Handle(event ui.Event) bool { return s.UI.Handle(event) }
 
 // Advance 推進一個 frame，並執行這一輪累積的 Intent。覆蓋層開著時不推進時間，
 // 但 Intent 照樣執行——存檔與讀檔本來就發生在 frame 邊界。
-func (s *Session) Advance(now time.Duration) error {
+//
+// 第一個回傳值說明這一次呼叫有沒有真的跑掉一個 frame。呼叫端不能自己用「呼叫前
+// 是不是暫停」來推斷：Intent 在這個函式裡執行，載入卡帶會讓原本暫停的狀態在同一
+// 次呼叫裡變成執行中。
+func (s *Session) Advance(now time.Duration) (bool, error) {
 	s.UI.Update(now)
 	if err := s.drainIntents(); err != nil {
-		return err
+		return false, err
+	}
+	if s.System == nil {
+		return false, nil
 	}
 	if s.Paused() || s.halt != ui.HaltNone {
 		s.applyPads(true)
-		return nil
+		return false, nil
 	}
 	s.applyPads(false)
 	if _, err := s.System.RunFrame(MaxFrameInstructions); err != nil {
+		// fail-closed：停下來、保留狀態、把原因擺在畫面上，不假裝成功也不繼續跑。
 		s.halt = classifyHalt(err)
 		s.haltNote = err.Error()
-		return err
+		s.UI.SetMode(ui.ModeHalt, s.haltNote)
+		return false, err
 	}
-	return nil
+	return true, nil
 }
 
 func (s *Session) applyPads(released bool) {
+	if s.System == nil {
+		return
+	}
 	for player := range s.pads {
 		value := s.pads[player]
 		if released {
@@ -140,9 +187,13 @@ func classifyHalt(err error) ui.HaltReason {
 // Compose 把遊戲畫面與覆蓋層畫進 dst。遊戲畫面以最近鄰整數放大，
 // 覆蓋層畫在 dst 的原生解析度上。
 func (s *Session) Compose(dst *image.RGBA) {
+	if s.System == nil {
+		// 沒有卡帶時沒有畫面可以墊底，直接畫介面；S0 自己會塗滿整頁。
+		s.UI.Draw(dst, nil)
+		return
+	}
 	snap := snapshot{s}
-	game := snap.Framebuffer()
-	blitNearest(dst, game)
+	blitNearest(dst, snap.Framebuffer())
 	s.UI.Draw(dst, snap)
 }
 
@@ -200,13 +251,47 @@ func (s *Session) apply(intent ui.Intent) error {
 		if s.OnQuit != nil {
 			s.OnQuit()
 		}
+	case ui.LoadCartridge:
+		return s.loadCartridge(value.Path)
 	case ui.UnloadCartridge:
-		s.quit = true
+		if s.Loader == nil {
+			s.quit = true
+			return nil
+		}
+		s.Shell()
 	}
 	return nil
 }
 
+// loadCartridge 換卡帶。整台機器重建，因為卡帶內容決定位址空間的內容；
+// 失敗時保持原狀並把理由留在畫面上，不留下半套狀態。
+func (s *Session) loadCartridge(path string) error {
+	if s.Loader == nil {
+		return fmt.Errorf("session: 這個前端不支援在執行中更換卡帶")
+	}
+	system, title, err := s.Loader(path)
+	if err != nil {
+		return err
+	}
+	s.System = system
+	s.Title = title
+	s.halt, s.haltNote = ui.HaltNone, ""
+	s.paused = false
+	s.frame = nil
+	if s.StateRoot != "" {
+		s.StateDir = StateDirFor(s.StateRoot, path)
+	}
+	if s.Library != nil {
+		s.Library.Rescan()
+	}
+	s.UI.SetMode(ui.ModeGame, "")
+	return nil
+}
+
 func (s *Session) reset(kind ui.ResetKind) error {
+	if s.System == nil {
+		return fmt.Errorf("session: 沒有卡帶可以重設")
+	}
 	// 軟重設與冷開機目前都走同一條 68000 reset；兩者的差別（RAM 是否保留）
 	// 要等 machine 提供冷開機路徑才成立，在那之前不假裝有分別。
 	_ = kind
@@ -214,6 +299,9 @@ func (s *Session) reset(kind ui.ResetKind) error {
 }
 
 func (s *Session) saveSlot(slot int) error {
+	if s.System == nil {
+		return fmt.Errorf("session: 沒有卡帶可以存檔")
+	}
 	if s.StateDir == "" {
 		return fmt.Errorf("session: 沒有指定存檔目錄")
 	}
@@ -239,6 +327,9 @@ func (s *Session) saveSlot(slot int) error {
 }
 
 func (s *Session) loadSlot(slot int) error {
+	if s.System == nil {
+		return fmt.Errorf("session: 沒有卡帶可以讀檔")
+	}
 	file, err := os.Open(s.slotPath(slot))
 	if err != nil {
 		return err
@@ -258,6 +349,9 @@ func (s *Session) capture(kind ui.CaptureKind) error {
 	if kind != ui.CaptureScreenshot {
 		return fmt.Errorf("session: 錄影尚未實作")
 	}
+	if s.System == nil {
+		return fmt.Errorf("session: 沒有畫面可以截圖")
+	}
 	if s.Screenshot == nil {
 		return fmt.Errorf("session: 這個前端沒有提供截圖輸出")
 	}
@@ -267,6 +361,9 @@ func (s *Session) capture(kind ui.CaptureKind) error {
 // poke 是金手指的寫入路徑。範圍檢查在這裡再做一次：ui.PokeWorkRAM.Valid 是
 // 型別層的保證，這裡是執行層的保證，兩層都不能省。
 func (s *Session) poke(value ui.PokeWorkRAM) error {
+	if s.System == nil {
+		return fmt.Errorf("session: 沒有卡帶可以寫入")
+	}
 	if !value.Valid() {
 		return fmt.Errorf("session: $%06X 不在 Work RAM 範圍內", value.Addr)
 	}

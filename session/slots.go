@@ -29,7 +29,7 @@ func (s *Session) Slots() []ui.SlotInfo {
 
 func (s *Session) slotInfo(slot int) ui.SlotInfo {
 	info := ui.SlotInfo{Index: slot}
-	if s.StateDir == "" {
+	if s.StateDir == "" || s.System == nil {
 		return info
 	}
 	path := s.slotPath(slot)

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"image"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/frontend/x11"
@@ -70,4 +72,39 @@ func (o *overlayInput) canvas(width, height int) *image.RGBA {
 // 不含覆蓋層也不套濾鏡，所以它可以當畫面證據用。
 func screenshotName() string {
 	return fmt.Sprintf("acan-%s.png", time.Now().Format("20060102-150405"))
+}
+
+// 版本資訊。發行時由 -ldflags 覆蓋，開發中顯示 dev。
+var (
+	buildVersion = "dev"
+	buildDate    = "unknown"
+)
+
+// splitList 讀逗號分隔的目錄清單。
+func splitList(spec string) []string {
+	var out []string
+	for _, item := range strings.Split(spec, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+// recentFor 目前只把命令列指定的卡帶當成「最近」。持久化的最近清單屬於設定檔，
+// 那是 P3 的範圍，這裡不假裝已經有。
+func recentFor(romPath string) []string {
+	if romPath == "" {
+		return nil
+	}
+	return []string{romPath}
+}
+
+// mustRead 讀檔失敗即結束；換卡帶路徑上的錯誤由呼叫端處理，這裡只給啟動用。
+func mustRead(path string) []byte {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	return raw
 }

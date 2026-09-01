@@ -111,6 +111,14 @@ var wantHashes = map[string]string{
 	"S4/960x720/compact":       "8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc",
 	"S4/1280x720/touch":        "ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0",
 	"D1/960x720/compact":       "e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6",
+	"S0/960x720/compact":       "84e731b98b74525e2414a15c7df179c9b787ce415a11b8a12a1bc55e16a1f65a",
+	"S0/1280x720/touch":        "fa17df07234c345ca9edeafef255dbe9c1ad6094d7b3588e2b18c3fe21794446",
+	"S0ready/960x720/compact":  "8ca7a1e7fbfb1a66eaedae4c2d31498a08da1f6915e698f6e42048b74c092148",
+	"S0.1/960x720/compact":     "90adda11beebb2cb6fb7529b7177f8522a8b42b372ba37ca0fc94cc1deef90bf",
+	"S1/960x720/compact":       "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
+	"S1/1280x720/touch":        "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
+	"S8/960x720/compact":       "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
+	"S9/960x720/compact":       "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
 }
 
 // dumpDir 由 ACAN_UI_DUMP 指定；設了就把每張畫面寫成 PNG，供人眼檢查版面。

@@ -15,6 +15,12 @@ type UI struct {
 	config  Config
 	slots   SlotSource
 
+	library   Library
+	firmware  FirmwareSource
+	about     AboutInfo
+	mode      Mode
+	haltNote  string
+
 	stack     []screen
 	modal     *confirm
 	toasts    []toastItem
@@ -24,13 +30,28 @@ type UI struct {
 	paused    bool
 }
 
+// Mode 決定介面的常駐畫面。
+type Mode uint8
+
+const (
+	// ModeGame 是有卡帶在跑：覆蓋層預設隱藏，按 Menu 才出現。
+	ModeGame Mode = iota
+	// ModeShell 是沒有卡帶：S0 啟動畫面常駐，關不掉。
+	ModeShell
+	// ModeHalt 是 fail-closed 停機：S9 常駐且不能用返回鍵略過。
+	ModeHalt
+)
+
 // Options 是建立 UI 的參數。Font 留空時用嵌入的 bitmapfont/v4。
 type Options struct {
-	Surface Surface
-	Config  Config
-	Slots   SlotSource
-	Theme   *Theme
-	Font    *Font
+	Surface  Surface
+	Config   Config
+	Slots    SlotSource
+	Library  Library
+	Firmware FirmwareSource
+	About    AboutInfo
+	Theme    *Theme
+	Font     *Font
 }
 
 // New 建立介面狀態機。
@@ -48,13 +69,64 @@ func New(options Options) *UI {
 		surface.Scale = 1
 	}
 	return &UI{
-		surface: surface,
-		metrics: MetricsFor(surface.Profile),
-		theme:   theme,
-		font:    font,
-		config:  options.Config,
-		slots:   options.Slots,
+		surface:  surface,
+		metrics:  MetricsFor(surface.Profile),
+		theme:    theme,
+		font:     font,
+		config:   options.Config,
+		slots:    options.Slots,
+		library:  options.Library,
+		firmware: options.Firmware,
+		about:    options.About,
 	}
+}
+
+// SetMode 切換常駐畫面。ModeShell 與 ModeHalt 的根畫面關不掉：
+// 沒有卡帶時沒有東西可以回去，停機時不能假裝沒事發生。
+func (u *UI) SetMode(mode Mode, note string) {
+	u.mode = mode
+	u.modal = nil
+	u.haltNote = note
+	switch mode {
+	case ModeShell:
+		u.stack = []screen{&startScreen{}}
+	case ModeHalt:
+		u.stack = []screen{&haltScreen{}}
+	default:
+		u.stack = nil
+	}
+}
+
+// Mode 回報目前的常駐畫面。
+func (u *UI) Mode() Mode { return u.mode }
+
+// firmwareEntries 取得四份韌體的現況；沒有來源時視為全部未設定。
+func (u *UI) firmwareEntries() []FirmwareEntry {
+	if u.firmware == nil {
+		entries := make([]FirmwareEntry, FirmwareCount)
+		for i := range entries {
+			entries[i].Kind = FirmwareKind(i)
+		}
+		return entries
+	}
+	return u.firmware.FirmwareEntries()
+}
+
+// firmwareReady 回報四份韌體是否齊備。缺任一份就不啟動任何卡帶。
+func (u *UI) firmwareReady() bool {
+	for _, entry := range u.firmwareEntries() {
+		if !entry.Loaded {
+			return false
+		}
+	}
+	return true
+}
+
+func (u *UI) recentEntries() []CartridgeEntry {
+	if u.library == nil {
+		return nil
+	}
+	return u.library.Recent()
 }
 
 // Visible 回報覆蓋層是否正在顯示。為 true 時入口停止推進模擬時間，
@@ -69,7 +141,7 @@ func (u *UI) Metrics() Metrics { return u.metrics }
 
 // Open 叫出覆蓋選單。
 func (u *UI) Open() {
-	if u.Visible() {
+	if u.mode != ModeGame || u.Visible() {
 		return
 	}
 	u.stack = []screen{&overlayScreen{}}
@@ -77,13 +149,18 @@ func (u *UI) Open() {
 	u.emit(SetPaused{Paused: true})
 }
 
-// Close 關掉整個覆蓋層，回到遊戲。
+// Close 關掉整個覆蓋層，回到遊戲。ModeShell 與 ModeHalt 有常駐根畫面，
+// 這時只退回根畫面而不是隱藏介面。
 func (u *UI) Close() {
 	if !u.Visible() {
 		return
 	}
-	u.stack = nil
 	u.modal = nil
+	if u.mode != ModeGame {
+		u.stack = u.stack[:1]
+		return
+	}
+	u.stack = nil
 	u.paused = false
 	u.emit(SetPaused{Paused: false})
 }
@@ -97,6 +174,9 @@ func (u *UI) pop() {
 	}
 	u.stack = u.stack[:len(u.stack)-1]
 }
+
+// SetHaltNote 更新停機說明。
+func (u *UI) SetHaltNote(note string) { u.haltNote = note }
 
 func (u *UI) emit(intent Intent) { u.intents = append(u.intents, intent) }
 
@@ -151,6 +231,8 @@ func (u *UI) handleBack() bool {
 		u.errorText = ""
 	case len(u.stack) > 1:
 		u.pop()
+	case u.mode != ModeGame:
+		// 根畫面關不掉：沒有卡帶時沒有東西可以回去，停機不能被略過。
 	case u.Visible():
 		u.Close()
 	default:

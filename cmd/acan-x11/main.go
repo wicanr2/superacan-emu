@@ -92,10 +92,16 @@ func main() {
 	audioSink := flag.String("audio-sink", "", "shell command receiving 48000 Hz signed 16-bit stereo PCM on stdin, for example \"aplay -f cd -t raw\"")
 	stateDir := flag.String("state-dir", "", "directory holding the ten save-state slots the overlay menu reads and writes")
 	uiScript := flag.String("ui-script", "", "scripted overlay events for smoke runs: frame:EVENT,... where EVENT is one of "+session.ScriptEventNames())
+	romDirs := flag.String("rom-dir", "", "comma-separated directories the cartridge browser scans")
+	stateRoot := flag.String("state-root", "", "root directory for per-cartridge save-state directories")
+	saveDir := flag.String("save-dir", "", "directory holding per-cartridge battery files")
 	flag.Parse()
 
-	if *iplPath == "" || *keyPath == "" || *romPath == "" {
-		fail("--ipl, --key and --rom are required")
+	if *iplPath == "" || *keyPath == "" {
+		fail("--ipl and --key are required")
+	}
+	if *romPath == "" && *romDirs == "" {
+		fail("--rom or --rom-dir is required")
 	}
 	if (*soundBIOS1Path == "") != (*soundBIOS2Path == "") {
 		fail("--sound-bios1 and --sound-bios2 must be supplied together")
@@ -104,37 +110,74 @@ func main() {
 		fail("--scale must be at least 1")
 	}
 
-	system, err := machine.NewSystem(
-		loadWordSwapped(*iplPath, machine.IPLSize),
-		loadCartridge(*romPath).Bytes,
-		loadLinear(*keyPath, 16),
-	)
-	if err != nil {
-		fail(err.Error())
-	}
+	// 韌體只讀一次；換卡帶時整台機器重建，但韌體位元組沿用同一份。
+	iplBytes := loadWordSwapped(*iplPath, machine.IPLSize)
+	keyBytes := loadLinear(*keyPath, 16)
+	var soundBIOS [2][]byte
 	if *soundBIOS1Path != "" {
-		if err := system.LoadSoundBIOS(0, loadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize)); err != nil {
-			fail(err.Error())
-		}
-		if err := system.LoadSoundBIOS(1, loadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize)); err != nil {
-			fail(err.Error())
-		}
+		soundBIOS[0] = loadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize)
+		soundBIOS[1] = loadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize)
 	}
 
 	stopAudio := func() {}
-	if *audioSink != "" {
-		stopAudio, err = startAudioSink(system, *audioSink)
+	attachAudio := func(system *machine.System) {
+		if *audioSink == "" {
+			return
+		}
+		stopAudio()
+		stop, err := startAudioSink(system, *audioSink)
 		if err != nil {
 			fail(fmt.Sprintf("audio sink: %v", err))
 		}
+		stopAudio = stop
 	}
-	defer stopAudio()
+	defer func() { stopAudio() }()
 
-	loadCartridgeSave(system, *savePath)
-	if err := system.Reset(); err != nil {
-		fail(fmt.Sprintf("reset: %v", err))
+	// 目前掛著的卡帶，退出時要把電池記憶體寫回去。
+	var current *machine.System
+	var currentSave string
+	newSystem := func(path string) (*machine.System, string, error) {
+		image, err := media.DecodeCartridge(path, mustRead(path))
+		if err != nil {
+			return nil, "", err
+		}
+		system, err := machine.NewSystem(iplBytes, image.Bytes, keyBytes)
+		if err != nil {
+			return nil, "", err
+		}
+		if soundBIOS[0] != nil {
+			if err := system.LoadSoundBIOS(0, soundBIOS[0]); err != nil {
+				return nil, "", err
+			}
+			if err := system.LoadSoundBIOS(1, soundBIOS[1]); err != nil {
+				return nil, "", err
+			}
+		}
+		if current != nil {
+			writeCartridgeSave(current, currentSave)
+		}
+		save := *savePath
+		if save == "" && *saveDir != "" {
+			save = session.BatteryPathFor(*saveDir, path)
+		}
+		loadCartridgeSave(system, save)
+		if err := system.Reset(); err != nil {
+			return nil, "", err
+		}
+		attachAudio(system)
+		current, currentSave = system, save
+		return system, session.TitleFromPath(path), nil
 	}
-	defer writeCartridgeSave(system, *savePath)
+
+	var system *machine.System
+	if *romPath != "" {
+		var err error
+		system, _, err = newSystem(*romPath)
+		if err != nil {
+			fail(err.Error())
+		}
+	}
+	defer func() { writeCartridgeSave(current, currentSave) }()
 
 	window, err := x11.New("Super A'Can Emulator", umc6618.Width, umc6618.Height, *scale)
 	if err != nil {
@@ -143,15 +186,21 @@ func main() {
 	defer window.Close()
 
 	windowW, windowH := window.Size()
+	library := session.NewLibrary(splitList(*romDirs), recentFor(*romPath), *stateRoot, *saveDir)
 	overlay := session.New(session.Options{
-		System:   system,
-		Title:    session.TitleFromPath(*romPath),
-		StateDir: *stateDir,
-		Surface:  ui.Surface{W: windowW, H: windowH, Scale: 1, Profile: ui.ProfileCompact},
-		Config:   ui.DefaultConfig(),
+		System:      system,
+		Title:       session.TitleFromPath(*romPath),
+		StateDir:    *stateDir,
+		Surface:     ui.Surface{W: windowW, H: windowH, Scale: 1, Profile: ui.ProfileCompact},
+		Config:      ui.DefaultConfig(),
+		Library:     library,
+		FirmwareSet: session.DescribeFirmwareSet(*iplPath, *keyPath, *soundBIOS1Path, *soundBIOS2Path),
+		About:       session.About(buildVersion, buildDate),
 	})
+	overlay.StateRoot = *stateRoot
+	overlay.Loader = newSystem
 	overlay.Screenshot = func(frame *image.RGBA) error {
-		return writeScreenshot(screenshotName(), system.Bus.Video().Framebuffer())
+		return writeScreenshot(screenshotName(), current.Bus.Video().Framebuffer())
 	}
 	input := newOverlayInput()
 	script, err := session.ParseScript(*uiScript)
@@ -210,11 +259,11 @@ func main() {
 		loadPressed = window.KeysymPressed(keysymF7)
 		overlay.SetPad(0, padState(window, playerOneKeys))
 		overlay.SetPad(1, padState(window, playerTwoKeys))
-		paused := overlay.Paused()
-		if err := overlay.Advance(time.Since(started)); err != nil {
+		advanced, err := overlay.Advance(time.Since(started))
+		if err != nil {
 			fail(err.Error())
 		}
-		if !paused {
+		if advanced {
 			completed++
 		}
 		if overlay.UI.Visible() {
@@ -225,7 +274,7 @@ func main() {
 			if err := window.PresentRGBA(canvas.Pix, windowW, windowH); err != nil {
 				fail(err.Error())
 			}
-		} else if err := window.Present(system.Bus.Video().Framebuffer()); err != nil {
+		} else if err := window.Present(overlay.System.Bus.Video().Framebuffer()); err != nil {
 			fail(err.Error())
 		}
 		if *frames != 0 && completed >= *frames {
@@ -236,12 +285,12 @@ func main() {
 		}
 	}
 
-	if *frames != 0 {
-		sha := system.Bus.Video().FramebufferSHA256()
-		fmt.Printf("frames=%d instructions=%d framebuffer_sha256=%x\n", completed, system.Instructions, sha)
+	if *frames != 0 && overlay.System != nil {
+		sha := overlay.System.Bus.Video().FramebufferSHA256()
+		fmt.Printf("frames=%d instructions=%d framebuffer_sha256=%x\n", completed, overlay.System.Instructions, sha)
 	}
-	if *screenshot != "" {
-		if err := writeScreenshot(*screenshot, system.Bus.Video().Framebuffer()); err != nil {
+	if *screenshot != "" && overlay.System != nil {
+		if err := writeScreenshot(*screenshot, overlay.System.Bus.Video().Framebuffer()); err != nil {
 			fail(err.Error())
 		}
 	}

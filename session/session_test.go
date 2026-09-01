@@ -47,7 +47,7 @@ func newTestSession(t *testing.T) *Session {
 func advance(t *testing.T, s *Session, frames int) {
 	t.Helper()
 	for i := 0; i < frames; i++ {
-		if err := s.Advance(time.Duration(i) * 16 * time.Millisecond); err != nil {
+		if _, err := s.Advance(time.Duration(i) * 16 * time.Millisecond); err != nil {
 			t.Fatalf("frame %d: %v", i, err)
 		}
 	}

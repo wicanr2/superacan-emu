@@ -186,7 +186,7 @@ func main() {
 				overlay.Play(script, frame)
 				overlay.SetPad(0, p1)
 				overlay.SetPad(1, p2)
-				if err = overlay.Advance(frameClock(frame)); err != nil {
+				if _, err = overlay.Advance(frameClock(frame)); err != nil {
 					break
 				}
 			} else {

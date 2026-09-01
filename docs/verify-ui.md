@@ -28,6 +28,14 @@
 | S4 存檔槽（存檔模式） | 960×720 `compact` | `8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc` |
 | S4 存檔槽（存檔模式） | 1280×720 `touch` | `ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0` |
 | D1 覆寫確認 | 960×720 `compact` | `e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6` |
+| S0 啟動（韌體不齊） | 960×720 `compact` | `84e731b98b74525e2414a15c7df179c9b787ce415a11b8a12a1bc55e16a1f65a` |
+| S0 啟動（韌體不齊） | 1280×720 `touch` | `fa17df07234c345ca9edeafef255dbe9c1ad6094d7b3588e2b18c3fe21794446` |
+| S0 啟動（韌體齊備） | 960×720 `compact` | `8ca7a1e7fbfb1a66eaedae4c2d31498a08da1f6915e698f6e42048b74c092148` |
+| S0.1 主機韌體 | 960×720 `compact` | `90adda11beebb2cb6fb7529b7177f8522a8b42b372ba37ca0fc94cc1deef90bf` |
+| S1 卡帶瀏覽器 | 960×720 `compact` | `82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca` |
+| S1 卡帶瀏覽器 | 1280×720 `touch` | `64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9` |
+| S8 關於 | 960×720 `compact` | `fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81` |
+| S9 停機 | 960×720 `compact` | `c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf` |
 
 雜湊只能守住「沒有意外變動」，看不出版面本來就畫錯。要用人眼檢查時把畫面另存
 PNG：
@@ -75,6 +83,26 @@ frame 904 讀檔之後機器退回存檔當下，再往前 296 個 frame，600�
 走完同一條流程，`TestLoadStateResumesIdentically` 證明從存檔續跑與一路跑到底的
 指令數、frame 與 framebuffer SHA-256 完全相同，`TestOverlayGatesPadInput` 證明選單
 開著時 machine 收到的是「全部放開」。
+
+## 沒有卡帶時的啟動流程
+
+`cmd/acan-x11` 的 `--rom` 變成選用：給 `--rom-dir` 就從 S0 啟動畫面開始，
+走瀏覽器選卡帶。這條路在 Xvfb 內驗過，而且**從介面載入的卡帶與從命令列載入的
+是同一台機器**：
+
+```sh
+DISPLAY=:99 acan-x11 --ipl … --key … --sound-bios1 … --sound-bios2 … \
+    --rom-dir /media --state-root …/states --frames 300 --pace=false --scale 3 \
+    --ui-script "5:down,10:confirm,20:confirm"
+→ frames=300 instructions=4364786 framebuffer_sha256=defbd19a…885c6
+
+acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
+→ steps=4364786 framebuffer_sha256=defbd19a…885c6
+```
+
+不需要商業 ROM 的版本在 `session` 的單元測試裡：`TestShellBrowsesAndLoadsHeadless`
+用自製的 raw 檔與雙部分 ZIP 走完「啟動畫面 → 瀏覽器 → 載入 → 退出卡帶」，
+`TestIncompleteFirmwareBlocksBrowserLoad` 確認韌體不齊時載不進去。
 
 ## X11 前端的覆蓋層
 
