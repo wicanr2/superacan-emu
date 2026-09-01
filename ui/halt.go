@@ -11,7 +11,7 @@ func (h *haltScreen) id() string { return "S9" }
 func (h *haltScreen) rows(u *UI) []menuRow {
 	return []menuRow{
 		{label: textSaveState, action: func(u *UI) {
-			u.push(&slotsScreen{mode: slotModeSave, focus: u.config.SaveSlot})
+			u.push(&slotsScreen{mode: slotModeSave, focus: u.config.Interface.SaveSlot})
 		}},
 		{label: textEjectToShell, action: func(u *UI) { u.emit(UnloadCartridge{}) }},
 		{label: textQuit, action: func(u *UI) { u.emit(Quit{}) }},

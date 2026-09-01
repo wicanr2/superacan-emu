@@ -50,9 +50,20 @@ func ParseScript(spec string) (Script, error) {
 		if err != nil {
 			return nil, fmt.Errorf("session: script entry %q: %w", entry, err)
 		}
-		event, ok := scriptEvents[strings.ToLower(strings.TrimSpace(name))]
+		name = strings.ToLower(strings.TrimSpace(name))
+		// raw<code> 送出一個原始按鍵，讓腳本也能走完「指定綁定」這條路；
+		// 前端識別字串由 Session.ScriptFrontend 決定，因為那才是綁定的歸屬。
+		if code, isRaw := strings.CutPrefix(name, "raw"); isRaw {
+			value, err := strconv.ParseUint(strings.TrimPrefix(code, "0x"), 16, 32)
+			if err != nil {
+				return nil, fmt.Errorf("session: script event %q: raw 之後要接十六進位鍵碼", name)
+			}
+			script[frame] = append(script[frame], ui.RawKey{Code: uint32(value)})
+			continue
+		}
+		event, ok := scriptEvents[name]
 		if !ok {
-			return nil, fmt.Errorf("session: script event %q is not one of %s", name, ScriptEventNames())
+			return nil, fmt.Errorf("session: script event %q is not one of %s（或 raw<十六進位鍵碼>）", name, ScriptEventNames())
 		}
 		script[frame] = append(script[frame], event)
 	}
@@ -69,9 +80,17 @@ func ScriptEventNames() string {
 	return strings.Join(names, ", ")
 }
 
-// Play 送出這個 frame 的事件。
+// Play 送出這個 frame 的事件。腳本裡的原始按鍵在送出前補上前端識別字串：
+// 綁定要記得是誰寫的，腳本本身不是一個前端。
 func (s *Session) Play(script Script, frame uint64) {
 	for _, event := range script[frame] {
+		if raw, ok := event.(ui.RawKey); ok && raw.Frontend == "" {
+			raw.Frontend = s.ScriptFrontend
+			if raw.Frontend == "" {
+				raw.Frontend = "script"
+			}
+			event = raw
+		}
 		s.Handle(event)
 	}
 }

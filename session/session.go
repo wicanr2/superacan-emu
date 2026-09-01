@@ -37,6 +37,10 @@ type Session struct {
 	StateRoot string
 	// Library 供瀏覽器列出卡帶，換卡帶後要重掃。
 	Library *Library
+	// ConfigPath 不為空時，介面每次改設定都會原子寫回這個檔案。
+	ConfigPath string
+	// ScriptFrontend 是腳本送出的原始按鍵要掛在哪個前端名下。
+	ScriptFrontend string
 
 	firmware  ui.FirmwareIDs
 	romSize   int64
@@ -242,6 +246,11 @@ func (s *Session) apply(intent ui.Intent) error {
 		return s.deleteSlot(value.Slot)
 	case ui.SetLayerMask:
 		s.layerMask = value.Mask
+	case ui.ApplyConfig:
+		if s.ConfigPath == "" {
+			return nil
+		}
+		return SaveConfig(s.ConfigPath, value.Config)
 	case ui.Capture:
 		return s.capture(value.Kind)
 	case ui.PokeWorkRAM:

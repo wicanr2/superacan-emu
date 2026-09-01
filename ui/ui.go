@@ -100,6 +100,19 @@ func (u *UI) SetMode(mode Mode, note string) {
 // Mode 回報目前的常駐畫面。
 func (u *UI) Mode() Mode { return u.mode }
 
+// rawCapturer 是正在等待實體輸入的畫面。
+type rawCapturer interface{ capturing() bool }
+
+// WantsRawInput 回報介面正在等待「按下哪一個鍵」。為 true 時前端只送 RawKey／
+// RawPad 與取消，不要送翻譯過的導覽事件——否則 Enter 會同時被當成確認與被指定。
+func (u *UI) WantsRawInput() bool {
+	if !u.Visible() || u.modal != nil {
+		return false
+	}
+	capturer, ok := u.stack[len(u.stack)-1].(rawCapturer)
+	return ok && capturer.capturing()
+}
+
 // firmwareEntries 取得四份韌體的現況；沒有來源時視為全部未設定。
 func (u *UI) firmwareEntries() []FirmwareEntry {
 	if u.firmware == nil {

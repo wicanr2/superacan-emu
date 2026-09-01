@@ -193,3 +193,125 @@ func TestHaltScreenRendersAndCannotBeDismissed(t *testing.T) {
 		t.Fatal("停機畫面不能被返回鍵或取消略過")
 	}
 }
+
+func newSettingsUI(t *testing.T, mutate func(*Config)) *UI {
+	t.Helper()
+	config := DefaultConfig()
+	config.Input.Players[0].Keyboard = map[string]Binding{
+		"up": {Frontend: "x11", Code: 0xff52, Label: "ArrowUp"},
+		"a":  {Frontend: "x11", Code: 0x7a, Label: "z"},
+		"b":  {Frontend: "x11", Code: 0x78, Label: "x"},
+	}
+	config.Input.Players[0].Gamepad = map[string]Binding{
+		"a": {Frontend: "pad", Code: 0, Label: "Button 0"},
+	}
+	config.Input.Hotkeys = map[string]Binding{
+		"menu":       {Frontend: "x11", Code: 0xffbe, Label: "F1"},
+		"save_state": {Frontend: "x11", Code: 0xffc2, Label: "F5"},
+	}
+	if mutate != nil {
+		mutate(&config)
+	}
+	u := New(Options{
+		Surface: surfaceCases[0].surface, Config: config, Slots: fixedSlots{},
+		Library: fixedLibrary{}, Firmware: fixedFirmware{complete: true}, About: fixedAbout,
+	})
+	u.Update(0)
+	return u
+}
+
+func TestSettingsScreensRender(t *testing.T) {
+	u := newSettingsUI(t, nil)
+	u.Open()
+	u.push(&settingsScreen{})
+	checkHash(t, "S5/"+surfaceCases[0].name, render(t, "S5/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+
+	u = newSettingsUI(t, nil)
+	u.Open()
+	u.push(&bindingScreen{})
+	checkHash(t, "S5.1/"+surfaceCases[0].name, render(t, "S5.1/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+
+	u = newSettingsUI(t, nil)
+	u.Open()
+	u.push(&hotkeyScreen{})
+	checkHash(t, "S5.2/"+surfaceCases[0].name, render(t, "S5.2/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+}
+
+// 衝突要在畫面上看得到：同一個鍵綁兩個動作不是錯誤，但使用者一定要知道，
+// 否則會以為某個按鈕壞了。
+func TestConflictIsVisible(t *testing.T) {
+	u := newSettingsUI(t, func(config *Config) {
+		// 「上一個存檔槽」指到與「存檔到目前槽」相同的鍵。
+		config.Input.Hotkeys["prev_slot"] = Binding{Frontend: "x11", Code: 0xffc2, Label: "F5"}
+	})
+	u.Open()
+	u.push(&hotkeyScreen{})
+	screen := u.stack[len(u.stack)-1].(*hotkeyScreen)
+	conflicts := conflictsIn(screen.rows(u), func(r bindingRow) Binding { return r.keyboard })
+	if len(conflicts) != 2 {
+		t.Fatalf("兩列都要標出衝突，得到 %v", conflicts)
+	}
+	checkHash(t, "S5.2conflict/"+surfaceCases[0].name,
+		render(t, "S5.2conflict/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+}
+
+// 指定綁定：進入等待狀態，收到 RawKey 才寫入，並要求入口存檔。
+func TestBindingCaptureWritesConfig(t *testing.T) {
+	u := newSettingsUI(t, nil)
+	u.Open()
+	u.push(&bindingScreen{})
+	u.TakeIntents()
+	screen := u.stack[len(u.stack)-1].(*bindingScreen)
+	screen.focus = 4 // "a"
+
+	u.Handle(Action{Kind: ActConfirm})
+	if !screen.waiting {
+		t.Fatal("按下確認應該進入等待輸入")
+	}
+	// 等待中不得被導覽事件干擾。
+	u.Handle(Nav{Dir: DirDown})
+	if screen.focus != 4 {
+		t.Fatal("等待輸入時焦點不該移動")
+	}
+	u.Handle(RawKey{Frontend: "x11", Code: 0x71, Label: "q"})
+	if screen.waiting {
+		t.Fatal("收到按鍵之後應該結束等待")
+	}
+	if got := u.config.Input.Players[0].Keyboard["a"]; got.Code != 0x71 || got.Frontend != "x11" {
+		t.Fatalf("綁定 %+v", got)
+	}
+	intents := u.TakeIntents()
+	if len(intents) != 1 {
+		t.Fatalf("應該要求入口存檔，得到 %#v", intents)
+	}
+	if _, ok := intents[0].(ApplyConfig); !ok {
+		t.Fatalf("得到 %#v", intents[0])
+	}
+
+	// Esc 取消等待，不改變原綁定。
+	screen.focus = 5 // "b"
+	u.Handle(Action{Kind: ActConfirm})
+	u.Handle(Action{Kind: ActCancel})
+	if screen.waiting {
+		t.Fatal("Esc 應該取消等待")
+	}
+	if got := u.config.Input.Players[0].Keyboard["b"]; got.Code != 0x78 {
+		t.Fatalf("取消之後綁定不該變：%+v", got)
+	}
+}
+
+// Del 清除該列的兩組綁定。
+func TestDeleteClearsBothBindings(t *testing.T) {
+	u := newSettingsUI(t, nil)
+	u.Open()
+	u.push(&bindingScreen{})
+	screen := u.stack[len(u.stack)-1].(*bindingScreen)
+	screen.focus = 4 // "a"
+	u.Handle(Action{Kind: ActDelete})
+	if _, ok := u.config.Input.Players[0].Keyboard["a"]; ok {
+		t.Fatal("鍵盤綁定應該被清除")
+	}
+	if _, ok := u.config.Input.Players[0].Gamepad["a"]; ok {
+		t.Fatal("手把綁定應該被清除")
+	}
+}

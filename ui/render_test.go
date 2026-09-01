@@ -105,9 +105,9 @@ func render(t *testing.T, key string, u *UI, surface Surface) string {
 // 記錄於 docs/verify-ui.md。畫面一改動這些值就會變，那正是它們的用途：
 // 版面的變更必須是刻意的。
 var wantHashes = map[string]string{
-	"S3/960x720/compact":       "ff406b886d278a0c70600e20d8b53161713df90cdf58434635ab5ef9546e5ef0",
-	"S3/1280x720/touch":        "46eef64f92a9890101d108c61e033ab431b5b08fd9570c3a798bdfc98a84a924",
-	"S3+focus/960x720/compact": "73ad19293711c6a1b51c6d86f6f20f63d68fdcf8592f990d8c09ecb14ce243ca",
+	"S3/960x720/compact":       "6990880e9083ec950cb87bbade7e1945f95c5040e6776bc9aa13ed5394fc7460",
+	"S3/1280x720/touch":        "ee222da403badeba5a8779e7573c763a1ad16b9df25ceaca029987ec1499d345",
+	"S3+focus/960x720/compact": "5ca59032ac1c4bcaad23445d9b3b96274c65f1bddc91c5a6b6542804e2fe714c",
 	"S4/960x720/compact":       "8279ec7eade67dca4b70e3cca03deb3f0bd9cd8573a170119cb0a06f52d007cc",
 	"S4/1280x720/touch":        "ce19280911c7abca897d29aacabcd241ac646e01f5a713029a45721b6b8273e0",
 	"D1/960x720/compact":       "e1bf95ba55c979941a854d0e07d8a964b630a26e51bf28c5e81b99a6eb4c72e6",
@@ -118,6 +118,10 @@ var wantHashes = map[string]string{
 	"S1/960x720/compact":       "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
 	"S1/1280x720/touch":        "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
 	"S8/960x720/compact":       "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
+	"S5/960x720/compact":          "c48bf197a895e9b46313a21d23dae7e98577ebcd7231e6afb7799228d16056cc",
+	"S5.1/960x720/compact":        "1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62",
+	"S5.2/960x720/compact":        "2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8",
+	"S5.2conflict/960x720/compact": "107ecbc854d803c375197eec83f6c68097dd35778cc307b06767ad6b07f0ddbf",
 	"S9/960x720/compact":       "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
 }
 
@@ -266,7 +270,7 @@ func TestToastLifetimes(t *testing.T) {
 // 抑制操作訊息時錯誤仍然要顯示。
 func TestSuppressedInfoToastsKeepErrors(t *testing.T) {
 	u := newTestUI(surfaceCases[0].surface)
-	u.config.SuppressInfoToasts = true
+	u.config.Interface.SuppressInfoToasts = true
 	u.toast("info", SeverityInfo)
 	u.toast("warn", SeverityWarn)
 	if len(u.toasts) != 1 {

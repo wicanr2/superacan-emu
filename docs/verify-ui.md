@@ -36,6 +36,10 @@
 | S1 卡帶瀏覽器 | 1280×720 `touch` | `64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9` |
 | S8 關於 | 960×720 `compact` | `fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81` |
 | S9 停機 | 960×720 `compact` | `c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf` |
+| S5 設定 | 960×720 `compact` | `c48bf197a895e9b46313a21d23dae7e98577ebcd7231e6afb7799228d16056cc` |
+| S5.1 輸入綁定 | 960×720 `compact` | `1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62` |
+| S5.2 熱鍵 | 960×720 `compact` | `2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8` |
+| S5.2 熱鍵（含衝突標示） | 960×720 `compact` | `107ecbc854d803c375197eec83f6c68097dd35778cc307b06767ad6b07f0ddbf` |
 
 雜湊只能守住「沒有意外變動」，看不出版面本來就畫錯。要用人眼檢查時把畫面另存
 PNG：
@@ -103,6 +107,31 @@ acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
 不需要商業 ROM 的版本在 `session` 的單元測試裡：`TestShellBrowsesAndLoadsHeadless`
 用自製的 raw 檔與雙部分 ZIP 走完「啟動畫面 → 瀏覽器 → 載入 → 退出卡帶」，
 `TestIncompleteFirmwareBlocksBrowserLoad` 確認韌體不齊時載不進去。
+
+## 設定檔與重新綁定
+
+設定檔的四條規則各自對應一種失敗，四條都有測試：型別不符只讓那個欄位回到預設
+（`TestTypeMismatchOnlyResetsThatField`）；未知的頂層鍵原樣保留
+（`TestUnknownKeysSurviveARoundTrip`）——只忽略不保留的話，舊版寫一次設定就會把
+新版的欄位刪光；整份無法解析時改名成 `config.json.bad` 再用預設值繼續
+（`TestBrokenConfigIsRenamedNotOverwritten`）；寫入先寫暫存檔再改名。
+
+綁定帶前端識別：同一個實體鍵在 X11 keysym 與 `ebiten.Key` 底下是不同數值，
+所以每組綁定都記錄寫入它的前端字串，讀入時前端不符就不套用而回到預設
+（`cmd/acan-x11` 的 `TestForeignFrontendBindingFallsBackToDefault`）。
+
+整條「改綁定 → 寫檔」在真實 X11 視窗裡跑過。腳本的 `raw<十六進位鍵碼>` 事件會送出
+一個原始按鍵，所以指定綁定這條路也能腳本化：
+
+```sh
+DISPLAY=:99 acan-x11 … --max-ticks 80 --config /tmp/settings.json \
+    --ui-script "5:menu,10:down,12:down,14:down,16:down,18:down,20:confirm,\
+25:confirm,30:down,32:down,34:down,36:down,38:confirm,42:raw71"
+```
+
+結果：`settings.json` 的 `input.players[0].keyboard.a` 變成
+`{"frontend": "x11", "code": 113}`。`--max-ticks` 是必要的——`--frames` 只數真正
+跑掉的 frame，而腳本會停在選單裡，沒有這個上限 smoke run 不會結束。
 
 ## X11 前端的覆蓋層
 

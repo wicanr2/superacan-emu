@@ -98,3 +98,27 @@ const (
 	textNone              = "—"
 	textEjectToShell      = "退出卡帶"
 )
+
+// P3 的文案。
+const (
+	textSettingsTitle    = "設定"
+	textSettingsInput    = "輸入"
+	textSettingsHotkeys  = "熱鍵"
+	textSettingsVideo    = "影像"
+	textSettingsAudio    = "音訊"
+	textSettingsLanguage = "語言"
+	textStageVideo       = "影像設定在 P5"
+	textStageAudio       = "音訊設定在 P5"
+	textStageLanguage    = "語言在 P8"
+	textInputTitle       = "輸入"
+	textHotkeyTitle      = "熱鍵"
+	textColumnButton     = "按鈕"
+	textColumnAction     = "動作"
+	textColumnKeyboard   = "鍵盤"
+	textColumnGamepad    = "手把"
+	textPressInput       = "按下按鍵…（Esc 取消）"
+	textConflictWith     = "與「%s」共用"
+	textInputHelp        = "Enter 指定 · Del 清除 · ←→ 切換鍵盤／手把 · Tab 切換 P1／P2"
+	textHotkeyHelp       = "Enter 指定 · Del 清除 · Esc 返回"
+	textHotkeyConflict   = "※ 有熱鍵指到同一個按鍵，兩個動作都會觸發。"
+)

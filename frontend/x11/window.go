@@ -24,6 +24,7 @@ type Window struct {
 	image      []byte
 	pressed    map[xproto.Keycode]bool
 	keysyms    map[xproto.Keycode]uint32
+	presses    []uint32
 	closed     bool
 	maxRequest int
 }
@@ -210,6 +211,16 @@ func (w *Window) flush(width, height int) error {
 	return nil
 }
 
+// TakeKeyPresses 取走並清空自上次呼叫以來按下的 keysym。
+func (w *Window) TakeKeyPresses() []uint32 {
+	if len(w.presses) == 0 {
+		return nil
+	}
+	out := w.presses
+	w.presses = nil
+	return out
+}
+
 // Size 回傳視窗的像素尺寸，覆蓋層要以此建立畫布。
 func (w *Window) Size() (int, int) { return w.sourceW * w.scale, w.sourceH * w.scale }
 
@@ -229,6 +240,11 @@ func (w *Window) Poll() bool {
 		switch typed := event.(type) {
 		case xproto.KeyPressEvent:
 			w.pressed[typed.Detail] = true
+			// 綁定畫面要知道「剛剛按下的是哪一個鍵」，而不是「這個鍵現在有沒有
+			// 被按著」。這條佇列有上限，避免沒人取用時無限成長。
+			if len(w.presses) < 64 {
+				w.presses = append(w.presses, w.keysyms[typed.Detail])
+			}
 		case xproto.KeyReleaseEvent:
 			delete(w.pressed, typed.Detail)
 		case xproto.ClientMessageEvent:

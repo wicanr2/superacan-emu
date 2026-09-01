@@ -78,7 +78,7 @@ func rowWrap(focus, delta int) int {
 func (s *slotsScreen) activate(u *UI) {
 	slot := s.focus
 	info := u.slotInfo(slot)
-	u.config.SaveSlot = slot
+	u.config.Interface.SaveSlot = slot
 	if s.mode == slotModeSave {
 		if info.Present {
 			u.modal = &confirm{

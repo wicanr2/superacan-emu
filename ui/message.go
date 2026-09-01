@@ -26,7 +26,7 @@ type toastItem struct {
 
 // toast 排入一則訊息。同時最多三則，超過時最舊的立即消失。
 func (u *UI) toast(text string, severity Severity) {
-	if severity == SeverityInfo && u.config.SuppressInfoToasts {
+	if severity == SeverityInfo && u.config.Interface.SuppressInfoToasts {
 		return
 	}
 	life := infoToastLife

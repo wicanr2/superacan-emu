@@ -57,26 +57,6 @@ type keyBinding struct {
 	button uint16
 }
 
-// 與 Ebitengine 前端相同的鍵位，讓兩個前端的操作方式一致。
-var playerOneKeys = []keyBinding{
-	{keysymLowerZ, machine.ButtonA}, {keysymLowerX, machine.ButtonB},
-	{keysymReturn, machine.ButtonStart}, {keysymShiftR, machine.ButtonSelect},
-	{keysymUp, machine.ButtonUp}, {keysymDown, machine.ButtonDown},
-	{keysymLeft, machine.ButtonLeft}, {keysymRight, machine.ButtonRight},
-	{keysymLowerA, machine.ButtonX}, {keysymLowerS, machine.ButtonY},
-	{keysymLowerQ, machine.ButtonL}, {keysymLowerW, machine.ButtonR},
-}
-
-// P2 的鍵位參考 Bcan.ini 的預設值：方向 R/F/D/G、按鍵 U/I/K/Y/O/P、Start=2、Select=6。
-var playerTwoKeys = []keyBinding{
-	{keysymLowerU, machine.ButtonA}, {keysymLowerI, machine.ButtonB},
-	{keysymDigit2, machine.ButtonStart}, {keysymDigit6, machine.ButtonSelect},
-	{keysymLowerR, machine.ButtonUp}, {keysymLowerF, machine.ButtonDown},
-	{keysymLowerD, machine.ButtonLeft}, {keysymLowerG, machine.ButtonRight},
-	{keysymLowerK, machine.ButtonX}, {keysymLowerY, machine.ButtonY},
-	{keysymLowerO, machine.ButtonL}, {keysymLowerP, machine.ButtonR},
-}
-
 func main() {
 	iplPath := flag.String("ipl", "", "path to word-swapped 4096-byte internal_68k.bin")
 	keyPath := flag.String("key", "", "path to 16-byte umc6650.bin")
@@ -95,6 +75,8 @@ func main() {
 	romDirs := flag.String("rom-dir", "", "comma-separated directories the cartridge browser scans")
 	stateRoot := flag.String("state-root", "", "root directory for per-cartridge save-state directories")
 	saveDir := flag.String("save-dir", "", "directory holding per-cartridge battery files")
+	configPath := flag.String("config", "", "settings file; defaults to the platform config directory, \"none\" disables it")
+	maxTicks := flag.Uint64("max-ticks", 0, "exit after this many host loop iterations regardless of pause state; for scripted smoke runs")
 	flag.Parse()
 
 	if *iplPath == "" || *keyPath == "" {
@@ -109,6 +91,31 @@ func main() {
 	if *scale < 1 {
 		fail("--scale must be at least 1")
 	}
+
+	// 設定檔在建視窗之前讀：綁定與音量都要在第一個 frame 就生效。
+	settingsPath := *configPath
+	if settingsPath == "" {
+		if resolved, err := session.ConfigPath(); err == nil {
+			settingsPath = resolved
+		}
+	}
+	if settingsPath == "none" {
+		settingsPath = ""
+	}
+	config := ui.DefaultConfig()
+	if settingsPath != "" {
+		loaded, warnings, err := session.LoadConfig(settingsPath)
+		if err != nil {
+			fail(fmt.Sprintf("settings: %v", err))
+		}
+		config = loaded
+		for _, warning := range warnings {
+			fmt.Fprintf(os.Stderr, "settings: %s\n", warning)
+		}
+	}
+	playerOneKeys := bindingsFor(config, 0)
+	playerTwoKeys := bindingsFor(config, 1)
+	menuKeysym := hotkeyKeysym(config, "menu", keysymF1)
 
 	// 韌體只讀一次；換卡帶時整台機器重建，但韌體位元組沿用同一份。
 	iplBytes := loadWordSwapped(*iplPath, machine.IPLSize)
@@ -192,12 +199,14 @@ func main() {
 		Title:       session.TitleFromPath(*romPath),
 		StateDir:    *stateDir,
 		Surface:     ui.Surface{W: windowW, H: windowH, Scale: 1, Profile: ui.ProfileCompact},
-		Config:      ui.DefaultConfig(),
+		Config:      config,
 		Library:     library,
 		FirmwareSet: session.DescribeFirmwareSet(*iplPath, *keyPath, *soundBIOS1Path, *soundBIOS2Path),
 		About:       session.About(buildVersion, buildDate),
 	})
 	overlay.StateRoot = *stateRoot
+	overlay.ConfigPath = settingsPath
+	overlay.ScriptFrontend = frontendName
 	overlay.Loader = newSystem
 	overlay.Screenshot = func(frame *image.RGBA) error {
 		return writeScreenshot(screenshotName(), current.Bus.Video().Framebuffer())
@@ -229,10 +238,36 @@ func main() {
 		// 停住，用 frame 數當索引會讓腳本永遠等不到下一個事件。
 		overlay.Play(script, tick)
 		tick++
-		if input.edge(window, keysymF1) {
-			overlay.Handle(ui.Action{Kind: ui.ActMenu})
+		// --frames 只數真正跑掉的 frame，覆蓋層開著時它不會前進。腳本會停在
+		// 選單裡，所以還需要一個不受暫停影響的上限，否則 smoke run 不會結束。
+		if *maxTicks != 0 && tick > *maxTicks {
+			break
 		}
-		if overlay.UI.Visible() {
+		// 等待指定綁定時只送原始按鍵：否則 Enter 會同時被當成確認與被指定。
+		if overlay.UI.WantsRawInput() {
+			for _, keysym := range window.TakeKeyPresses() {
+				if keysym == keysymEscape {
+					overlay.Handle(ui.Action{Kind: ui.ActCancel})
+					continue
+				}
+				overlay.Handle(ui.RawKey{
+					Frontend: frontendName, Code: keysym, Label: keysymLabel(keysym),
+				})
+			}
+			for _, key := range overlayKeys {
+				input.edge(window, key.keysym)
+			}
+			input.edge(window, keysymEscape)
+			input.edge(window, menuKeysym)
+		} else {
+			window.TakeKeyPresses()
+			if input.edge(window, menuKeysym) {
+				overlay.Handle(ui.Action{Kind: ui.ActMenu})
+			}
+		}
+		if overlay.UI.WantsRawInput() {
+			// 已經處理完，這一輪不再翻譯導覽事件。
+		} else if overlay.UI.Visible() {
 			if input.edge(window, keysymEscape) {
 				overlay.Handle(ui.Action{Kind: ui.ActCancel})
 			}

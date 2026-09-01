@@ -10,20 +10,20 @@ type overlayScreen struct{ focus int }
 func (s *overlayScreen) id() string { return "S3" }
 
 func (s *overlayScreen) rows(u *UI) []menuRow {
-	slot := fmt.Sprintf("%s%d", textSlotPrefix, u.config.SaveSlot)
+	slot := fmt.Sprintf("%s%d", textSlotPrefix, u.config.Interface.SaveSlot)
 	return []menuRow{
 		{label: textResume, action: func(u *UI) { u.Close() }},
 		{label: textSaveState, value: slot, chevron: true, action: func(u *UI) {
-			u.push(&slotsScreen{mode: slotModeSave, focus: u.config.SaveSlot})
+			u.push(&slotsScreen{mode: slotModeSave, focus: u.config.Interface.SaveSlot})
 		}},
 		{label: textLoadState, value: slot, chevron: true, action: func(u *UI) {
-			u.push(&slotsScreen{mode: slotModeLoad, focus: u.config.SaveSlot})
+			u.push(&slotsScreen{mode: slotModeLoad, focus: u.config.Interface.SaveSlot})
 		}},
 		{label: textResetMachine, chevron: true, action: func(u *UI) {
 			u.push(&resetScreen{})
 		}},
 		{label: textCheats, chevron: true, disabled: true, reason: textStageCheats},
-		{label: textSettings, chevron: true, disabled: true, reason: textStageSettings},
+		{label: textSettings, chevron: true, action: func(u *UI) { u.push(&settingsScreen{}) }},
 		{label: textDiagnostics, chevron: true, disabled: true, reason: textStageDiag},
 		{label: textScreenshot, hotkey: textScreenshotHK, action: func(u *UI) {
 			u.emit(Capture{Kind: CaptureScreenshot})
