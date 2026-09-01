@@ -147,8 +147,8 @@ func (c *CPU) genericMove(opcode uint16) (bool, error) {
 	// MOVE 的目的端預減不收 EA 計算的 2 cycle：位址計算與寫入重疊。
 	var destination operand
 	if destinationMode == 4 {
-		c.state.A[destinationRegister] = (c.state.A[destinationRegister] - operandStride(destinationRegister, size)) & addressMask
-		destination = operand{kind: operandMemory, address: c.state.A[destinationRegister] & addressMask}
+		c.state.A[destinationRegister] -= operandStride(destinationRegister, size)
+		destination = operand{kind: operandMemory, address: c.state.A[destinationRegister]}
 	} else {
 		destination, ok, err = c.resolveOperand(stream, destinationMode, destinationRegister, size)
 		if err != nil || !ok {
@@ -400,7 +400,7 @@ func (c *CPU) genericQuickConditional(opcode uint16) (bool, error) {
 		} else {
 			result = c.state.A[register] - quick
 		}
-		c.state.A[register] = result & addressMask
+		c.state.A[register] = result
 		if err := c.internal(4); err != nil {
 			return true, err
 		}
@@ -653,9 +653,9 @@ func (c *CPU) genericAddressArithmetic(opcode uint16, isAdd bool) (bool, error) 
 	}
 	extended := signExtend(value, size)
 	if isAdd {
-		c.state.A[destination] = (c.state.A[destination] + extended) & addressMask
+		c.state.A[destination] += extended
 	} else {
-		c.state.A[destination] = (c.state.A[destination] - extended) & addressMask
+		c.state.A[destination] -= extended
 	}
 	internal := uint8(2)
 	if size == WidthWord || isRegisterOrImmediate(source) {

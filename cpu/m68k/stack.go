@@ -48,7 +48,7 @@ func (c *CPU) movemLongRegistersToPredecrement(addressRegister uint8) error {
 			continue
 		}
 		register := uint8(15) - bit
-		c.state.A[addressRegister] = (c.state.A[addressRegister] - 4) & addressMask
+		c.state.A[addressRegister] = c.state.A[addressRegister] - 4
 		value := c.registerValue(register)
 		if register == addressRegister+8 {
 			value = c.state.A[addressRegister]
@@ -98,7 +98,7 @@ func (c *CPU) bsr(displacement8 uint8) error {
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 		return err
 	}
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeLong(c.state.A[7], returnAddress, FCSupervisorData); err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (c *CPU) rts() error {
 	if err != nil {
 		return err
 	}
-	c.state.A[7] = (c.state.A[7] + 4) & addressMask
+	c.state.A[7] = c.state.A[7] + 4
 	return c.refillPrefetch(target&addressMask, 0)
 }
 
@@ -126,7 +126,7 @@ func (c *CPU) rte() error {
 	if err != nil {
 		return err
 	}
-	c.state.A[7] = (c.state.A[7] + 6) & addressMask
+	c.state.A[7] = c.state.A[7] + 6
 	c.state.SR = restoredSR
 	return c.refillPrefetch(target&addressMask, 0)
 }
@@ -138,7 +138,7 @@ func (c *CPU) peaPCDisplacement() error {
 		return err
 	}
 	address := uint32(int32((c.state.PC+2)&addressMask)+int32(int16(displacement))) & addressMask
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeLong(c.state.A[7], address, FCSupervisorData); err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (c *CPU) moveLongImmediateToPredecrement(destination uint8) error {
 	if err != nil {
 		return err
 	}
-	c.state.A[destination] = (c.state.A[destination] - 4) & addressMask
+	c.state.A[destination] = c.state.A[destination] - 4
 	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (c *CPU) moveLongImmediateToPredecrement(destination uint8) error {
 
 func (c *CPU) moveLongAddressToPredecrement(source, destination uint8) error {
 	value := c.state.A[source]
-	c.state.A[destination] = (c.state.A[destination] - 4) & addressMask
+	c.state.A[destination] = c.state.A[destination] - 4
 	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (c *CPU) jsrAddressIndexed(addressRegister uint8) error {
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 		return err
 	}
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeLong(c.state.A[7], (c.state.PC+4)&addressMask, FCSupervisorData); err != nil {
 		return err
 	}

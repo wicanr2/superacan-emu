@@ -206,11 +206,11 @@ func main() {
 		fmt.Printf("bus_matches=%d bus_retained=%d bus_omitted=%d\n",
 			trace.Matched, len(trace.Records), trace.Matched-uint64(len(trace.Records)))
 	}
+	for _, record := range system.Trace.Records() {
+		fmt.Printf("trace step=%d pc=$%06X opcode=$%04X cycles=%d\n",
+			record.Index, record.PC, record.Opcode, record.Cycles)
+	}
 	if err != nil {
-		for _, record := range system.Trace.Records() {
-			fmt.Printf("trace step=%d pc=$%06X opcode=$%04X cycles=%d\n",
-				record.Index, record.PC, record.Opcode, record.Cycles)
-		}
 		fail(err.Error())
 	}
 	if *screenshot != "" {

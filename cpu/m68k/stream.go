@@ -58,7 +58,9 @@ func (c *CPU) briefIndexedAddress(base uint32, extension uint16) uint32 {
 		index = uint32(int32(int16(index)))
 	}
 	displacement := int32(int8(extension))
-	return uint32(int32(base)+int32(index)+displacement) & addressMask
+	// 保留完整 32 位元：An 是 32 位元暫存器，位址匯流排的 24 位元遮罩由
+	// readWord／writeWord 負責，PC 目標則由呼叫端自行遮罩。
+	return uint32(int32(base) + int32(index) + displacement)
 }
 
 func (s *instructionStream) finish() error {

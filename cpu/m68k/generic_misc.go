@@ -291,7 +291,7 @@ func (c *CPU) genericPushEffectiveAddress(opcode uint16) (bool, error) {
 			return true, err
 		}
 	}
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] -= 4
 	if err := c.writeLong(c.state.A[7], source.address, FCSupervisorData); err != nil {
 		return true, err
 	}
@@ -308,12 +308,12 @@ func (c *CPU) genericLink(register uint8) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] -= 4
 	if err := c.writeLong(c.state.A[7], c.state.A[register], FCSupervisorData); err != nil {
 		return true, err
 	}
 	c.state.A[register] = c.state.A[7]
-	c.state.A[7] = uint32(int32(c.state.A[7])+int32(int16(displacement))) & addressMask
+	c.state.A[7] = uint32(int32(c.state.A[7]) + int32(int16(displacement)))
 	return true, stream.finish()
 }
 
@@ -323,7 +323,7 @@ func (c *CPU) genericUnlink(register uint8) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	c.state.A[7] = (c.state.A[7] + 4) & addressMask
+	c.state.A[7] += 4
 	c.state.A[register] = value
 	return true, c.prefetch()
 }
@@ -337,7 +337,7 @@ func (c *CPU) genericReturnAndRestore() (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	c.state.A[7] = (c.state.A[7] + 6) & addressMask
+	c.state.A[7] += 6
 	c.state.SR = c.state.SR&0xff00 | status&0x001f
 	return true, c.refillPrefetch(target&addressMask, 0)
 }
@@ -353,7 +353,7 @@ func (c *CPU) genericJump(opcode uint16, isSubroutine bool) (bool, error) {
 	}
 	if isSubroutine {
 		returnAddress := (c.state.PC + 2 + uint32(extensionWords)*2) & addressMask
-		c.state.A[7] = (c.state.A[7] - 4) & addressMask
+		c.state.A[7] -= 4
 		if err := c.writeLong(c.state.A[7], returnAddress, FCSupervisorData); err != nil {
 			return true, err
 		}
@@ -371,7 +371,7 @@ func (c *CPU) jumpTarget(mode, register uint8) (uint32, uint8, uint8, bool, erro
 		displacement := c.state.IRC
 		return uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask, 1, 2, true, nil
 	case 6:
-		return c.briefIndexedAddress(c.state.A[register], c.state.IRC), 1, 6, true, nil
+		return c.briefIndexedAddress(c.state.A[register], c.state.IRC) & addressMask, 1, 6, true, nil
 	case 7:
 		switch register {
 		case 0:
@@ -387,7 +387,7 @@ func (c *CPU) jumpTarget(mode, register uint8) (uint32, uint8, uint8, bool, erro
 			return uint32(int32(base)+int32(int16(c.state.IRC))) & addressMask, 1, 2, true, nil
 		case 3:
 			base := (c.state.PC + 2) & addressMask
-			return c.briefIndexedAddress(base, c.state.IRC), 1, 6, true, nil
+			return c.briefIndexedAddress(base, c.state.IRC) & addressMask, 1, 6, true, nil
 		}
 	}
 	return 0, 0, 0, false, nil
@@ -425,10 +425,8 @@ func (c *CPU) genericMoveMultiple(opcode uint16) (bool, error) {
 
 	var address uint32
 	switch mode {
-	case 3, 2:
-		address = c.state.A[register] & addressMask
-	case 4:
-		address = c.state.A[register] & addressMask
+	case 2, 3, 4:
+		address = c.state.A[register]
 	default:
 		resolved, ok, err := c.resolveOperand(stream, mode, register, size)
 		if err != nil || !ok {
@@ -445,7 +443,7 @@ func (c *CPU) genericMoveMultiple(opcode uint16) (bool, error) {
 			if mask&(uint16(1)<<bit) == 0 {
 				continue
 			}
-			address = (address - stride) & addressMask
+			address -= stride
 			value := c.registerValue(15 - bit)
 			if err := c.writeMultiple(address, value, size); err != nil {
 				return true, err
@@ -470,7 +468,7 @@ func (c *CPU) genericMoveMultiple(opcode uint16) (bool, error) {
 				return true, err
 			}
 		}
-		address = (address + stride) & addressMask
+		address += stride
 	}
 	if toRegisters && mode == 3 {
 		c.state.A[register] = address

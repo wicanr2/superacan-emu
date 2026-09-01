@@ -88,12 +88,12 @@ func (c *CPU) genericDecimal(opcode uint16, isAdd bool) (bool, error) {
 	}
 
 	// -(Ay),-(Ax)
-	c.state.A[sourceRegister] = (c.state.A[sourceRegister] - operandStride(sourceRegister, WidthByte)) & addressMask
+	c.state.A[sourceRegister] -= operandStride(sourceRegister, WidthByte)
 	source, err := c.readByte(c.state.A[sourceRegister], FCSupervisorData)
 	if err != nil {
 		return true, err
 	}
-	c.state.A[destinationRegister] = (c.state.A[destinationRegister] - operandStride(destinationRegister, WidthByte)) & addressMask
+	c.state.A[destinationRegister] -= operandStride(destinationRegister, WidthByte)
 	destination, err := c.readByte(c.state.A[destinationRegister], FCSupervisorData)
 	if err != nil {
 		return true, err
@@ -167,12 +167,12 @@ func (c *CPU) genericExtendedArithmetic(opcode uint16, isAdd bool) (bool, error)
 	}
 
 	stride := operandStride(sourceRegister, size)
-	c.state.A[sourceRegister] = (c.state.A[sourceRegister] - stride) & addressMask
+	c.state.A[sourceRegister] -= stride
 	source, err := c.readSized(c.state.A[sourceRegister], size)
 	if err != nil {
 		return true, err
 	}
-	c.state.A[destinationRegister] = (c.state.A[destinationRegister] - operandStride(destinationRegister, size)) & addressMask
+	c.state.A[destinationRegister] -= operandStride(destinationRegister, size)
 	destination, err := c.readSized(c.state.A[destinationRegister], size)
 	if err != nil {
 		return true, err

@@ -50,6 +50,10 @@ func (s *instructionStream) currentAddress() uint32 {
 
 // resolveOperand 解析一個 68000 effective address。mode 7 的 register 欄位再細分
 // 絕對定址、PC 相對與立即值；不支援的組合回傳 false 讓呼叫端 fail-closed。
+//
+// 位址暫存器與計算出來的位址一律保留完整 32 位元：68000 的 An 是 32 位元暫存器，
+// 只有位址匯流排是 24 位元，遮罩發生在 readWord／writeWord。若在這裡就截成
+// 24 位元，`CMPA.L #$FFFFA122,A5` 這類與 Work RAM 高位址比較的迴圈永遠不會結束。
 func (c *CPU) resolveOperand(stream *instructionStream, mode, register uint8, size Width) (operand, bool, error) {
 	switch mode {
 	case 0:
@@ -57,23 +61,23 @@ func (c *CPU) resolveOperand(stream *instructionStream, mode, register uint8, si
 	case 1:
 		return operand{kind: operandAddressRegister, register: register}, true, nil
 	case 2:
-		return operand{kind: operandMemory, address: c.state.A[register] & addressMask}, true, nil
+		return operand{kind: operandMemory, address: c.state.A[register]}, true, nil
 	case 3:
-		address := c.state.A[register] & addressMask
-		c.state.A[register] = (c.state.A[register] + operandStride(register, size)) & addressMask
+		address := c.state.A[register]
+		c.state.A[register] += operandStride(register, size)
 		return operand{kind: operandMemory, address: address}, true, nil
 	case 4:
 		if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 			return operand{}, false, err
 		}
-		c.state.A[register] = (c.state.A[register] - operandStride(register, size)) & addressMask
-		return operand{kind: operandMemory, address: c.state.A[register] & addressMask}, true, nil
+		c.state.A[register] -= operandStride(register, size)
+		return operand{kind: operandMemory, address: c.state.A[register]}, true, nil
 	case 5:
 		displacement, err := stream.nextWord()
 		if err != nil {
 			return operand{}, false, err
 		}
-		address := uint32(int32(c.state.A[register])+int32(int16(displacement))) & addressMask
+		address := uint32(int32(c.state.A[register]) + int32(int16(displacement)))
 		return operand{kind: operandMemory, address: address}, true, nil
 	case 6:
 		address, err := stream.nextBriefIndexedAddress(c.state.A[register])
@@ -91,20 +95,20 @@ func (c *CPU) resolveOperand(stream *instructionStream, mode, register uint8, si
 			if err != nil {
 				return operand{}, false, err
 			}
-			return operand{kind: operandMemory, address: uint32(int32(int16(word))) & addressMask}, true, nil
+			return operand{kind: operandMemory, address: uint32(int32(int16(word)))}, true, nil
 		case 1: // (xxx).L
 			address, err := stream.nextLong()
 			if err != nil {
 				return operand{}, false, err
 			}
-			return operand{kind: operandMemory, address: address & addressMask}, true, nil
+			return operand{kind: operandMemory, address: address}, true, nil
 		case 2: // (d16,PC)
 			base := stream.currentAddress()
 			displacement, err := stream.nextWord()
 			if err != nil {
 				return operand{}, false, err
 			}
-			address := uint32(int32(base)+int32(int16(displacement))) & addressMask
+			address := uint32(int32(base) + int32(int16(displacement)))
 			return operand{kind: operandMemory, address: address}, true, nil
 		case 3: // (d8,PC,Xn)
 			base := stream.currentAddress()

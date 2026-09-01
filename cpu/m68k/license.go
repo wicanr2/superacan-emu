@@ -107,7 +107,7 @@ func (c *CPU) mulsWordPostincrement(source, destination uint8) error {
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 2) & addressMask
+	c.state.A[source] = c.state.A[source] + 2
 	if err := c.prefetch(); err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func (c *CPU) cmpLongPostincrementToData(source, destination uint8) error {
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.state.A[source] = c.state.A[source] + 4
 	left, right := c.state.D[destination], uint32(hi)<<16|uint32(lo)
 	result := left - right
 	c.state.SR &^= flagNegative | flagZero | flagOverflow | flagCarry
@@ -325,7 +325,7 @@ func (c *CPU) moveWordImmediateToPredecrement(register uint8) error {
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 		return err
 	}
-	c.state.A[register] = (c.state.A[register] - 2) & addressMask
+	c.state.A[register] = c.state.A[register] - 2
 	c.setNZ16(value)
 	if err := c.writeWord(c.state.A[register], value, FCSupervisorData); err != nil {
 		return err
@@ -399,7 +399,7 @@ func (c *CPU) moveWordPostincrementToData(source, destination uint8) error {
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 2) & addressMask
+	c.state.A[source] = c.state.A[source] + 2
 	c.state.D[destination] = c.state.D[destination]&0xffff_0000 | uint32(value)
 	c.setNZ16(value)
 	return c.prefetch()
@@ -469,7 +469,7 @@ func (c *CPU) jmpAddressIndirect(register uint8) error {
 func (c *CPU) jsrAddressIndirect(register uint8) error {
 	target := c.state.A[register] & addressMask
 	returnAddress := (c.state.PC + 2) & addressMask
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeLong(c.state.A[7], returnAddress, FCSupervisorData); err != nil {
 		return err
 	}
@@ -727,7 +727,7 @@ func (c *CPU) movemWordRegistersToPredecrement(addressRegister uint8) error {
 			continue
 		}
 		register := uint8(15) - bit
-		c.state.A[addressRegister] = (c.state.A[addressRegister] - 2) & addressMask
+		c.state.A[addressRegister] = c.state.A[addressRegister] - 2
 		value := c.registerValue(register)
 		if register == addressRegister+8 {
 			value = c.state.A[addressRegister]
@@ -982,7 +982,7 @@ func (c *CPU) moveLongPostincrementToDisplacement(source, destination uint8) err
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.state.A[source] = c.state.A[source] + 4
 	address := uint32(int32(c.state.A[destination])+int32(int16(displacement))) & addressMask
 	c.setNZ32(value)
 	if err := c.writeLong(address, value, FCSupervisorData); err != nil {
@@ -1224,7 +1224,7 @@ func (c *CPU) jsrAbsoluteLong() error {
 	}
 	target := (uint32(hi)<<16 | uint32(lo)) & addressMask
 	returnAddress := (c.state.PC + 6) & addressMask
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeWord(c.state.A[7], uint16(returnAddress>>16), FCSupervisorData); err != nil {
 		return err
 	}
@@ -1314,7 +1314,7 @@ func (c *CPU) moveWordImmediateToPostincrement(register uint8) error {
 	if err := c.writeWord(c.state.A[register], value, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.A[register] = (c.state.A[register] + 2) & addressMask
+	c.state.A[register] = c.state.A[register] + 2
 	return stream.finish()
 }
 
@@ -1536,7 +1536,7 @@ func (c *CPU) moveWordDataToPostincrement(source, destination uint8) error {
 	if err := c.writeWord(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.A[destination] = (c.state.A[destination] + 2) & addressMask
+	c.state.A[destination] = c.state.A[destination] + 2
 	return c.prefetch()
 }
 
@@ -1607,7 +1607,7 @@ func (c *CPU) moveALongPostincrement(source, destination uint8) error {
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.state.A[source] = c.state.A[source] + 4
 	c.state.A[destination] = value
 	return c.prefetch()
 }
@@ -1661,7 +1661,7 @@ func (c *CPU) moveLongPostincrementToAddressIndirect(source, destination uint8) 
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.state.A[source] = c.state.A[source] + 4
 	c.setNZ32(value)
 	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
@@ -1810,12 +1810,12 @@ func (c *CPU) moveWordPostincrementToPostincrement(source, destination uint8) er
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 2) & addressMask
+	c.state.A[source] = c.state.A[source] + 2
 	c.setNZ16(value)
 	if err := c.writeWord(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.A[destination] = (c.state.A[destination] + 2) & addressMask
+	c.state.A[destination] = c.state.A[destination] + 2
 	return c.prefetch()
 }
 
@@ -1844,12 +1844,12 @@ func (c *CPU) moveLongPostincrementToPostincrement(source, destination uint8) er
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 4) & addressMask
+	c.state.A[source] = c.state.A[source] + 4
 	c.setNZ32(value)
 	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.A[destination] = (c.state.A[destination] + 4) & addressMask
+	c.state.A[destination] = c.state.A[destination] + 4
 	return c.prefetch()
 }
 
@@ -1945,7 +1945,7 @@ func (c *CPU) moveLongImmediateToPostincrement(destination uint8) error {
 	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.A[destination] = (c.state.A[destination] + 4) & addressMask
+	c.state.A[destination] = c.state.A[destination] + 4
 	c.setNZ32(value)
 	return stream.finish()
 }
@@ -2303,7 +2303,7 @@ func (c *CPU) divuWordImmediate(destination uint8) error {
 }
 
 func (c *CPU) moveWordDataToPredecrement(source, destination uint8) error {
-	c.state.A[destination] = (c.state.A[destination] - 2) & addressMask
+	c.state.A[destination] = c.state.A[destination] - 2
 	value := uint16(c.state.D[source])
 	if err := c.writeWord(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
@@ -2333,7 +2333,7 @@ func (c *CPU) lslLongImmediate(register, count uint8) error {
 
 func (c *CPU) moveLongDataToPredecrement(source, destination uint8) error {
 	value := c.state.D[source]
-	c.state.A[destination] = (c.state.A[destination] - 4) & addressMask
+	c.state.A[destination] = c.state.A[destination] - 4
 	if err := c.writeLong(c.state.A[destination], value, FCSupervisorData); err != nil {
 		return err
 	}
@@ -2354,7 +2354,7 @@ func (c *CPU) clearWordAddressIndirect(register uint8) error {
 }
 
 func (c *CPU) clearLongPredecrement(register uint8) error {
-	c.state.A[register] = (c.state.A[register] - 4) & addressMask
+	c.state.A[register] = c.state.A[register] - 4
 	address := c.state.A[register]
 	if _, err := c.readLong(address, FCSupervisorData); err != nil {
 		return err

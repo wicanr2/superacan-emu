@@ -101,7 +101,7 @@ func (c *CPU) cmpiWordPredecrement(register uint8) error {
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 		return err
 	}
-	c.state.A[register] = (c.state.A[register] - 2) & addressMask
+	c.state.A[register] = c.state.A[register] - 2
 	value, err := c.readWord(c.state.A[register], FCSupervisorData, PhaseDataRead)
 	if err != nil {
 		return err
@@ -154,12 +154,12 @@ func (c *CPU) cmpmWord(source, destination uint8) error {
 	if err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] + 2) & addressMask
+	c.state.A[source] = c.state.A[source] + 2
 	destinationValue, err := c.readWord(c.state.A[destination], FCSupervisorData, PhaseDataRead)
 	if err != nil {
 		return err
 	}
-	c.state.A[destination] = (c.state.A[destination] + 2) & addressMask
+	c.state.A[destination] = c.state.A[destination] + 2
 	c.setCompare16(destinationValue, sourceValue)
 	return c.prefetch()
 }

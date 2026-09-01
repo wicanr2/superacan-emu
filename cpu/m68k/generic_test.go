@@ -347,3 +347,29 @@ func TestGenericExtendedAddAccumulatesCarryAndZero(t *testing.T) {
 		t.Fatalf("非零結果必須清除 Z，SR=$%04X", cpu.state.SR)
 	}
 }
+
+func TestGenericAddressRegistersKeepAllThirtyTwoBits(t *testing.T) {
+	// MOVE.W (A4)+,(A5)+：68000 的 An 是 32 位元暫存器，24 位元遮罩只發生在
+	// 位址匯流排。若在暫存器裡就截斷，`CMPA.L #$FFFFA122,A5` 這種與 Work RAM
+	// 高位址比較的複製迴圈永遠不會結束。
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x3adc, 0x0402: 0xbbfc, 0x0404: 0xffff, 0x0406: 0xa122, 0x0408: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[4] = 0x0000_2000
+	cpu.state.A[5] = 0xffff_a120
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.A[5] != 0xffff_a122 {
+		t.Fatalf("A5=$%08X, want $FFFFA122", cpu.state.A[5])
+	}
+	if _, err := cpu.Step(); err != nil { // CMPA.L #$FFFFA122,A5
+		t.Fatal(err)
+	}
+	if cpu.state.SR&flagZero == 0 {
+		t.Fatalf("CMPA.L 必須相等，SR=$%04X", cpu.state.SR)
+	}
+}

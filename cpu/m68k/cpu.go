@@ -1128,11 +1128,11 @@ func (c *CPU) serviceInterrupt(level uint8) error {
 	if level == 7 {
 		c.level7Pending = false
 	}
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeLong(c.state.A[7], oldPC, FCSupervisorData); err != nil {
 		return err
 	}
-	c.state.A[7] = (c.state.A[7] - 2) & addressMask
+	c.state.A[7] = c.state.A[7] - 2
 	if err := c.writeWord(c.state.A[7], oldSR, FCSupervisorData); err != nil {
 		return err
 	}
@@ -1152,7 +1152,7 @@ func (c *CPU) moveBytePredecrementToAddressIndirect(source, destination uint8) e
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 		return err
 	}
-	c.state.A[source] = (c.state.A[source] - decrement) & addressMask
+	c.state.A[source] = c.state.A[source] - decrement
 	value, err := c.readByte(c.state.A[source], FCSupervisorData)
 	if err != nil {
 		return err
@@ -1264,7 +1264,7 @@ func (c *CPU) moveByteAddressIndirectToPostincrement(source, destination uint8) 
 	if destination == 7 {
 		increment = 2
 	}
-	c.state.A[destination] = (c.state.A[destination] + increment) & addressMask
+	c.state.A[destination] = c.state.A[destination] + increment
 	return c.prefetch()
 }
 
@@ -1578,7 +1578,7 @@ func (c *CPU) jsrAbsoluteWord() error {
 	if err := c.advance(Phase{Kind: PhaseInternal, Cycles: 2}); err != nil {
 		return err
 	}
-	c.state.A[7] = (c.state.A[7] - 4) & addressMask
+	c.state.A[7] = c.state.A[7] - 4
 	if err := c.writeWord(c.state.A[7], uint16(returnAddress>>16), FCSupervisorData); err != nil {
 		return err
 	}
