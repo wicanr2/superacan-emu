@@ -206,42 +206,72 @@ func (s *System) LoadState(input io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("machine: read save state: %w", err)
 	}
+	state, err := ParseSaveState(raw, s.IPLSHA256, s.ROMSHA256)
+	if err != nil {
+		return err
+	}
+	s.Restore(state)
+	return nil
+}
+
+// ParseSaveState 驗證並解出一份存檔，但不套用。LoadState 與 InspectSaveState 共用
+// 這一份驗證，拒絕理由因此只有一個出處。
+func ParseSaveState(raw []byte, ipl, rom [32]byte) (SystemState, error) {
+	var state SystemState
 	if len(raw) < saveStateHeaderSize+sha256.Size {
-		return fmt.Errorf("machine: save state is %d bytes, shorter than its header", len(raw))
+		return state, fmt.Errorf("machine: save state is %d bytes, shorter than its header", len(raw))
 	}
 	var header saveStateHeader
 	if err := binary.Read(bytes.NewReader(raw[:saveStateHeaderSize]), binary.LittleEndian, &header); err != nil {
-		return fmt.Errorf("machine: decode save state header: %w", err)
+		return state, fmt.Errorf("machine: decode save state header: %w", err)
 	}
 	if string(header.Magic[:]) != saveStateMagic {
-		return fmt.Errorf("machine: save state magic %q is not %q", header.Magic[:], saveStateMagic)
+		return state, fmt.Errorf("machine: save state magic %q is not %q", header.Magic[:], saveStateMagic)
 	}
 	if header.Version != saveStateVersion {
-		return fmt.Errorf("machine: save state version %d, want %d", header.Version, saveStateVersion)
+		return state, fmt.Errorf("machine: save state version %d, want %d", header.Version, saveStateVersion)
 	}
 	if header.HeaderSize != saveStateHeaderSize {
-		return fmt.Errorf("machine: save state header size %d, want %d", header.HeaderSize, saveStateHeaderSize)
+		return state, fmt.Errorf("machine: save state header size %d, want %d", header.HeaderSize, saveStateHeaderSize)
 	}
-	if header.IPLSHA256 != s.IPLSHA256 {
-		return fmt.Errorf("machine: save state belongs to a different IPL")
+	if header.IPLSHA256 != ipl {
+		return state, fmt.Errorf("machine: save state belongs to a different IPL")
 	}
-	if header.ROMSHA256 != s.ROMSHA256 {
-		return fmt.Errorf("machine: save state belongs to a different cartridge")
+	if header.ROMSHA256 != rom {
+		return state, fmt.Errorf("machine: save state belongs to a different cartridge")
 	}
 
 	digest := raw[saveStateHeaderSize : saveStateHeaderSize+sha256.Size]
 	payload := raw[saveStateHeaderSize+sha256.Size:]
 	if uint64(len(payload)) != header.PayloadSize {
-		return fmt.Errorf("machine: save state payload is %d bytes, header says %d", len(payload), header.PayloadSize)
+		return state, fmt.Errorf("machine: save state payload is %d bytes, header says %d", len(payload), header.PayloadSize)
 	}
 	if actual := sha256.Sum256(payload); !bytes.Equal(actual[:], digest) {
-		return fmt.Errorf("machine: save state payload failed its integrity check")
+		return state, fmt.Errorf("machine: save state payload failed its integrity check")
 	}
-
-	var state SystemState
 	if err := binary.Read(bytes.NewReader(payload), binary.LittleEndian, &state); err != nil {
-		return fmt.Errorf("machine: decode save state payload: %w", err)
+		return state, fmt.Errorf("machine: decode save state payload: %w", err)
 	}
-	s.Restore(state)
-	return nil
+	return state, nil
+}
+
+// SaveStateInfo 是不套用任何狀態、只讀檔案就能得到的存檔資訊，供存檔槽畫面在
+// 使用者選擇之前就標出哪些槽不能讀。
+type SaveStateInfo struct {
+	Valid       bool
+	Reason      string
+	Frame       uint64
+	Framebuffer []uint32
+}
+
+// InspectSaveState 檢查一份存檔並取出縮圖用的 framebuffer。拒絕時 Reason 直接來自
+// ParseSaveState 的錯誤，與實際載入的拒絕理由同源。
+func InspectSaveState(raw []byte, ipl, rom [32]byte) SaveStateInfo {
+	state, err := ParseSaveState(raw, ipl, rom)
+	if err != nil {
+		return SaveStateInfo{Reason: err.Error()}
+	}
+	framebuffer := make([]uint32, len(state.Video.Framebuffer))
+	copy(framebuffer, state.Video.Framebuffer[:])
+	return SaveStateInfo{Valid: true, Frame: state.Video.Frame, Framebuffer: framebuffer}
 }

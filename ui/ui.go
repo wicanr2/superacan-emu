@@ -1,0 +1,205 @@
+package ui
+
+import (
+	"image"
+	"time"
+)
+
+// UI 是介面的狀態機。它不持有模擬核心，也不知道自己被畫到哪一種視窗上；
+// 要求動作時把 Intent 排進佇列，由入口在 frame 邊界取走執行。
+type UI struct {
+	surface Surface
+	metrics Metrics
+	theme   Theme
+	font    *Font
+	config  Config
+	slots   SlotSource
+
+	stack     []screen
+	modal     *confirm
+	toasts    []toastItem
+	errorText string
+	intents   []Intent
+	now       time.Duration
+	paused    bool
+}
+
+// Options 是建立 UI 的參數。Font 留空時用嵌入的 bitmapfont/v4。
+type Options struct {
+	Surface Surface
+	Config  Config
+	Slots   SlotSource
+	Theme   *Theme
+	Font    *Font
+}
+
+// New 建立介面狀態機。
+func New(options Options) *UI {
+	theme := DefaultTheme()
+	if options.Theme != nil {
+		theme = *options.Theme
+	}
+	font := options.Font
+	if font == nil {
+		font = DefaultFont()
+	}
+	surface := options.Surface
+	if surface.Scale < 1 {
+		surface.Scale = 1
+	}
+	return &UI{
+		surface: surface,
+		metrics: MetricsFor(surface.Profile),
+		theme:   theme,
+		font:    font,
+		config:  options.Config,
+		slots:   options.Slots,
+	}
+}
+
+// Visible 回報覆蓋層是否正在顯示。為 true 時入口停止推進模擬時間，
+// 並把輸入全部交給 UI。
+func (u *UI) Visible() bool { return len(u.stack) > 0 }
+
+// Config 回傳目前設定，入口寫回設定檔時用。
+func (u *UI) Config() Config { return u.config }
+
+// Metrics 回傳目前生效的度量。
+func (u *UI) Metrics() Metrics { return u.metrics }
+
+// Open 叫出覆蓋選單。
+func (u *UI) Open() {
+	if u.Visible() {
+		return
+	}
+	u.stack = []screen{&overlayScreen{}}
+	u.paused = true
+	u.emit(SetPaused{Paused: true})
+}
+
+// Close 關掉整個覆蓋層，回到遊戲。
+func (u *UI) Close() {
+	if !u.Visible() {
+		return
+	}
+	u.stack = nil
+	u.modal = nil
+	u.paused = false
+	u.emit(SetPaused{Paused: false})
+}
+
+func (u *UI) push(s screen) { u.stack = append(u.stack, s) }
+
+func (u *UI) pop() {
+	if len(u.stack) <= 1 {
+		u.Close()
+		return
+	}
+	u.stack = u.stack[:len(u.stack)-1]
+}
+
+func (u *UI) emit(intent Intent) { u.intents = append(u.intents, intent) }
+
+// TakeIntents 取走並清空待執行的 Intent。入口必須在 frame 邊界呼叫。
+func (u *UI) TakeIntents() []Intent {
+	if len(u.intents) == 0 {
+		return nil
+	}
+	out := u.intents
+	u.intents = nil
+	return out
+}
+
+// Handle 消化一個事件。回傳是否被 UI 吃掉；false 表示前端應該把它當成遊戲輸入。
+func (u *UI) Handle(ev Event) bool {
+	if surface, ok := ev.(Surface); ok {
+		if surface.Scale < 1 {
+			surface.Scale = 1
+		}
+		u.surface = surface
+		u.metrics = MetricsFor(surface.Profile)
+		return true
+	}
+	if life, ok := ev.(Life); ok && life.Kind == LifeBack {
+		return u.handleBack()
+	}
+	if !u.Visible() {
+		if action, ok := ev.(Action); ok && action.Kind == ActMenu {
+			u.Open()
+			return true
+		}
+		return false
+	}
+	if u.errorText != "" {
+		if action, ok := ev.(Action); ok && (action.Kind == ActConfirm || action.Kind == ActCancel) {
+			u.errorText = ""
+			return true
+		}
+	}
+	if u.modal != nil {
+		return u.modal.handle(u, ev)
+	}
+	return u.stack[len(u.stack)-1].handle(u, ev)
+}
+
+// handleBack 實作 §9.3 的返回鍵順序：modal、錯誤列、堆疊、覆蓋層、根畫面。
+func (u *UI) handleBack() bool {
+	switch {
+	case u.modal != nil:
+		u.modal = nil
+	case u.errorText != "":
+		u.errorText = ""
+	case len(u.stack) > 1:
+		u.pop()
+	case u.Visible():
+		u.Close()
+	default:
+		u.Open()
+	}
+	return true
+}
+
+// Update 推進 UI 自己的時間。now 是單調時間，由入口提供；UI 不讀掛鐘，
+// 也不因為它而改變模擬排程。
+func (u *UI) Update(now time.Duration) {
+	u.now = now
+	u.expireToasts()
+}
+
+// Draw 把覆蓋層畫到 dst。dst 是表面原生解析度的 RGBA，遊戲畫面應已畫在上面；
+// snap 可以是 nil（尚未載入卡帶）。
+func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
+	c := &canvas{dst: dst, scale: u.surface.Scale, metrics: u.metrics, font: u.font, theme: u.theme}
+	if u.Visible() {
+		// 只畫最上層。每一層都自己負責畫滿需要的底，堆疊在視覺上不疊加；
+		// 半透明面板疊在半透明面板上會讓下層的字透出來。
+		u.stack[len(u.stack)-1].draw(u, c, snap)
+		if u.modal != nil {
+			u.modal.draw(u, c)
+		}
+	}
+	u.drawErrorBar(c)
+	u.drawToasts(c)
+}
+
+// fillPage 把整頁塗成不透明的面板底。整頁畫面要遮住遊戲畫面：面板色本身帶
+// alpha 是為了讓覆蓋選單透出後面的畫面，整頁畫面沿用同一個 alpha 會讓遊戲的
+// 高飽和色塊從字底下透出來。
+func (u *UI) fillPage(c *canvas) {
+	solid := u.theme.Panel
+	solid.A = 0xff
+	c.rect(0, 0, c.width(), c.height(), solid)
+}
+
+// slotInfo 取一個槽的現況；沒有 SlotSource 時視為空槽。
+func (u *UI) slotInfo(slot int) SlotInfo {
+	if u.slots == nil {
+		return SlotInfo{Index: slot}
+	}
+	for _, info := range u.slots.Slots() {
+		if info.Index == slot {
+			return info
+		}
+	}
+	return SlotInfo{Index: slot}
+}

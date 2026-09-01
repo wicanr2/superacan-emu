@@ -7,6 +7,9 @@ UMC6650 key SHA-256 `f158d83be6e73389967c6dadfd5160bb742e09212a1b218fb829bae3b49
 以及 `internal_6502_1.bin`／`internal_6502_2.bin` 兩個音效 BIOS bank。ROM、BIOS 與
 Bcan 二進位都不入版控，執行時由外部唯讀掛載。
 
+1200-frame 的基準值（含 framebuffer SHA-256）另記於
+[`verify-ui.md`](verify-ui.md)，介面每個階段都要比對那一組。
+
 ## 3600 frame 有界執行
 
 命令形如：
