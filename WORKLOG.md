@@ -1,5 +1,16 @@
 # 工作歷程
 
+## 2026-09-01：FRC 的 ROM 用法與 IRQ3 消費者
+
+- 來源：`../acan` 稽核工作階段以 Capstone 反組譯 Speedy Dragon、Formosa Duel、
+  Journey to the Laugh 的 `$E90014/16/18` 寫入點、卡帶 autovector 表與 `$E90018` consumer。
+- 訂正 `docs/frc-timer.md`：舊敘述「不能證明任何遊戲實際使用 FRC」在 1200 幀回歸下不成立，
+  Speedy Dragon 的 IRQ3 acknowledge 為 17，且其 IRQ3 handler `$3454` 累加 `$FCE00E`、
+  `$30DE` 是等待該 tick 的迴圈。
+- 補記三款遊戲的 producer／consumer，以及 `$E90018` 必須回報持續變動的計數值
+  （Formosa Duel 把它加到 tilemap 1 的 scroll，並用兩次讀值拼亂數種子）。
+- 真實週期公式仍未知；校準入口是 Speedy 的「設週期→等 N 個 tick」。
+
 ## 2026-09-01：sound RAM 32 KiB alias 假說的 A/B 實驗
 
 - 問題：`APU.sch` 的 U11 只接 `SNDRAM_A0..A14`（32 KiB），但 65C02 位址空間、68k

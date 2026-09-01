@@ -24,5 +24,18 @@ frequency、pending、supported 及 IRQ3 acknowledge 計數，避免未使用 FR
 回歸被誤稱為計時器軟體相容性證據。
 
 Boom Zoo、Monopoly 與 Speedy Dragon 搭配完整 BIOS 的 120 幀回歸皆完成，三者
-均回報 `frc=$0000/$0000,pending:false,supported:false`、IRQ3 acknowledge 為 0；
-因此它們只證明新增裝置沒有改變既有啟動路徑，不能證明任何遊戲實際使用 FRC。
+均回報 `frc=$0000/$0000,pending:false,supported:false`、IRQ3 acknowledge 為 0。
+
+跑到 1200 幀後 Speedy Dragon 會實際使用它：該次回歸的 `irq_ack` 的 IRQ3 欄為 17。
+ROM 端的用法也已由 `../acan` 的反組譯固定（見該庫 `docs/memory-map.md` §2.1）：
+
+- Speedy Dragon `$30CE` `move.w d0,$E90016` 後 `$30D4` `move.w #$A200,$E90014`，是
+  「以 d0 設週期並啟動」的常式；卡帶 IRQ3 向量指向 `$3454`，內容是
+  `addq.b #$1,$FCE00E` + `rte`，而 `$30DE` 是 `tst.b $FCE00E` / `beq` 的等待迴圈。
+- Formosa Duel `$5EB4/$5EBC` 寫 `$A000`／`$FFFF`，並把 `$E90018` 的讀值加到
+  `$F00124/$F00126`（tilemap 1 scroll），另在 `$6076/$607E` 連讀兩次拼成 32-bit 種子。
+- Journey to the Laugh `$FC6AC/$FC6B4` 寫週期 `$8FC`＋control `$A0D6`。
+
+因此 `$E90014/16/18` 是同一顆計數器（控制／週期／目前值），到期拉 IRQ3；`$E90018`
+必須回報一個持續變動的計數值，遊戲會把它當亂數與捲動來源。真實週期公式仍未知，
+Speedy 的「設週期→等 N 個 tick」是目前最好的校準入口。
