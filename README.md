@@ -18,14 +18,14 @@ driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的純 Go �
 的 `archive/cpp/`，標為 deprecated reference implementation，作 Go 差分 oracle，
 不再新增功能。Go 68000 核心採獨立實作；Moira 只作 sample，不直接翻譯。
 
-Go 主線目前已有 media manifest、整機 bus、UMC6650、phase timeline、headless runner，
-並以固定 IPL SHA-256 完成真實 Boom Zoo IPL、UMC6650、卡帶授權與 overlay 轉交；
-目前已用純 Go W65C02 完成 Boom Zoo sound driver boot ack；UM6618 register、palette、
-VRAM、scanline timing 與第一版 tilemap／sprite／window／ROZ framebuffer 已接入，卡帶
-可自然離開 vblank poll，並產生可重現的非黑畫面指紋。headless runner 可輸出有界 bus
-transaction、IRQ acknowledge 計數、VRAM 與 framebuffer hash。UM6618 IRQ7 已在真實
-路徑受理；ROZ 逐行表已有 MAME-derived 實作。尚未完成完整 CPU ISA／一般 exception、
-同 frame 畫面差分及 UMC6619 PCM。
+Go 主線已有完整整機 bus、雙 CPU 排程、UMC6650、UM6618、UMC6619、主機 DMA、IRQ、
+P1 輸入、headless runner 與 Ebitengine v2.9.9 前端。Speedy Dragon、Formosa Duel 與
+Boom Zoo 均已在純 Go machine core 連續執行 1200 frames，產生可辨識畫面與非零音訊；
+核心沒有遊戲專屬 opcode stub。Ebitengine 已接上 P1 鍵盤、320×240 framebuffer、48 kHz
+主機音訊與有界截圖 smoke；三款 ROM 的 1200-frame GUI 路徑均已由 Xvfb 驗證，結果
+與 headless machine core 基準一致。
+完整 68000／W65C02 ISA、所有未使用硬體模式、實機音訊與跨平台發行仍是相容性工作，
+不能因三款 ROM 通過就宣稱硬體覆蓋完整。
 下列完整相容性仍是
 deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
@@ -78,11 +78,11 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 ## 建置（Go 主線）
 
-需求：Go 1.26。Ebitengine 尚未接入目前 headless machine core；加入前會固定
-module 版本與跨平台工具鏈。
+需求：Go 1.26.7、Ebitengine v2.9.9。GUI 與 headless 共用同一 machine core；Linux
+桌面建置需要 X11／OpenGL／ALSA 開發套件，無實體顯示器時使用有界 Xvfb。
 
 本儲存庫的開發、建置與測試一律在專案專用 Docker 工具鏈內進行；下列是容器內
-命令，不應直接在主機執行。目前正在建立專案專用的固定 Go image。
+命令，不應直接在主機執行。可由 `docker/ebitengine.Dockerfile` 建立固定工具映像。
 
 ```sh
 go test ./...
@@ -92,6 +92,19 @@ deprecated C++ oracle 的歷史建置方式見
 [`archive/cpp/README.md`](archive/cpp/README.md)，不是目前產品入口。
 
 ## 執行
+
+Ebitengine 視窗入口：
+
+```sh
+go run ./cmd/acan \
+    --ipl /path/to/internal_68k.bin \
+    --key /path/to/umc6650.bin \
+    --rom "/path/to/Boom Zoo (Taiwan).bin"
+```
+
+開發 smoke 可加 `--frames 300 --audio=false --screenshot /tmp/frame.png`，到指定的硬體
+frame 後正常結束並輸出 framebuffer SHA-256。`--audio=false` 適用於沒有主機音效裝置
+的 Docker／CI；這不是另一套快速模擬路徑。
 
 Go headless runner 已能載入外部、逐 word byte-swap 的 IPL／ROM 及線性 UMC6650 key：
 
@@ -167,6 +180,8 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
   排程、sound boot 路徑與尚未完成的 ISA／IRQ
 - [`docs/umc6618-implementation.md`](docs/umc6618-implementation.md)：視訊 register、
   palette、VRAM、scanline 與真實卡帶交易證據
+- [`docs/ebitengine-frontend.md`](docs/ebitengine-frontend.md)：GUI／machine deadline 邊界、
+  依賴版本、88-frame smoke 與目前畫面限制
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：

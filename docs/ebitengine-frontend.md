@@ -37,9 +37,12 @@
 
 ## 平台邊界與剩餘驗證
 
-- 實測 Ebitengine v2.9.9 的 Linux GLFW/OpenGL 桌面目標在 `CGO_ENABLED=0` 無法編譯；
-  `CGO_ENABLED=1` 可編譯。machine／CPU／chip 仍是純 Go。是否只對 Linux 桌面前端
-  開放 cgo 例外，仍待專案決策；在決策前不得把現況寫成「全 binary 無 cgo」。
+- cgo 政策已定案（2026-09-01）：整個發行 binary 禁止 cgo，前端不例外。現行
+  `cmd/acan` 不符合此政策，只能作開發用 GUI，不得列入發行包。
+- 依賴實測：Ebitengine v2.9.9 的 `internal/glfw` 只在 darwin 與 windows 使用 purego，
+  linbsd 路徑是 cgo；`oto/v3@v3.4.0` 的 `driver_unix.go` 亦為 cgo。因此 Linux
+  桌面在 `CGO_ENABLED=0` 無法編譯，`CGO_ENABLED=1` 可編譯。落地禁 cgo 政策需要
+  另建純 Go 的視窗／輸入與音訊輸出層，machine／CPU／chip 不受影響。
 - Xvfb smoke 使用 `--audio=false`，證明 GUI 與 headless 共用同一 machine 結果；實體 ALSA
   裝置的人耳播放、延遲與 underrun 仍需 Linux 實機驗收。
 - `SetTPS(60)` 是主機更新請求；硬體 frame 邊界仍由 cycle scheduler 決定。不得用

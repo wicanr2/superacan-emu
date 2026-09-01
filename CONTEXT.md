@@ -6,7 +6,10 @@
 
 本專案是 Super A'Can 晶片與整機行為的跨平台模擬器，不是遊戲 remake。2026-08-31
 已決定停止 C++ 產品線，改以純 Go 重寫 machine core，Ebitengine 負責畫面、音訊與
-輸入；禁止 cgo。現有 C++ 將移至同 repo 的 `archive/cpp/`，只作 deprecated 行為
+輸入。cgo 政策已於 2026-09-01 定案：**整個發行 binary 禁止 cgo，前端不例外**。
+Ebitengine v2.9.9 的 Linux 桌面後端（GLFW/OpenGL）與 oto v3 的 ALSA driver 實測
+都需要 cgo，因此現行 `cmd/acan` 尚不符合此政策，桌面呈現層須改為純 Go 實作；
+machine core 不受影響。現有 C++ 已移至同 repo 的 `archive/cpp/`，只作 deprecated 行為
 oracle 與歷史紀錄。可執行遊戲是驗證硬體模型的方法，不代表可以用遊戲專屬特判
 取代晶片契約。`../acan/` 是唯讀的硬體／Bcan 逆向知識庫，目前由另一工作階段
 review；本專案只引用固定證據，不回寫。
@@ -24,17 +27,18 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 
 | 元件 | 狀態 | 證據邊界 |
 |---|---|---|
-| module | `github.com/wicanr2/superacan-emu`，Go 1.26 | 尚未加入 Ebitengine dependency |
+| module | `github.com/wicanr2/superacan-emu`，Go 1.26、Ebitengine v2.9.9 | `go.sum` 已固定；machine core 不 import Ebitengine |
 | 68000 phase API | scheduler-before-bus、24-bit address、FC、byte／word transaction | API 已測；尚未有整機 scheduler consumer |
 | 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
-| 68000 opcode | 真實 IPL＋Boom Zoo 已無錯執行 1,300,000 條指令，完成 sound boot、多輪 video 初始化與 58 次 IRQ7；已有 autovector、RTE | 官方 ISA／timing 表；未覆蓋完整 ISA、一般 exception、user/supervisor stack 切換 |
-| W65C02 | 純 Go reset／堆疊／分支與 Boom Zoo boot 所需子集；已產生 `$0300=$FF` ack | 3:1 shared scheduler；尚未完整 ISA／IRQ |
+| 68000 opcode | 三款 ROM 已各完成 1200 frames；最高 19,272,069 條指令；已有 autovector、RTE、exception 與實際 IRQ 路徑 | 官方 ISA／timing 表；未以合成測試覆蓋完整 ISA matrix |
+| W65C02 | 純 Go 執行兩套 sound driver、IRQ 與 UMC6619 控制；三款 ROM 皆產生非零音訊 | 3:1 shared scheduler；未以合成測試覆蓋完整 ISA matrix |
 | media | word-swap、大小驗證、原始 SHA-256 manifest | BIOS／ROM 不入版控 |
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650 | 視訊／音訊／DMA window 尚未接入 Go |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
-| UMC6619 | 65C02 間接位址／資料埠與暫存器檔 | PCM／timer／DMA 尚未執行 |
+| UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
 | UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 已非黑且 hash 可重現；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，oracle 畫面差分尚未完成 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置 | 1,300,000 條 68k／1,524,044 條 65C02；雙 overlay 關閉 |
+| Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 三款 ROM 各 1200 frames，指令數與 framebuffer hash 均吻合 headless；目前需 cgo，違反已定案的禁 cgo 政策，待改為純 Go 呈現層 |
 | bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |
 | archived C++ | `archive/cpp/` | 從新 source root 的 Docker Release 重建已通過 |
 
@@ -89,11 +93,10 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 
 ## 下一個交付閘門
 
-下一個 vertical slice 已把 UM6618 register／palette／VRAM、scanline 與第一版 framebuffer
-接入，並讓卡帶自然離開 vblank poll。固定 Boom Zoo 路徑已有 61,437 個非黑像素；這是
-合成器生命跡象，不是畫面正確性宣告。現在實作 sprite／主機 DMA、IRQ4／5／7、複雜
-ROZ 逐行模式，並建立同 frame archived oracle 差分。掃描線 IRQ4／5／7 與 68000
-autovector 已接通；固定 smoke 實際受理 58 次 IRQ7。
-UM6619 仍須由 register file 擴充為 PCM／timer／DMA，W65C02 仍須完成
-完整 ISA 與 IRQ。各晶片都以 archived C++ 與 MAME 作分級 oracle，而非直接翻譯。
-Ebitengine 前端不能先於 headless machine core 決定 scheduler。
+目前 machine core 的最低相容性閘門已由三款 ROM 各 1200 frames 通過：Speedy Dragon
+18,515,145、Formosa Duel 19,272,069、Boom Zoo 17,370,088 條 68000 指令，均有可辨識
+framebuffer；三款亦有非零音訊資料。下一個交付閘門是像素層級的正確性：以 Bcan 0.0.8b
+作同畫面 oracle，逐項定位 UM6618 圖層、優先度與調色差異，取代目前「畫面可辨識」這種
+只到構圖層級的證據。平行未完成的是禁 cgo 政策落地（純 Go 桌面呈現層）與實機音訊、
+鍵盤驗收；之後才進入 Linux 發行包與 macOS 工具鏈。尚未被遊戲覆蓋的 ISA／硬體模式
+保留明確證據限制。

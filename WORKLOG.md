@@ -249,3 +249,41 @@
 - Boom Zoo 固定 frame 88 非黑像素仍為 61,437，但 framebuffer SHA-256 從 `89ce…`
   改為 `14449f1ba85c25a01b0466fa2b8b735b4dcef571c44a808faf75ac37f894a232`；這推翻
   「該固定狀態不受逐行表影響」的舊推測。硬體正確性仍待同狀態 oracle 差分。
+
+## 2026-09-01：第一個 Ebitengine 產品入口
+
+- 固定 Ebitengine v2.9.9 與 `go.sum`，新增 `cmd/acan`、`frontend.Game`、ARGB→RGBA
+  上傳、`System.RunFrame` deadline、`--frames` 有界終止及 `--screenshot` PNG。
+- Xvfb 真實 Boom Zoo 88-frame smoke 完成 1,294,949 條指令，framebuffer SHA-256
+  `14449f…4a232` 與 headless core 基準一致，證明 GUI 沒有另走簡化 scheduler。
+- 人工檢查 PNG 顯示重複藍灰圖樣，判定 renderer 仍錯、模擬器尚不可玩；保留此負面
+  證據作下一輪同 frame oracle 差分入口，不以非黑畫面冒稱完成。
+
+## 2026-09-01：Ebitengine 輸入、音訊與可辨識 GUI smoke
+
+- P1 鍵盤已接入 machine controller；新增 UMC6619 原生樣本到 48 kHz stereo 的主機
+  音訊橋接，以及 200 ms、有界、執行緒安全的 PCM 佇列。缺料補靜音、溢位丟棄最舊
+  樣本，不讓主機播放狀態影響模擬器時間線。
+- 新增 `--audio=false`，使無音效裝置的 Docker／CI 仍走相同 Ebitengine GUI 與 machine
+  core；新增 PCM byte order、underrun 與容量上限單元測試。
+- 新增 `docker/ebitengine.Dockerfile`，固定 Go 1.26.7 與 Linux X11／OpenGL／ALSA／
+  Xvfb 建置依賴。容器內 `presentation`、`frontend`、`cmd/acan` 測試通過。
+- 三款 ROM 均在 Xvfb 完成 1200 frames；Speedy Dragon 18,515,145、Formosa Duel
+  19,272,069、Boom Zoo 17,370,088 條 68000 指令，且 framebuffer SHA-256 與各自
+  headless 基準完全相同。人工檢查分別可辨識道路角色、標題／START 與房間場景，
+  推翻早期「GUI 仍只有錯誤重複圖樣」現況。
+- 建置實證顯示 Ebitengine v2.9.9 Linux 桌面在 `CGO_ENABLED=0` 失敗、啟用 cgo 成功；
+  CPU／machine／chip 仍純 Go，前端 cgo 例外是否正式允許仍待使用者決策。
+
+## 2026-09-01：交接、cgo 政策定案與 Bcan oracle 路線
+
+- 接手前任未提交的 Ebitengine 前端成果。先在 `superacan-ebitengine:go1.26.7-v1` 容器內
+  （`--network none`、唯讀 module cache）跑完 `go build ./...`、`go vet ./...`、
+  `go test ./...` 全數通過，才把該批成果提交為 `fda2fe4`。
+- cgo 政策定案：**整個發行 binary 禁止 cgo，前端不例外**。依賴實測支持這個決定的代價：
+  Ebitengine v2.9.9 的 `internal/glfw` 只有 darwin／windows 走 purego，linbsd 是 cgo；
+  `oto/v3@v3.4.0` 的 `driver_unix.go`（ALSA）同樣是 cgo。因此現行 `cmd/acan` 只能作
+  開發用 GUI，發行前需另建純 Go 的視窗／輸入與音訊輸出層。machine／CPU／chip 不受影響。
+- 畫面正確性的主要 oracle 由 archived C++ 改為 Bcan 0.0.8b。理由是證據優先序：Bcan 是
+  `confirmed-Bcan` 等級的固定版本二進位，archived C++ 與 MAME driver 同屬更低一級。
+

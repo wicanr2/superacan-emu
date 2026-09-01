@@ -12,7 +12,7 @@
 - [x] 建立獨立 Go Motorola 68000 核心骨架。
   完成條件：公開 bus／phase／IRQ API、register 與 prefetch state、`Step` result、reset
   vector vertical slice；設計符合 `docs/chip-emulation-principles.md`。
-- [ ] 建立 opcode／addressing-mode／exception 測試階梯與 Moira 差分 harness。
+- [x] 建立 opcode／addressing-mode／exception 測試階梯與 Moira 差分 harness。
   完成條件：每個差異可分類為 Go bug、sample 差異或硬體 unknown，不以 Moira 自動定案。
 - [x] 建立第一組 opcode decoder、16 種 condition code、MOVEQ、BRA.b／BRA.w 與
   Bcc.b／Bcc.w phase trace。完成證據見 `docs/m68k-implementation.md`。
@@ -48,10 +48,16 @@
   smoke 實際受理 58 次 IRQ7，IRQ4／5 目前只有合成線位測試。
 - [x] 依 MAME-derived 契約實作 UM6618 ROZ 三張逐行表：incxx、scrollx、scrolly 與
   zero-line suppression；Boom Zoo frame 88 hash 確實改變。硬體正確性仍待 oracle。
-- [ ] 以相同 frame 的 archived oracle hash／截圖做差分並修正優先度與邊界行為。
-- [ ] 完成 W65C02 ISA、IRQ／NMI／WAI 與 I/O ack，將目前 instruction-total 3:1 排程
+- [x] 固定 Ebitengine v2.9.9，建立 `cmd/acan` 視窗入口、P1 鍵盤、RGBA framebuffer、
+  48 kHz 音訊、`--frames` 有界 smoke 與 PNG 輸出；三款 ROM 1200-frame Xvfb 路徑
+  均得到可辨識畫面，指令數與 framebuffer hash 完全吻合 headless 基準。
+- [ ] 以同畫面 oracle 做像素差分並修正優先度與邊界行為。主要 oracle 改為 Bcan 0.0.8b
+  （證據等級 `confirmed-Bcan`，高於 archived C++ 與 MAME-derived）；archived C++ 只作
+  次要對照。完成條件：至少一款 ROM 的靜態畫面能逐像素比對並分類每一處差異。
+- [ ] 補齊尚未由現有 ROM 與合成測試覆蓋的 W65C02 ISA／NMI／WAI 邊界，並將 3:1 排程
   收斂成可驗證的 cycle 邊界。
-- [ ] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ6／IRQ7 來源。
+- [x] 將 UMC6619 從間接 register port 擴充為 PCM、timer、DMA 與 IRQ 來源，並接上
+  Ebitengine 主機音訊佇列；實機音訊播放與未知 envelope 仍分列驗收／證據缺口。
 
 ## Deprecated C++ 收尾紀錄
 
@@ -81,7 +87,7 @@
 
 ## Go 核心工程
 
-- [ ] 建立純 Go phase scheduler，讓 Linux、headless、macOS 與 Ebitengine 前端共用
+- [x] 建立純 Go phase scheduler，讓 Linux、headless、macOS 與 Ebitengine 前端共用
   同一硬體時間線；不沿用 C++ `main.cpp` runner 架構。
 - [ ] 為 register transaction、IRQ edge／level／ack、DMA 邊界、reset 與 open-bus 建立
   不依賴商業 ROM 的單元／整合測試。
@@ -90,6 +96,18 @@
   繼續排除於 Git。
 
 ## 平台與發行
+
+- [x] 決定 cgo 邊界。2026-09-01 定案：**整個發行 binary 禁止 cgo，前端不例外**。
+- [ ] 讓桌面前端在 `CGO_ENABLED=0` 建置成功。已證實 Ebitengine v2.9.9 的
+  `internal/glfw` 只在 darwin／windows 走 purego，linbsd 路徑是 cgo；`oto/v3`
+  的 `driver_unix.go` 同樣是 cgo。因此落地需要純 Go 的視窗／輸入（候選：
+  `jezek/xgb`，已是現有 indirect 依賴）與純 Go 的音訊輸出（候選：直接操作
+  `/dev/snd` 或改走外部播放行程）。完成條件：`CGO_ENABLED=0 go build ./...`
+  通過，且三款 ROM 的 1200-frame framebuffer SHA-256 與 headless 基準不變。
+- [ ] 在達成上一項之前，`cmd/acan` 只作開發用 GUI，不得列入發行包。
+- [ ] 在有實體音效裝置的 Linux 驗收 48 kHz 播放、鍵盤操作、延遲與 underrun。
+- [x] Speedy Dragon、Formosa Duel、Boom Zoo 各完成 1200-frame GUI 正常路徑，並與
+  headless 指令數及 framebuffer hash 對照一致。
 
 - [ ] 里程碑 5 收斂後規劃 macOS 編譯。
   完成條件：選定可重現工具鏈、SDL2 來源、支援架構與最低 macOS 版本，產物在 macOS
