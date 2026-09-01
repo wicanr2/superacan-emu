@@ -19,6 +19,7 @@ func (s *settingsScreen) rows(u *UI) []menuRow {
 		{label: u.s.SettingsVideo, chevron: true, action: func(u *UI) { u.push(&videoScreen{}) }},
 		{label: u.s.SettingsAudio, chevron: true, action: func(u *UI) { u.push(&audioScreen{}) }},
 		{label: u.s.SettingsLanguage, chevron: true, action: func(u *UI) { u.push(&languageScreen{}) }},
+		{label: u.s.TouchTitle, chevron: true, action: func(u *UI) { u.push(&touchScreen{}) }},
 	}
 }
 

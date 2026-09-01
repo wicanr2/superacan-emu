@@ -134,6 +134,24 @@ acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
 診斷畫面的數字直接讀 machine（`TestDiagnosticsReadMachineDirectly`），不另外累計，
 所以它顯示的 68000 指令數就是 headless 報出來的那一個。
 
+## 觸控層
+
+虛擬手把與觸控版面在 Android 前端存在之前就先做完並驗證，理由是觸控度量會逼出
+「這個面板在 44 單位列高下放不下」這類問題，晚發現要重畫每一個畫面。
+
+- **命中區不小於 44 見方，而且每邊比繪製區大至少 4 單位**
+  （`TestTouchTargetsAreLargeEnough`，兩個方向都驗）。手指會遮住按鍵，
+  使用者看不到自己按在哪。
+- **五個同時觸點全部生效**（`TestFiveSimultaneousTouches`）：方向＋兩鍵＋肩鍵是
+  常見組合，只追一個觸點會讓斜向移動時按不出動作。放開其中一個不影響其餘。
+- **方向鍵有死區、對角線是兩個位元**（`TestDPadDeadzoneAndDiagonals`）：
+  死區太小會讓「按上」變成「上＋左」。
+- **覆蓋層開著時虛擬手把隱藏且不吃觸點**（`TestVirtualPadHidesUnderTheOverlay`）：
+  兩套控制同時存在會互相搶觸點。
+- **橫式與直式各有記錄的畫面雜湊**（`touch/landscape/1280x720`、
+  `touch/portrait/720x1280`）。橫式把按鍵疊在 4:3 畫面左右的黑邊上，
+  直式把畫面貼齊上方、控制區獨占下半不與畫面重疊。
+
 ## 多語言
 
 字串表是結構不是 map：少一個 key 會在編譯期就發現，不會變成畫面上的空白。

@@ -93,6 +93,12 @@ func renderImage(u *UI, surface Surface) *image.RGBA {
 	return dst
 }
 
+// hashPix 是畫面位元組的 SHA-256。
+func hashPix(img *image.RGBA) string {
+	sum := sha256.Sum256(img.Pix)
+	return hex.EncodeToString(sum[:])
+}
+
 // render 回傳畫面的 SHA-256，並在 ACAN_UI_DUMP 有設時另存一份 PNG。
 func render(t *testing.T, key string, u *UI, surface Surface) string {
 	t.Helper()
@@ -118,7 +124,7 @@ var wantHashes = map[string]string{
 	"S1/960x720/compact":           "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
 	"S1/1280x720/touch":            "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
 	"S8/960x720/compact":           "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
-	"S5/960x720/compact":           "4b36e9aaae6f6f336b271a0da4d4226503baa72dfa3c08325c3bf496ccfadff8",
+	"S5/960x720/compact":           "eeb6cbf576e00d37f94e5ba8f1b18f6e6da28cbdfb577be0f30cdfd06c687e0e",
 	"S5.1/960x720/compact":         "1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62",
 	"S5.2/960x720/compact":         "2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8",
 	"S5.2conflict/960x720/compact": "107ecbc854d803c375197eec83f6c68097dd35778cc307b06767ad6b07f0ddbf",
@@ -129,6 +135,9 @@ var wantHashes = map[string]string{
 	"S6.2/960x720/compact":         "2a9a1b920de23e41add79372579ba9de3123e4f2f6e3b3a04690c5c33326c23c",
 	"S2cheat/960x720/compact":      "00c5f434b6f9d487dc216dcb6e1b2880749249992c49747ed83b03a2e165aec0",
 	"S5.5/960x720/compact":         "bd03a3f823ad79bc27ddeca87beb956036579343b2e1d7592d971a4b79d6ce0d",
+	"touch/landscape/1280x720":    "02f9aa4da9b0cff601c689962d95e7e666074c1f4810e71ccb152c96d294eb6f",
+	"touch/portrait/720x1280":     "136f6e36294c488d990cd92c9dd1887091469c115be98db176bb282a4cfa570e",
+	"S5.6/960x720/compact":        "ef7627eafd70b7d25dad31aecf4fcd241d36b008093017d6f0f3c10c196263e0",
 	"S9/960x720/compact":           "c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf",
 }
 

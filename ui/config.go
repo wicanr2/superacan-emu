@@ -83,6 +83,7 @@ type TouchConfig struct {
 	Haptics      bool   `json:"haptics"`
 	DPadDeadzone int    `json:"dpad_deadzone"`
 	StickMode    bool   `json:"stick_mode"`
+	SwapHands    bool   `json:"swap_hands,omitempty"`
 }
 
 // InputConfig 是輸入設定。

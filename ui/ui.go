@@ -27,6 +27,8 @@ type UI struct {
 
 	// textRightEdge 是最後一次 Draw 時文字畫到的最右邊，供版面溢出測試使用。
 	textRightEdge int
+
+	touch touchInput
 	mode          Mode
 	haltNote      string
 
@@ -260,6 +262,9 @@ func (u *UI) Handle(ev Event) bool {
 	if life, ok := ev.(Life); ok && life.Kind == LifeBack {
 		return u.handleBack()
 	}
+	if pointer, ok := ev.(Pointer); ok && u.handleTouch(pointer) {
+		return true
+	}
 	if !u.Visible() {
 		if action, ok := ev.(Action); ok && action.Kind == ActMenu {
 			u.Open()
@@ -310,6 +315,7 @@ func (u *UI) Update(now time.Duration) {
 func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
 	c := &canvas{dst: dst, scale: u.surface.Scale, metrics: u.metrics, font: u.font, theme: u.theme}
 	defer func() { u.textRightEdge = c.textRightEdge }()
+	u.drawVirtualPad(c)
 	if u.Visible() {
 		// 只畫最上層。每一層都自己負責畫滿需要的底，堆疊在視覺上不疊加；
 		// 半透明面板疊在半透明面板上會讓下層的字透出來。

@@ -225,6 +225,16 @@ var translations = []translation{
 	{"CaptureStarted", [5]string{"Recording started.", "Enregistrement démarré.", "Grabación iniciada.", "已開始錄影。", "已开始录影。"}},
 	{"CaptureStopped", [5]string{"Recording stopped.", "Enregistrement arrêté.", "Grabación detenida.", "已停止錄影。", "已停止录影。"}},
 	{"ScreenshotSaved", [5]string{"Screenshot written.", "Capture d'écran écrite.", "Captura guardada.", "已寫出截圖。", "已写出截图。"}},
+	{"TouchTitle", [5]string{"Touch layout", "Disposition tactile", "Diseño táctil", "觸控版面", "触控版面"}},
+	{"TouchOpacity", [5]string{"Opacity", "Opacité", "Opacidad", "不透明度", "不透明度"}},
+	{"TouchScale", [5]string{"Button size", "Taille des boutons", "Tamaño de botones", "按鍵大小", "按键大小"}},
+	{"TouchDeadzone", [5]string{"D-Pad dead zone", "Zone morte du D-Pad", "Zona muerta del D-Pad", "方向鍵死區", "方向键死区"}},
+	{"TouchDeadzoneNote", [5]string{"too small turns “up” into “up+left”", "trop petite, « haut » devient « haut+gauche »", "demasiado pequeña convierte «arriba» en «arriba+izquierda»", "太小會讓「按上」變成「上＋左」", "太小会让「按上」变成「上＋左」"}},
+	{"TouchSwapHands", [5]string{"Swap hands", "Inverser les mains", "Intercambiar manos", "左右手互換", "左右手互换"}},
+	{"TouchStickMode", [5]string{"Stick mode", "Mode stick", "Modo stick", "搖桿模式", "摇杆模式"}},
+	{"StageStickMode", [5]string{"stick mode is not implemented", "le mode stick n'est pas implémenté", "el modo stick no está implementado", "搖桿模式尚未實作", "摇杆模式尚未实作"}},
+	{"TouchHaptics", [5]string{"Haptics", "Retour haptique", "Vibración", "觸覺回饋", "触觉回馈"}},
+	{"TouchNote", [5]string{"The overlay menu hides the virtual pad: two control schemes at once fight over the same touches.", "Le menu masque la manette virtuelle : deux schémas de contrôle se disputeraient les mêmes contacts.", "El menú oculta el mando virtual: dos esquemas de control competirían por los mismos toques.", "覆蓋選單開著時虛擬手把隱藏：兩套控制同時存在會互相搶觸點。", "覆盖选单开着时虚拟手把隐藏：两套控制同时存在会互相抢触点。"}},
 }
 
 // stringsFor 以反射把語言表填進 Strings。表是逐列的，結構是逐欄的，

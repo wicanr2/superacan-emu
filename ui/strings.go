@@ -191,4 +191,14 @@ type Strings struct {
 	CaptureStarted       string
 	CaptureStopped       string
 	ScreenshotSaved      string
+	TouchTitle string
+	TouchOpacity string
+	TouchScale string
+	TouchDeadzone string
+	TouchDeadzoneNote string
+	TouchSwapHands string
+	TouchStickMode string
+	StageStickMode string
+	TouchHaptics string
+	TouchNote string
 }
