@@ -116,12 +116,17 @@ Esc 或 Backspace 取消、Del 刪除、Tab 換頁籤。
 | Boom Zoo | 17,369,003 | 22,533 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
 | Formosa Duel | 19,270,779 | 76,800 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
 | Journey to the Laugh | 17,778,132 | 7,645 | `42285d489bd74a5c5fd0d66700ed7e7c8b2b83f4855612d7dec4db07c30b146e` |
-| Monopoly – Adventure in Africa | 11,827,355 | 76,800 | `c254c50d5f85dd6ede60b82c8b2a07ca2ca8ccd41e9bfbe65a1c45299083d582` |
+| Monopoly – Adventure in Africa | 11,827,355 | 76,800 | `39ae8de2ed83c23de1750e5535f347e2c2466a353f3c5c7f3a69cf595b248f86` |
 | Sango Fighter | 11,634,924 | 50,390 | `412213dac64ec07ef8db6ee69f4a90a351880f11c3229b378647d05f559bd505` |
-| Speedy Dragon | 18,513,698 | 33,125 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
-| Super Taiwanese Baseball League | 17,572,195 | 45,080 | `e28f1c411a389ecd46206d8006e1e9b54f62a75047bcb2e64b7f12763f094023` |
+| Speedy Dragon | 18,513,698 | 33,125 | `b525266ca176f01613091f059391171fada19a1b3225c4b79fa55857583f2595` |
+| Super Taiwanese Baseball League | 17,572,195 | 45,080 | `23bd031e2b487da63249d6de2b4da6c55a0ef7ce347f253f80b98309f0bb173b` |
 | The Son of Evil | 16,727,440 | 32,274 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
 | Super Dragon Force（雙部分 ZIP） | 23,988,611 | 5,066 | `b9bba41025f239508306cd4a8e6d58c632681e05b9e24c997f8695bb40e8eedf` |
+
+這些數字綁在 renderer 的現況上。渲染路徑一改，指令數不動而 framebuffer 雜湊會動，
+那不是迴歸而是預期——例如 `2d71080` 移除 ROZ 的整層翻轉之後，Monopoly、Speedy Dragon
+與 Super Taiwanese Baseball League 三款的雜湊隨之改變，指令數一個位元都沒變。
+介面階段要看的是「指令數與雜湊在**沒有改 renderer 的情況下**保持不變」。
 
 重跑方式（ROM 與 BIOS 唯讀掛載，不入版控）：
 
