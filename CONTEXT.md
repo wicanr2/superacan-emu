@@ -32,12 +32,13 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | 68000 reset | supervisor SR、SSP／PC vector、兩級 prefetch | 40-cycle 起始值目前是 sample-derived，待 Motorola 規格審查 |
 | 68000 opcode | 一般化 effective-address 執行層覆蓋全部 12 種定址模式與主要指令族；八款 ROM 各完成 3600 frames，最高 56,747,720 條指令 | 時間取自 PRM 指令時間表（`strong-inference`）；未與 Moira 做逐指令差分 |
 | W65C02 | 256 項指令表覆蓋完整 65C02 指令集與 W65C02S 未指派編碼的 NOP 行為；八款 ROM 皆產生非零音訊 | 3:1 shared scheduler；`$DB`（STP）維持 fail-closed |
-| media | word-swap、大小驗證、原始 SHA-256 manifest | BIOS／ROM 不入版控 |
+| media | word-swap、大小驗證、原始 SHA-256 manifest、raw 與 ZIP 卡帶（含雙部分）| BIOS／ROM 不入版控；雙部分依尺寸接合，來源為 Bcan 的驗證規則 |
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650、UM6619 主機端讀取埠 | `$E90004/05`、`$E9000C/0D`、`$E90018/19` 為 MAME-derived，與 Bcan 讀取閂位置一致 |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
 | UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 開場與 Bcan 截圖同區域已可逐像素對照；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，靜態畫面的定案差分待 CPU 走到標題選單 |
-| headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置 | 1,300,000 條 68k／1,524,044 條 65C02；雙 overlay 關閉 |
+| headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置；有界指令回溯、視訊暫存器 dump、存讀檔 | 九款卡帶各完成 3600 frames |
+| save state | `ACANGOS1` 格式、交易式載入、綁定 IPL 與卡帶 SHA-256 | 決定性已用 Boom Zoo 驗證；與 Bcan 的 ACANRTS 不相容 |
 | Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 八款 ROM 各 1200 frames，指令數與 framebuffer SHA-256 均吻合 headless；`CGO_ENABLED=0` 可建 js/wasm 與 windows |
 | X11 frontend | 純 Go 視窗／鍵盤／整數倍放大，音訊走外部播放程序 | `CGO_ENABLED=0` 可建置；八款 ROM 各 1200 frames 與 headless 完全相同 |
 | bus observer | 可依 24-bit 位址範圍有界保留 byte／word transaction | word access 恰為一筆；含 68k PC／opcode／step |

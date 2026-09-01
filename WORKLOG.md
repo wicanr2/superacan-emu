@@ -413,3 +413,21 @@
   圖層：字形正確但被畫到 `x≈300` 之後切掉。該 frame 的 ROZ 暫存器 scroll 全零、
   `incxx`／`incyy` 都是 1:1。在能取得 oracle 同一瞬間的暫存器之前不動 renderer。
 
+## 2026-09-01：例外路徑、雙部分卡帶、卡帶存檔、P2 與 save state
+
+- 68000 補上統一的例外進入點，接上 TRAP、TRAPV、CHK、除以零、特權違例、ILLEGAL 與
+  line-A／line-F。SR 的寫入集中到 `setStatusRegister`，S 位元改變時交換 A7 與
+  `InactiveSP`，MOVE USP 因此可以實作。「68000 定義為非法」與「我們還沒實作」分開：
+  前者產生例外，後者維持 fail-closed。八款既有 ROM 的 1200-frame 指紋完全不變。
+- `media.DecodeCartridge` 接受 raw 與 ZIP。雙部分卡帶依尺寸排序而不是檔名——流通版本
+  的成員檔名被改過，尺寸則由 Bcan 的驗證規則固定。補上 CMPM 的一般化實作之後，
+  `Super Dragon Force (Taiwan).zip` 成為第九款可執行的卡帶，標題畫面為
+  「SUPER DRAGONFORCE ©1996 KINGFORMATION」。
+- 卡帶電池記憶體可存讀（`--save`），兩個 GUI 前端補上 P2 鍵位（沿用 Bcan.ini 配置）。
+- 新增 `ACANGOS1` 存檔格式：每個裝置有 Snapshot／Restore，載入是交易式的，
+  四種壞檔都有測試守著。真實 ROM 驗證：Boom Zoo 在 frame 600 存檔、另一個行程載入後
+  續跑 600 frame，指令數與 framebuffer SHA-256 與連續跑 1200 frame 完全相同。
+- 九款卡帶重跑 3600 frame：八款既有的數字一個位元組都沒變，第九款新增。
+- UI 規劃寫入 `docs/ui-plan.md`：自繪的 `ui` 套件把介面畫進 RGBA 緩衝，兩個前端只負責
+  貼圖與翻譯輸入，因此可在 headless 比對畫面雜湊，也不會讓 UI 滲進模擬路徑。
+

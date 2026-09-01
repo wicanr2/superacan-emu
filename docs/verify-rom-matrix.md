@@ -26,9 +26,17 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 | Speedy Dragon | 55,885,830 | 3600 | 76,374 | 2,372,355 |
 | Super Taiwanese Baseball League | 51,678,959 | 3600 | 62,674 | 2,546,863 |
 | The Son of Evil | 49,999,382 | 3600 | 3,907 | 2,279,978 |
+| Super Dragon Force（雙部分 ZIP）| 76,452,965 | 3600 | 6,697 | 2,674,727 |
 
-八款全部沒有觸發未實作 opcode、未知硬體操作或有界執行上限。這是本專案第一次讓
-`Bcan008b/ROMS` 下的每一款 raw ROM 都連續執行到指定 frame 數。
+九款全部沒有觸發未實作 opcode、未知硬體操作或有界執行上限。這是本專案第一次讓
+`Bcan008b/ROMS` 下的每一個卡帶檔案——包含唯一的雙部分 ZIP——都連續執行到指定
+frame 數。
+
+`Super Dragon Force (Taiwan).zip` 的兩個成員是 2 MiB + 1 MiB，依尺寸接成 3 MiB 之後
+可以開機並跑出標題畫面：「SUPER DRAGONFORCE」加上開始遊戲／繼續遊戲／遊戲設定，
+版權行是「©1996 KINGFORMATION CO., LTD.」。acan 知識庫把這個 ZIP 的兩個成員標為
+F007 Super Light Saga 的部分；實際跑出來的標題與該標示不同，這裡只記錄執行結果，
+不回寫該知識庫。
 
 ## 5400 frame 正常玩家路徑
 
