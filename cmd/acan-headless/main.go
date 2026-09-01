@@ -34,6 +34,7 @@ func main() {
 	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
 	watch := flag.String("watch", "", "comma-separated hexadecimal bus addresses/ranges")
 	traceInstructions := flag.Int("trace-instructions", 0, "retain the last N 68000 instructions and print them if execution stops")
+	dumpVideoRegisters := flag.Bool("video-registers", false, "print the 256 UM6618 registers and the derived per-layer state")
 	watchLimit := flag.Uint64("watch-limit", 64, "maximum matching bus transactions to retain")
 	soundRAMAlias := flag.Bool("sound-ram-alias", false, "diagnostic: model the sound SRAM as a single 32 KiB device (drop A15 for RAM accesses)")
 	press := flag.String("press", "", "P1 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
@@ -205,6 +206,23 @@ func main() {
 	if trace != nil {
 		fmt.Printf("bus_matches=%d bus_retained=%d bus_omitted=%d\n",
 			trace.Matched, len(trace.Records), trace.Matched-uint64(len(trace.Records)))
+	}
+	if *dumpVideoRegisters {
+		video := system.Bus.Video()
+		for index := 0; index < 256; index += 8 {
+			fmt.Printf("vreg $%03X:", index*2)
+			for offset := 0; offset < 8; offset++ {
+				fmt.Printf(" %04X", video.Register(uint16(index+offset)))
+			}
+			fmt.Println()
+		}
+		for layer := 0; layer < 3; layer++ {
+			base := 0x80 + layer*0x10
+			fmt.Printf("layer %d flags=$%04X tilemode=$%04X scrollx=$%04X scrolly=$%04X base=$%04X mode=$%04X\n",
+				layer, video.Register(uint16(base)), video.Register(uint16(base+1)),
+				video.Register(uint16(base+2)), video.Register(uint16(base+3)),
+				video.Register(uint16(base+4)), video.Register(uint16(base+5)))
+		}
 	}
 	for _, record := range system.Trace.Records() {
 		fmt.Printf("trace step=%d pc=$%06X opcode=$%04X cycles=%d\n",

@@ -65,9 +65,14 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 
 ## 已知落差
 
+- **Sango Fighter 的選單文字落在畫面最右緣**：以 `--layer-mask` 逐層輸出可以確定
+  文字在 ROZ 圖層，而且字形本身正確，只是被畫到 `x≈300` 之後被切掉；Bcan 的同一個
+  選單把文字置中。該 frame 的 ROZ 暫存器是 mode `$0622`、scroll 全零、`incxx`／`incyy`
+  都是 `$0100`（1:1），逐行表因 mode bit 9 而略過。在能取得 oracle 同一瞬間的暫存器
+  之前不改 renderer——目前無法分辨是我們的 scroll 來源錯了，還是兩邊根本不在同一個
+  遊戲狀態。
 - **Sango Fighter 尚未進到對戰**：改用 START／A／B 交替輸入之後可以走到選角畫面，
-  但沒有進入實際對戰；Bcan 在同樣的 START 序列下會進到對戰場景。差別可能在輸入
-  序列本身（需要方向鍵選人再確認），也可能在輸入路徑，尚未定位。
+  但沒有進入實際對戰。選單文字被切掉會讓玩家看不到選項，兩件事可能同源。
 - **The Son of Evil 有單張雜訊畫面**：frame 3600 取樣到整片隨機像素，frame 1200 的
   開場圖版與 frame 5400 的遊戲中對話都正常。尚未定位是換場中的暫態還是特定 pixel
   mode 的解碼問題；該遊戲會使用 `$F001F0` 的 bit 3，而 MAME 只保存該位元、渲染路徑
