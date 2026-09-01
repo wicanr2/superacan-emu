@@ -2,16 +2,16 @@ package m68k
 
 // 68000 的例外向量編號。向量位址是編號乘以四。
 const (
-	VectorBusError          uint8 = 2
-	VectorAddressError      uint8 = 3
+	VectorBusError           uint8 = 2
+	VectorAddressError       uint8 = 3
 	VectorIllegalInstruction uint8 = 4
-	VectorDivideByZero      uint8 = 5
-	VectorCHK               uint8 = 6
-	VectorTRAPV             uint8 = 7
+	VectorDivideByZero       uint8 = 5
+	VectorCHK                uint8 = 6
+	VectorTRAPV              uint8 = 7
 	VectorPrivilegeViolation uint8 = 8
-	VectorLineA             uint8 = 10
-	VectorLineF             uint8 = 11
-	VectorTRAPBase          uint8 = 32
+	VectorLineA              uint8 = 10
+	VectorLineF              uint8 = 11
+	VectorTRAPBase           uint8 = 32
 )
 
 // exception 產生一個 68000 例外：推入回返 PC 與 SR、進入監督者模式並關閉 trace、

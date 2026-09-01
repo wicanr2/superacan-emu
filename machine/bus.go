@@ -26,8 +26,8 @@ type Bus struct {
 	soundRAMMask uint32
 	soundTag     [32768]uint8
 	soundClashes map[uint16]uint32
-	workRAM  [65536]byte
-	sram     [SRAMSize]byte
+	workRAM      [65536]byte
+	sram         [SRAMSize]byte
 
 	lockout         *umc6650.Device
 	video           *umc6618.Device
@@ -41,7 +41,7 @@ type Bus struct {
 	controlObserver func(oldValue, newValue uint16) error
 	sound           *SoundBus
 	// soundCycles 讀取音效 CPU 的累計週期，供 $E90018/19 使用。
-	soundCycles     func() uint64
+	soundCycles func() uint64
 }
 
 func NewBus(ipl, rom, key []byte) (*Bus, error) {
@@ -309,7 +309,7 @@ func (b *Bus) Write8(address uint32, value uint8) error {
 func (b *Bus) write8(address uint32, value uint8) error {
 	switch {
 	case address >= 0xe80000 && address < 0xe90000:
-		b.tagSoundWrite(uint16(address&0xffff))
+		b.tagSoundWrite(uint16(address & 0xffff))
 		b.soundRAM[address&0xffff&b.soundRAMMask] = value
 		if b.sound != nil && address&0xff00 == 0x0400 {
 			b.sound.WriteFrom68K(uint16(address&0xffff), value)

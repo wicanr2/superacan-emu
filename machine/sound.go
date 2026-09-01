@@ -8,19 +8,19 @@ import (
 // SoundBus is the W65C02-visible 64 KiB address space. RAM is physically
 // shared with the 68000 $E80000 window; $0400-$04FF is decoded as controller I/O.
 type SoundBus struct {
-	ram       *[65536]byte
-	ramMask   uint16
-	audio     *umc6619.Device
-	irqEnable uint8
-	irqStatus uint8
-	io        [256]uint8
-	pads      [2]uint16
-	shiftCtrl uint8
-	shiftRegs [2]uint8
-	latched   [2]uint16
-	latch     [2]uint8
-	latchFull [2]bool
-	onIRQ6    func()
+	ram        *[65536]byte
+	ramMask    uint16
+	audio      *umc6619.Device
+	irqEnable  uint8
+	irqStatus  uint8
+	io         [256]uint8
+	pads       [2]uint16
+	shiftCtrl  uint8
+	shiftRegs  [2]uint8
+	latched    [2]uint16
+	latch      [2]uint8
+	latchFull  [2]bool
+	onIRQ6     func()
 	onRAMWrite func(uint16)
 }
 
@@ -37,11 +37,11 @@ func newSoundBus(ram *[65536]byte) *SoundBus {
 	return bus
 }
 
-func (b *SoundBus) Audio() *umc6619.Device { return b.audio }
-func (b *SoundBus) setRAMMask(mask uint16)  { b.ramMask = mask }
+func (b *SoundBus) Audio() *umc6619.Device            { return b.audio }
+func (b *SoundBus) setRAMMask(mask uint16)            { b.ramMask = mask }
 func (b *SoundBus) setRAMWriteHook(hook func(uint16)) { b.onRAMWrite = hook }
-func (b *SoundBus) IRQAsserted() bool      { return b.irqStatus&b.irqEnable != 0 }
-func (b *SoundBus) IRQStatus() uint8       { return b.irqStatus }
+func (b *SoundBus) IRQAsserted() bool                 { return b.irqStatus&b.irqEnable != 0 }
+func (b *SoundBus) IRQStatus() uint8                  { return b.irqStatus }
 func (b *SoundBus) SetPad(player int, activeLow uint16) {
 	b.pads[player&1] = activeLow
 }

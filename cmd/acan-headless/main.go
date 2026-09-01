@@ -45,7 +45,7 @@ func main() {
 	soundRAMAlias := flag.Bool("sound-ram-alias", false, "diagnostic: model the sound SRAM as a single 32 KiB device (drop A15 for RAM accesses)")
 	press := flag.String("press", "", "P1 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
 	press2 := flag.String("press2", "", "P2 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
-	uiScript := flag.String("ui-script", "", "overlay UI event timeline: frame:EVENT,... (menu, down, confirm, ...)")
+	uiScript := flag.String("ui-script", "", "overlay UI event timeline: frame:EVENT,... where EVENT is one of "+session.ScriptEventNames())
 	uiSurfaceSpec := flag.String("ui-surface", "960x720", "overlay UI surface size WxH")
 	uiScale := flag.Int("ui-scale", 1, "overlay UI design-unit scale")
 	uiTouch := flag.Bool("ui-touch", false, "use the touch layout profile instead of compact")
@@ -68,7 +68,7 @@ func main() {
 		fail(err.Error())
 	}
 	uiEnabled := *uiScript != "" || *uiCompose != ""
-	script, err := parseUIScript(*uiScript)
+	script, err := session.ParseScript(*uiScript)
 	if err != nil {
 		fail(err.Error())
 	}
@@ -183,9 +183,7 @@ func main() {
 			p1 = applyPresses(frame, p1, presses)
 			p2 = applyPresses(frame, p2, presses2)
 			if overlay != nil {
-				for _, event := range script[frame] {
-					overlay.Handle(event)
-				}
+				overlay.Play(script, frame)
 				overlay.SetPad(0, p1)
 				overlay.SetPad(1, p2)
 				if err = overlay.Advance(frameClock(frame)); err != nil {

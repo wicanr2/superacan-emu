@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"image"
 	"os"
 	"os/exec"
 	"time"
@@ -16,37 +17,39 @@ import (
 	"github.com/wicanr2/superacan-emu/machine"
 	"github.com/wicanr2/superacan-emu/media"
 	"github.com/wicanr2/superacan-emu/presentation"
+	"github.com/wicanr2/superacan-emu/session"
+	"github.com/wicanr2/superacan-emu/ui"
 )
 
 // X11 keysym；數值出自 X11 的 keysymdef.h。
 const (
-	keysymLeft     = 0xff51
-	keysymUp       = 0xff52
-	keysymRight    = 0xff53
-	keysymDown     = 0xff54
-	keysymReturn   = 0xff0d
-	keysymShiftR   = 0xffe2
-	keysymEscape   = 0xff1b
-	keysymF5       = 0xffc2
-	keysymF7       = 0xffc4
-	keysymLowerA   = 0x0061
-	keysymLowerQ   = 0x0071
-	keysymLowerS   = 0x0073
-	keysymLowerW   = 0x0077
-	keysymLowerX   = 0x0078
-	keysymLowerZ   = 0x007a
-	keysymDigit2   = 0x0032
-	keysymDigit6   = 0x0036
-	keysymLowerD   = 0x0064
-	keysymLowerF   = 0x0066
-	keysymLowerG   = 0x0067
-	keysymLowerI   = 0x0069
-	keysymLowerK   = 0x006b
-	keysymLowerO   = 0x006f
-	keysymLowerP   = 0x0070
-	keysymLowerR   = 0x0072
-	keysymLowerU   = 0x0075
-	keysymLowerY   = 0x0079
+	keysymLeft   = 0xff51
+	keysymUp     = 0xff52
+	keysymRight  = 0xff53
+	keysymDown   = 0xff54
+	keysymReturn = 0xff0d
+	keysymShiftR = 0xffe2
+	keysymEscape = 0xff1b
+	keysymF5     = 0xffc2
+	keysymF7     = 0xffc4
+	keysymLowerA = 0x0061
+	keysymLowerQ = 0x0071
+	keysymLowerS = 0x0073
+	keysymLowerW = 0x0077
+	keysymLowerX = 0x0078
+	keysymLowerZ = 0x007a
+	keysymDigit2 = 0x0032
+	keysymDigit6 = 0x0036
+	keysymLowerD = 0x0064
+	keysymLowerF = 0x0066
+	keysymLowerG = 0x0067
+	keysymLowerI = 0x0069
+	keysymLowerK = 0x006b
+	keysymLowerO = 0x006f
+	keysymLowerP = 0x0070
+	keysymLowerR = 0x0072
+	keysymLowerU = 0x0075
+	keysymLowerY = 0x0079
 )
 
 type keyBinding struct {
@@ -87,6 +90,8 @@ func main() {
 	screenshot := flag.String("screenshot", "", "write the final emulated framebuffer as PNG")
 	pace := flag.Bool("pace", true, "wait for the 60 Hz host tick between frames; disable for bounded smoke runs")
 	audioSink := flag.String("audio-sink", "", "shell command receiving 48000 Hz signed 16-bit stereo PCM on stdin, for example \"aplay -f cd -t raw\"")
+	stateDir := flag.String("state-dir", "", "directory holding the ten save-state slots the overlay menu reads and writes")
+	uiScript := flag.String("ui-script", "", "scripted overlay events for smoke runs: frame:EVENT,... where EVENT is one of "+session.ScriptEventNames())
 	flag.Parse()
 
 	if *iplPath == "" || *keyPath == "" || *romPath == "" {
@@ -137,16 +142,62 @@ func main() {
 	}
 	defer window.Close()
 
+	windowW, windowH := window.Size()
+	overlay := session.New(session.Options{
+		System:   system,
+		Title:    session.TitleFromPath(*romPath),
+		StateDir: *stateDir,
+		Surface:  ui.Surface{W: windowW, H: windowH, Scale: 1, Profile: ui.ProfileCompact},
+		Config:   ui.DefaultConfig(),
+	})
+	overlay.Screenshot = func(frame *image.RGBA) error {
+		return writeScreenshot(screenshotName(), system.Bus.Video().Framebuffer())
+	}
+	input := newOverlayInput()
+	script, err := session.ParseScript(*uiScript)
+	if err != nil {
+		fail(err.Error())
+	}
+
 	// SetTPS 的等價物：主機以 60 Hz 請求下一個硬體 frame，硬體 frame 邊界仍由
 	// cycle scheduler 決定，不用改變核心 cycle 數來配合主機。
 	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
 
-	var completed uint64
+	var completed, tick uint64
 	var savePressed, loadPressed bool
+	started := time.Now()
 	for {
-		if !window.Poll() || window.KeysymPressed(keysymEscape) {
+		if !window.Poll() || overlay.Quitting() {
 			break
+		}
+		// 覆蓋層沒開的時候 Esc 仍是離開，這是現行行為；改成「開啟選單」
+		// 要等 WORKLIST A1 拍板。
+		if !overlay.UI.Visible() && window.KeysymPressed(keysymEscape) {
+			break
+		}
+		// 腳本以主機迴圈的次數計時，不用模擬 frame 數：覆蓋層開著時模擬時間
+		// 停住，用 frame 數當索引會讓腳本永遠等不到下一個事件。
+		overlay.Play(script, tick)
+		tick++
+		if input.edge(window, keysymF1) {
+			overlay.Handle(ui.Action{Kind: ui.ActMenu})
+		}
+		if overlay.UI.Visible() {
+			if input.edge(window, keysymEscape) {
+				overlay.Handle(ui.Action{Kind: ui.ActCancel})
+			}
+			for _, key := range overlayKeys {
+				if input.edge(window, key.keysym) {
+					overlay.Handle(key.event)
+				}
+			}
+		} else {
+			// 覆蓋層關著時仍要更新邊緣狀態，否則關掉選單後第一次按鍵會被吃掉。
+			for _, key := range overlayKeys {
+				input.edge(window, key.keysym)
+			}
+			input.edge(window, keysymEscape)
 		}
 		// 熱鍵取按下的那一瞬間，按著不放不會重複觸發。
 		if pressed := window.KeysymPressed(keysymF5); pressed && !savePressed {
@@ -157,13 +208,24 @@ func main() {
 			reportStateResult("load", readSaveState(system, *statePath))
 		}
 		loadPressed = window.KeysymPressed(keysymF7)
-		system.SoundBus.SetPad(0, padState(window, playerOneKeys))
-		system.SoundBus.SetPad(1, padState(window, playerTwoKeys))
-		if _, err := system.RunFrame(2_000_000); err != nil {
+		overlay.SetPad(0, padState(window, playerOneKeys))
+		overlay.SetPad(1, padState(window, playerTwoKeys))
+		paused := overlay.Paused()
+		if err := overlay.Advance(time.Since(started)); err != nil {
 			fail(err.Error())
 		}
-		completed++
-		if err := window.Present(system.Bus.Video().Framebuffer()); err != nil {
+		if !paused {
+			completed++
+		}
+		if overlay.UI.Visible() {
+			// 覆蓋層開著時走合成路徑：畫面停在最後一個完成的 frame，
+			// 選單畫在視窗的原生解析度上。
+			canvas := input.canvas(windowW, windowH)
+			overlay.Compose(canvas)
+			if err := window.PresentRGBA(canvas.Pix, windowW, windowH); err != nil {
+				fail(err.Error())
+			}
+		} else if err := window.Present(system.Bus.Video().Framebuffer()); err != nil {
 			fail(err.Error())
 		}
 		if *frames != 0 && completed >= *frames {

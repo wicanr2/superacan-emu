@@ -26,10 +26,10 @@ type System struct {
 	IPLSHA256 [32]byte
 	ROMSHA256 [32]byte
 	// Trace 為 nil 時完全不記錄；開啟後只保留最近 N 條指令。
-	Trace               *InstructionRing
-	soundReset          bool
-	soundCredit         int64
-	soundIRQ6           bool
+	Trace       *InstructionRing
+	soundReset  bool
+	soundCredit int64
+	soundIRQ6   bool
 }
 
 // RunFrame advances the shared hardware timeline until UM6618 completes one

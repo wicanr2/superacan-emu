@@ -76,6 +76,34 @@ frame 904 讀檔之後機器退回存檔當下，再往前 296 個 frame，600�
 指令數、frame 與 framebuffer SHA-256 完全相同，`TestOverlayGatesPadInput` 證明選單
 開著時 machine 收到的是「全部放開」。
 
+## X11 前端的覆蓋層
+
+`cmd/acan-x11` 同樣吃 `--ui-script`，所以覆蓋層在**真實 X 伺服器**上的路徑
+（`PresentRGBA` 的 RGBA→BGRX 轉換與切條 `PutImage`）也能在容器裡驗證，
+不必有人坐在螢幕前。腳本以主機迴圈次數計時而不是模擬 frame 數——覆蓋層開著時
+模擬時間停住，用 frame 數當索引的腳本會永遠等不到下一個事件。
+
+```sh
+Xvfb :99 -screen 0 1280x1024x24 &
+DISPLAY=:99 acan-x11 --ipl … --key … --rom "…/Boom Zoo (Taiwan).bin" \
+    --frames 900 --pace=false --scale 3 --state-dir …/states \
+    --ui-script "600:menu,610:down,620:confirm,630:confirm,640:cancel"
+```
+
+2026-09-01 的結果：跑完 900 個模擬 frame，`slot0.acanstate` 產生，
+`instructions=13117468`。互動鍵位：**F1 開選單**（Esc 改成開選單還沒拍板，
+見 WORKLIST A1，在那之前 Esc 維持「離開」）、方向鍵導覽、Enter 確認、
+Esc 或 Backspace 取消、Del 刪除、Tab 換頁籤。
+
+覆蓋層沒開時走原本的放大路徑，畫面結果不受影響。三款卡帶各跑 1200 frame，
+68000 指令數與 framebuffer SHA-256 與 headless 完全相同：
+
+| ROM | 68000 指令 | framebuffer SHA-256 |
+|---|---:|---|
+| Boom Zoo | 17,369,003 | `3784f866…155562` |
+| Formosa Duel | 19,270,779 | `0856269e…04d587` |
+| Sango Fighter | 11,634,924 | `412213da…9bd505` |
+
 ## 卡帶基準（C10）
 
 介面不得滲進模擬路徑。每一個介面階段完成後，九款卡帶的 1200-frame 執行結果

@@ -164,12 +164,37 @@ func (w *Window) Present(framebuffer []uint32) error {
 		}
 	}
 
+	return w.flush(width, w.sourceH*w.scale)
+}
+
+// PresentRGBA 送上一張與視窗同尺寸的 RGBA 圖。覆蓋層畫在視窗的原生解析度上，
+// 所以這條路徑不做放大；Present 的放大路徑保留給沒有覆蓋層的一般情況，
+// 它每個像素少一次轉換。
+func (w *Window) PresentRGBA(pix []byte, width, height int) error {
+	if width != w.sourceW*w.scale || height != w.sourceH*w.scale {
+		return fmt.Errorf("x11: image is %dx%d, window is %dx%d",
+			width, height, w.sourceW*w.scale, w.sourceH*w.scale)
+	}
+	if len(pix) < width*height*4 {
+		return fmt.Errorf("x11: image has %d bytes, want %d", len(pix), width*height*4)
+	}
+	// X11 的 ZPixmap 在 little-endian 主機上是 BGRX，來源是 RGBA。
+	for i := 0; i < width*height; i++ {
+		w.image[i*4+0] = pix[i*4+2]
+		w.image[i*4+1] = pix[i*4+1]
+		w.image[i*4+2] = pix[i*4+0]
+		w.image[i*4+3] = 0
+	}
+	return w.flush(width, height)
+}
+
+// flush 把內部緩衝依 MaximumRequestLength 切條送出。
+func (w *Window) flush(width, height int) error {
 	rowBytes := width * 4
 	rowsPerRequest := w.maxRequest / rowBytes
 	if rowsPerRequest < 1 {
 		rowsPerRequest = 1
 	}
-	height := w.sourceH * w.scale
 	for y := 0; y < height; y += rowsPerRequest {
 		rows := rowsPerRequest
 		if y+rows > height {
@@ -184,6 +209,12 @@ func (w *Window) Present(framebuffer []uint32) error {
 	}
 	return nil
 }
+
+// Size 回傳視窗的像素尺寸，覆蓋層要以此建立畫布。
+func (w *Window) Size() (int, int) { return w.sourceW * w.scale, w.sourceH * w.scale }
+
+// Scale 回傳整數放大倍率。
+func (w *Window) Scale() int { return w.scale }
 
 // Poll 消化所有待處理事件並更新按鍵狀態。回傳 false 表示視窗已關閉。
 func (w *Window) Poll() bool {
