@@ -21,6 +21,8 @@ type System struct {
 	Instructions        uint64
 	SoundInstructions   uint64
 	IRQAcknowledgements [8]uint64
+	// Trace 為 nil 時完全不記錄；開啟後只保留最近 N 條指令。
+	Trace               *InstructionRing
 	soundReset          bool
 	soundCredit         int64
 	soundIRQ6           bool
@@ -40,7 +42,9 @@ func (s *System) RunFrame(maxInstructions uint64) (uint64, error) {
 			return executed, fmt.Errorf("machine: frame did not complete within %d instructions", maxInstructions)
 		}
 		s.M68K.SetInterruptLevel(s.highestIRQLevel())
-		if _, err := s.M68K.Step(); err != nil {
+		result, err := s.M68K.Step()
+		s.Trace.observe(s.Instructions, result)
+		if err != nil {
 			return executed, err
 		}
 		s.Instructions++
@@ -99,6 +103,7 @@ func (s *System) RunInstructions(count uint64) (m68k.StepResult, error) {
 		s.M68K.SetInterruptLevel(s.highestIRQLevel())
 		var err error
 		result, err = s.M68K.Step()
+		s.Trace.observe(s.Instructions, result)
 		if err != nil {
 			return result, err
 		}

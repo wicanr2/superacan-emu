@@ -251,7 +251,12 @@ var opcodeTable = [256]instruction{
 func (c *CPU) executeGeneric(opcode uint8) (bool, error) {
 	entry := opcodeTable[opcode]
 	if entry.operation == opNone {
-		return false, nil
+		undefined, ok := undefinedOpcode(opcode)
+		if !ok {
+			return false, nil
+		}
+		c.state.PC++
+		return true, c.executeUndefined(undefined)
 	}
 	c.state.PC++
 	err := c.executeEntry(entry)
@@ -401,4 +406,49 @@ func (c *CPU) loadOperand(entry instruction) (uint8, uint16, error) {
 	}
 	value, err := c.read(address)
 	return value, address, err
+}
+
+// undefinedNOP 描述 W65C02S 上未指派的編碼：它們不是非法指令，而是有明確
+// 長度與週期數的 NOP。cycles 含 opcode 取指令的那一個週期。
+type undefinedNOP struct {
+	bytes  uint8
+	cycles uint8
+}
+
+// 依 W65C02S 資料手冊的未指派編碼分組。$CB（WAI）與 $DB（STP）已另有定義，
+// 不屬於此表。
+func undefinedOpcode(opcode uint8) (undefinedNOP, bool) {
+	switch opcode {
+	case 0x02, 0x22, 0x42, 0x62, 0x82, 0xc2, 0xe2:
+		return undefinedNOP{bytes: 2, cycles: 2}, true
+	case 0x44:
+		return undefinedNOP{bytes: 2, cycles: 3}, true
+	case 0x54, 0xd4, 0xf4:
+		return undefinedNOP{bytes: 2, cycles: 4}, true
+	case 0x5c:
+		return undefinedNOP{bytes: 3, cycles: 8}, true
+	case 0xdc, 0xfc:
+		return undefinedNOP{bytes: 3, cycles: 4}, true
+	case 0xdb: // STP：停機需要外部 reset，維持 fail-closed
+		return undefinedNOP{}, false
+	}
+	if opcode&0x0f == 0x03 || opcode&0x0f == 0x0b {
+		return undefinedNOP{bytes: 1, cycles: 1}, true
+	}
+	return undefinedNOP{}, false
+}
+
+func (c *CPU) executeUndefined(entry undefinedNOP) error {
+	// opcode 取指令已經計過一個週期；其餘的位元組照樣讀入，剩下的補內部週期。
+	for index := uint8(1); index < entry.bytes; index++ {
+		if _, err := c.fetch(); err != nil {
+			return err
+		}
+	}
+	for index := entry.bytes; index < entry.cycles; index++ {
+		if err := c.internal(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

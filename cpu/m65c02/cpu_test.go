@@ -43,13 +43,39 @@ func TestResetAndSoundDriverPrologue(t *testing.T) {
 }
 
 func TestUnknownOpcodeFailsClosedAtAddress(t *testing.T) {
+	// $DB 是 STP：停機後要外部 reset 才會恢復，本核心維持 fail-closed。
 	machine := &testMachine{}
-	machine.memory[0x1234] = 0x02
+	machine.memory[0x1234] = 0xdb
 	cpu := New(machine, machine)
 	cpu.state.PC = 0x1234
 	result, err := cpu.Step()
-	if err == nil || result.PCBefore != 0x1234 || result.Opcode != 0x02 || cpu.State().PC != 0x1234 {
+	if err == nil || result.PCBefore != 0x1234 || result.Opcode != 0xdb || cpu.State().PC != 0x1234 {
 		t.Fatalf("result=%+v state=%+v err=%v", result, cpu.State(), err)
+	}
+}
+
+func TestUndefinedOpcodesFollowW65C02SNOPTiming(t *testing.T) {
+	// W65C02S 的未指派編碼不是非法指令，而是有明確長度與週期的 NOP。
+	tests := []struct {
+		opcode uint8
+		bytes  uint16
+		cycles uint64
+	}{
+		{0xa3, 1, 1}, {0x02, 2, 2}, {0x44, 2, 3}, {0x54, 2, 4}, {0x5c, 3, 8}, {0xdc, 3, 4},
+	}
+	for _, test := range tests {
+		machine := &testMachine{}
+		machine.memory[0x1234] = test.opcode
+		cpu := New(machine, machine)
+		cpu.state.PC = 0x1234
+		result, err := cpu.Step()
+		if err != nil {
+			t.Fatalf("opcode $%02X: %v", test.opcode, err)
+		}
+		if cpu.State().PC != 0x1234+test.bytes || result.Cycles != test.cycles {
+			t.Fatalf("opcode $%02X: PC=$%04X cycles=%d, want $%04X and %d",
+				test.opcode, cpu.State().PC, result.Cycles, 0x1234+test.bytes, test.cycles)
+		}
 	}
 }
 

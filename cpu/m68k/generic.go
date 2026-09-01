@@ -462,7 +462,7 @@ func (c *CPU) genericOr(opcode uint16) (bool, error) {
 		return c.genericDivide(opcode, true)
 	}
 	if opcode&0x01f0 == 0x0100 {
-		return false, nil // SBCD 尚未實作
+		return c.genericDecimal(opcode, false) // SBCD
 	}
 	return c.genericBinary(opcode, binaryOr)
 }
@@ -474,7 +474,7 @@ func (c *CPU) genericSub(opcode uint16) (bool, error) {
 		return c.genericAddressArithmetic(opcode, false)
 	}
 	if opcode&0x0130 == 0x0100 {
-		return false, nil // SUBX 由既有 decoder 或後續切片處理
+		return c.genericExtendedArithmetic(opcode, false) // SUBX
 	}
 	return c.genericBinary(opcode, binarySub)
 }
@@ -504,7 +504,7 @@ func (c *CPU) genericAnd(opcode uint16) (bool, error) {
 		return c.genericMultiply(opcode, true)
 	}
 	if opcode&0x01f0 == 0x0100 {
-		return false, nil // ABCD 尚未實作
+		return c.genericDecimal(opcode, true) // ABCD
 	}
 	if opcode&0x0100 != 0 {
 		switch opcode & 0x00f8 {
@@ -522,7 +522,7 @@ func (c *CPU) genericAdd(opcode uint16) (bool, error) {
 		return c.genericAddressArithmetic(opcode, true)
 	}
 	if opcode&0x0130 == 0x0100 {
-		return false, nil // ADDX 由既有 decoder 或後續切片處理
+		return c.genericExtendedArithmetic(opcode, true) // ADDX
 	}
 	return c.genericBinary(opcode, binaryAdd)
 }

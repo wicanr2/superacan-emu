@@ -33,6 +33,7 @@ func main() {
 	layerMask := flag.Uint("layer-mask", uint(umc6618.AllLayers), "diagnostic render mask: tilemaps=1/2/4 sprite=8 ROZ=16 windows=32")
 	disableROZLineTables := flag.Bool("disable-roz-line-tables", false, "diagnostic: bypass MAME-derived ROZ per-line tables on final render")
 	watch := flag.String("watch", "", "comma-separated hexadecimal bus addresses/ranges")
+	traceInstructions := flag.Int("trace-instructions", 0, "retain the last N 68000 instructions and print them if execution stops")
 	watchLimit := flag.Uint64("watch-limit", 64, "maximum matching bus transactions to retain")
 	soundRAMAlias := flag.Bool("sound-ram-alias", false, "diagnostic: model the sound SRAM as a single 32 KiB device (drop A15 for RAM accesses)")
 	press := flag.String("press", "", "P1 input timeline: frame:BUTTON+BUTTON,... (held for 10 frames)")
@@ -118,6 +119,7 @@ func main() {
 			}
 		})
 	}
+	system.Trace = machine.NewInstructionRing(*traceInstructions)
 	if err := system.Reset(); err != nil {
 		fail(fmt.Sprintf("reset: %v", err))
 	}
@@ -205,6 +207,10 @@ func main() {
 			trace.Matched, len(trace.Records), trace.Matched-uint64(len(trace.Records)))
 	}
 	if err != nil {
+		for _, record := range system.Trace.Records() {
+			fmt.Printf("trace step=%d pc=$%06X opcode=$%04X cycles=%d\n",
+				record.Index, record.PC, record.Opcode, record.Cycles)
+		}
 		fail(err.Error())
 	}
 	if *screenshot != "" {

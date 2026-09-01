@@ -266,3 +266,84 @@ func TestGenericMoveMultipleWordSignExtendsIntoRegisters(t *testing.T) {
 		t.Fatalf("A0=$%08X, want $00002004", cpu.state.A[0])
 	}
 }
+
+func TestGenericDecimalAddAndSubtractRegisters(t *testing.T) {
+	// ABCD D0,D1：$25 + $37 = $62，且 X 參與運算。
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xc300, 0x0402: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[0] = 0x25
+	cpu.state.D[1] = 0x37
+	cpu.state.SR |= flagZero
+	cpu.state.SR &^= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint8(cpu.state.D[1]) != 0x62 {
+		t.Fatalf("D1=$%02X, want $62", uint8(cpu.state.D[1]))
+	}
+	if cpu.state.SR&flagZero != 0 {
+		t.Fatalf("非零結果必須清除 Z，SR=$%04X", cpu.state.SR)
+	}
+	if result.Cycles != 6 {
+		t.Fatalf("cycles=%d, want 6", result.Cycles)
+	}
+}
+
+func TestGenericDecimalSubtractPredecrement(t *testing.T) {
+	// SBCD -(A4),-(A3)：Speedy Dragon 的停止編碼。$42 - $17 = $25。
+	cpu, _, bus := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0x870c, 0x0402: 0x4e71,
+	})
+	bus.bytes = map[uint32]uint8{0x2000: 0x17, 0x3000: 0x42}
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.A[4] = 0x2001
+	cpu.state.A[3] = 0x3001
+	cpu.state.SR |= flagZero
+	cpu.state.SR &^= flagExtend
+	result, err := cpu.Step()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpu.state.A[4] != 0x2000 || cpu.state.A[3] != 0x3000 {
+		t.Fatalf("A4=$%08X A3=$%08X", cpu.state.A[4], cpu.state.A[3])
+	}
+	if len(bus.byteWrites) != 1 || bus.byteWrites[0].address != 0x3000 || bus.byteWrites[0].value != 0x25 {
+		t.Fatalf("byte writes=%+v, want one $25 至 $3000", bus.byteWrites)
+	}
+	// PRM 的 ABCD／SBCD 表：-(Ay),-(Ax) 形式為 18(3/1)。
+	if result.Cycles != 18 {
+		t.Fatalf("cycles=%d, want 18", result.Cycles)
+	}
+}
+
+func TestGenericExtendedAddAccumulatesCarryAndZero(t *testing.T) {
+	// ADDX.W D0,D1 帶進位：$FFFF + $0001 + X(1) = $0001，並保持 C 與 X。
+	cpu, _, _ := newInstructionCPU(map[uint32]uint16{
+		0x0400: 0xd340, 0x0402: 0x4e71,
+	})
+	if err := cpu.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	cpu.state.D[0] = 0x0001
+	cpu.state.D[1] = 0xffff
+	cpu.state.SR |= flagExtend | flagZero
+	if _, err := cpu.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if uint16(cpu.state.D[1]) != 0x0001 {
+		t.Fatalf("D1=$%08X, want low word $0001", cpu.state.D[1])
+	}
+	if cpu.state.SR&flagCarry == 0 || cpu.state.SR&flagExtend == 0 {
+		t.Fatalf("SR=$%04X, want C and X set", cpu.state.SR)
+	}
+	if cpu.state.SR&flagZero != 0 {
+		t.Fatalf("非零結果必須清除 Z，SR=$%04X", cpu.state.SR)
+	}
+}

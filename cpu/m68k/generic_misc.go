@@ -22,10 +22,12 @@ func (c *CPU) genericMiscellaneous(opcode uint16) (bool, error) {
 		return c.genericJump(opcode, true)
 	case opcode&0xffc0 == 0x4ec0:
 		return c.genericJump(opcode, false)
-	case opcode&0xffc0 == 0x4840:
-		return c.genericPushEffectiveAddress(opcode)
+	case opcode&0xffc0 == 0x4800:
+		return c.genericNegateDecimal(opcode)
 	case opcode&0xfff8 == 0x4840:
 		return c.genericSwap(uint8(opcode & 7))
+	case opcode&0xffc0 == 0x4840:
+		return c.genericPushEffectiveAddress(opcode)
 	case opcode&0xffb8 == 0x4880:
 		return c.genericExtend(opcode)
 	case opcode&0xfb80 == 0x4880:
