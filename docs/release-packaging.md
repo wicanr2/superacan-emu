@@ -59,7 +59,7 @@ AppImage 跑出來的結果要與模擬核心逐位元相同。在沒有 FUSE �
 ```sh
 DISPLAY=:99 ./SuperACan-x86_64.AppImage --ipl … --key … --sound-bios1 … --sound-bios2 … \
     --rom "…/Boom Zoo (Taiwan).bin" --scale 3 --pace=false --frames 300 --config none
-→ frames=300 instructions=4364786 framebuffer_sha256=defbd19a…885c6
+→ frames=300 instructions=4364786 framebuffer_sha256=122922cb…c71198
 ```
 
 這組數字與 `verify-ui.md` 記錄的 headless 基準相同，所以包起來的執行檔沒有被打包

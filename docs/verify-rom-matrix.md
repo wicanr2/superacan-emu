@@ -23,11 +23,11 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
 |---|---:|---:|---:|---:|
 | Boom Zoo | 50,505,560 | 3600 | 61,440 | 1,781,630 |
 | Formosa Duel | 56,747,720 | 3600 | 75,809 | 2,257,007 |
-| Journey to the Laugh | 53,531,761 | 3600 | 72,298 | 2,618,516 |
+| Journey to the Laugh | 53,531,761 | 3600 | 66,897 | 2,618,516 |
 | Monopoly – Adventure in Africa | 32,974,618 | 3600 | 76,800 | 2,557,330 |
 | Sango Fighter | 30,846,962 | 3600 | 18,173 | 2,607,495 |
 | Speedy Dragon | 55,885,830 | 3600 | 76,374 | 2,372,355 |
-| Super Taiwanese Baseball League | 51,678,959 | 3600 | 62,674 | 2,546,863 |
+| Super Taiwanese Baseball League | 51,678,959 | 3600 | 62,129 | 2,546,863 |
 | The Son of Evil | 49,999,382 | 3600 | 3,907 | 2,279,978 |
 | Super Dragon Force（雙部分 ZIP）| 76,452,965 | 3600 | 6,697 | 2,674,727 |
 
@@ -63,16 +63,19 @@ F007 Super Light Saga 的部分；實際跑出來的標題與該標示不同，�
 同一組輸入以 `cmd/acan` 在 Xvfb 執行 1200 frame（`--audio=false`），八款的 68000
 指令數與 framebuffer SHA-256 與 headless 完全相同，證明 GUI 沒有另走簡化排程：
 
-| ROM | 68000 指令 | framebuffer SHA-256 |
-|---|---:|---|
-| Boom Zoo | 17,369,003 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
-| Formosa Duel | 19,270,779 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
-| Journey to the Laugh | 17,778,132 | `42285d489bd74a5c5fd0d66700ed7e7c8b2b83f4855612d7dec4db07c30b146e` |
-| Monopoly | 11,827,355 | `c254c50d5f85dd6ede60b82c8b2a07ca2ca8ccd41e9bfbe65a1c45299083d582` |
-| Sango Fighter | 11,634,924 | `412213dac64ec07ef8db6ee69f4a90a351880f11c3229b378647d05f559bd505` |
-| Speedy Dragon | 18,513,698 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
-| Super Taiwanese Baseball League | 17,572,195 | `e28f1c411a389ecd46206d8006e1e9b54f62a75047bcb2e64b7f12763f094023` |
-| The Son of Evil | 16,727,440 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
+| ROM | 68000 指令 |
+|---|---:|
+| Boom Zoo | 17,369,003 |
+| Formosa Duel | 19,270,779 |
+| Journey to the Laugh | 17,778,132 |
+| Monopoly | 11,827,355 |
+| Sango Fighter | 11,634,924 |
+| Speedy Dragon | 18,513,698 |
+| Super Taiwanese Baseball League | 17,572,195 |
+| The Son of Evil | 16,727,440 |
+
+framebuffer SHA-256 的值只記在
+[`verify-ui.md` 的卡帶基準（C10）](verify-ui.md#卡帶基準c10)。
 
 ## 音訊
 
@@ -111,6 +114,37 @@ F007 Super Light Saga 的部分；實際跑出來的標題與該標示不同，�
   mode 的解碼問題；該遊戲會使用 `$F001F0` 的 bit 3，而 MAME 只保存該位元、渲染路徑
   並未讀取。
 - 畫面正確性只到「可辨識、可操作」這一級。像素級對帳見
-  [`docs/bcan-oracle-diff.md`](bcan-oracle-diff.md)；Boom Zoo 標題畫面與 Bcan 的差異
-  目前是 43.48%（`--width 256`），調色盤數值兩邊相同，差異在像素落點。
-- Super Dragon Force 是雙部分卡帶的 ZIP，本專案的 media 層尚未支援，不在上表。
+  [`docs/bcan-oracle-diff.md`](bcan-oracle-diff.md)：Boom Zoo 標題的版權文字列與
+  Sango Fighter 開場旁白的一整行都已與 Bcan 逐位元組相同，剩下的差異是元素的垂直
+  落點與動畫相位。
+- Super Dragon Force 是雙部分卡帶的 ZIP，音訊那一節取樣時尚未納入，不在音訊表內；
+  3600-frame 表已包含它。
+
+## README 的遊戲畫面
+
+README 的五張畫面由發行的 AppImage 產生，`--screenshot` 直接寫出 UM6618 的顯示
+孔徑，不套濾鏡也不含覆蓋層。容器內先起 Xvfb，再以 `--pace=false --config none`
+執行，避免主機節奏與使用者設定影響結果：
+
+```sh
+A=build/SuperACan-x86_64.AppImage
+B="--ipl /bios/internal_68k.bin --key /bios/umc6650.bin \
+   --sound-bios1 /bios/internal_6502_1.bin --sound-bios2 /bios/internal_6502_2.bin"
+run() { "$A" $B --pace=false --config none "$@"; }
+
+run --rom "/media/Monopoly - Adventure in Africa (Taiwan).bin" --frames 120 \
+    --screenshot docs/screenshots/appimage/acan-logo-f120.png
+run --rom "/media/Boom Zoo (Taiwan).bin" --frames 3600 \
+    --screenshot docs/screenshots/appimage/boomzoo-title-f3600.png
+run --rom "/media/Boom Zoo (Taiwan).bin" --press "3600:A" --frames 4200 \
+    --screenshot docs/screenshots/appimage/boomzoo-charselect-f4200.png
+run --rom "/media/Monopoly - Adventure in Africa (Taiwan).bin" --frames 3600 \
+    --screenshot docs/screenshots/appimage/monopoly-title-f3600.png
+run --rom "/media/Speedy Dragon (Taiwan).bin" --frames 1200 \
+    --screenshot docs/screenshots/appimage/speedydragon-intro-f1200.png
+```
+
+`docs/screenshots/` 底下未分類的舊檔出自 deprecated 的 C++ oracle，由
+[`verify-audio-input.md`](verify-audio-input.md) 與
+[`frame120-render-diff.md`](frame120-render-diff.md) 當歷史證據引用，不是目前的
+Go 核心輸出。

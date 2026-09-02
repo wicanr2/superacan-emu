@@ -81,21 +81,30 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 ![觸控版面](docs/screenshots/ui-touch-monopoly.png)
 
-## 遊戲截圖（開發驗證用途）
+## 遊戲截圖
 
 > 截圖為各遊戲之版權畫面，僅供模擬器開發驗證，不作其他用途。
 
-| Boom Zoo 標題 | Boom Zoo 角色選擇（按鍵驗證） |
-|---|---|
-| ![Boom Zoo 標題](docs/screenshots/boomzoo-title-f6000.png) | ![Boom Zoo 角色選擇](docs/screenshots/boomzoo-charselect-after-start.png) |
+下列五張由發行的 AppImage 產生（`--screenshot` 直接取 UM6618 的顯示孔徑，
+不套濾鏡也不含覆蓋層），重現命令見
+[`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)。
 
-| Monopoly 標題 | Monopoly 玩家人數選擇（按鍵驗證） |
+| Boom Zoo 標題（frame 3600） | Boom Zoo 角色選擇（frame 3600 按 A，frame 4200） |
 |---|---|
-| ![Monopoly 標題](docs/screenshots/monopoly-title-f3600.png) | ![Monopoly 人數選擇](docs/screenshots/monopoly-playersel-after-start.png) |
+| ![Boom Zoo 標題](docs/screenshots/appimage/boomzoo-title-f3600.png) | ![Boom Zoo 角色選擇](docs/screenshots/appimage/boomzoo-charselect-f4200.png) |
 
-| Speedy Dragon 開頭場景 | A'Can 開機 logo |
+| Monopoly 標題（frame 3600） | Speedy Dragon 開場（frame 1200） |
 |---|---|
-| ![Speedy Dragon](docs/screenshots/speedydragon-intro-f1200.png) | ![A'Can logo](docs/screenshots/monopoly-logo-f120.png) |
+| ![Monopoly 標題](docs/screenshots/appimage/monopoly-title-f3600.png) | ![Speedy Dragon](docs/screenshots/appimage/speedydragon-intro-f1200.png) |
+
+A'Can 開機 logo（frame 120）：
+
+![A'Can logo](docs/screenshots/appimage/acan-logo-f120.png)
+
+`docs/screenshots/` 底下未分類的舊檔是 deprecated C++ oracle 時期的畫面，由
+[`docs/verify-audio-input.md`](docs/verify-audio-input.md) 與
+[`docs/frame120-render-diff.md`](docs/frame120-render-diff.md) 當歷史證據引用，
+不代表目前的 Go 核心輸出。
 
 ## 建置（Go 主線）
 

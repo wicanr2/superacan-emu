@@ -212,10 +212,10 @@ FPS 是常駐指示不是 toast：`ui.drawFPS` 在 `Video.ShowFPS` 為真時畫�
 DISPLAY=:99 acan-x11 --ipl … --key … --sound-bios1 … --sound-bios2 … \
     --rom-dir /media --state-root …/states --frames 300 --pace=false --scale 3 \
     --ui-script "5:down,10:confirm,20:confirm"
-→ frames=300 instructions=4364786 framebuffer_sha256=defbd19a…885c6
+→ frames=300 instructions=4364786 framebuffer_sha256=122922cb…c71198
 
 acan-headless --rom "/media/Boom Zoo (Taiwan).bin" --frames 300
-→ steps=4364786 framebuffer_sha256=defbd19a…885c6
+→ steps=4364786 framebuffer_sha256=122922cb…c71198
 ```
 
 不需要商業 ROM 的版本在 `session` 的單元測試裡：`TestShellBrowsesAndLoadsHeadless`
@@ -363,9 +363,9 @@ Esc 或 Backspace 取消、Del 刪除、Tab 換頁籤。
 
 | ROM | 68000 指令 | framebuffer SHA-256 |
 |---|---:|---|
-| Boom Zoo | 17,369,003 | `3784f866…155562` |
-| Formosa Duel | 19,270,779 | `0856269e…04d587` |
-| Sango Fighter | 11,634,924 | `412213da…9bd505` |
+| Boom Zoo | 17,369,003 | `f720c9d1…b92301` |
+| Formosa Duel | 19,270,779 | `499d876d…9e7b0d` |
+| Sango Fighter | 11,634,924 | `f5bfffa1…4f9f06` |
 
 ## 卡帶基準（C10）
 
@@ -376,14 +376,14 @@ Esc 或 Backspace 取消、Del 刪除、Tab 換頁籤。
 
 | ROM | 68000 指令 | 非黑像素 | framebuffer SHA-256 |
 |---|---:|---:|---|
-| Boom Zoo | 17,369,003 | 22,533 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
-| Formosa Duel | 19,270,779 | 76,800 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
-| Journey to the Laugh | 17,778,132 | 7,645 | `42285d489bd74a5c5fd0d66700ed7e7c8b2b83f4855612d7dec4db07c30b146e` |
-| Monopoly – Adventure in Africa | 11,827,355 | 76,800 | `39ae8de2ed83c23de1750e5535f347e2c2466a353f3c5c7f3a69cf595b248f86` |
-| Sango Fighter | 11,634,924 | 50,390 | `412213dac64ec07ef8db6ee69f4a90a351880f11c3229b378647d05f559bd505` |
-| Speedy Dragon | 18,513,698 | 33,125 | `b525266ca176f01613091f059391171fada19a1b3225c4b79fa55857583f2595` |
-| Super Taiwanese Baseball League | 17,572,195 | 45,084 | `23bd031e2b487da63249d6de2b4da6c55a0ef7ce347f253f80b98309f0bb173b` |
-| The Son of Evil | 16,727,440 | 32,274 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
+| Boom Zoo | 17,369,003 | 22,533 | `f720c9d12517beb1f2575a0d83675e2fca834d5df6018fddeeeab025f9b92301` |
+| Formosa Duel | 19,270,779 | 76,800 | `499d876de1b6db15fac1efd1958f6c649624612045fd9f09276afdf0f39e7b0d` |
+| Journey to the Laugh | 17,778,132 | 7,645 | `a4bba957604591f3ebf22ffd120e8680986c5adac80878259bf635cb139ef3c6` |
+| Monopoly – Adventure in Africa | 11,827,355 | 76,800 | `71b754e4f0157bd29a6597755a9177685e93329a6b962f0c73515ce921dff892` |
+| Sango Fighter | 11,634,924 | 50,390 | `f5bfffa115d32a45c6d2aacc7412829ace9ff5bbd97b23b6fdaf63d14f9f0606` |
+| Speedy Dragon | 18,513,698 | 33,125 | `e03f86b9f076a8b003039f646e7a8334e5522457e70624c3051734ed6758bee0` |
+| Super Taiwanese Baseball League | 17,572,195 | 45,071 | `6eecdc748f3d1440e8f2bf457b6e56d2d99509523745248c84cf47baebb64a33` |
+| The Son of Evil | 16,727,440 | 32,274 | `8059d2e75a0e9526cb96dafa7b0f07cf207b519effe68803ad0ded95128616c3` |
 | Super Dragon Force（雙部分 ZIP） | 23,988,611 | 5,066 | `b9bba41025f239508306cd4a8e6d58c632681e05b9e24c997f8695bb40e8eedf` |
 
 這些數字綁在 renderer 的現況上。渲染路徑一改，指令數不動而 framebuffer 雜湊會動，

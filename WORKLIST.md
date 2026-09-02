@@ -1,6 +1,6 @@
 # Super A'Can 模擬器工作清單
 
-更新日期：2026-09-01。狀態只反映目前程式與最近證據；歷程見 `WORKLOG.md`。
+更新日期：2026-09-02。狀態只反映目前程式與最近證據；歷程見 `WORKLOG.md`。
 
 ## 目前位置
 
@@ -149,9 +149,16 @@
 
 ## D. 模擬正確性
 
-- [ ] 在靜止畫面上完成與 Bcan 的逐像素差分並分類每一處差異。Boom Zoo 標題目前差
-  43.48%（`--width 256`），調色盤數值兩邊相同、差異在落點。完成條件：至少一款卡帶的
-  靜止畫面差異能逐項標成 renderer 缺陷、oracle 侷限或硬體 unknown。
+- [ ] **Boom Zoo 標題各圖層的垂直落點**：logo 那一塊本專案比 Bcan 低 6 條，版權文字列
+  高 7 條，整張圖平移掃描的最佳位移是 0，所以是不同圖層各差幾條，不是整體偏移。
+  兩邊都已靜止，排除動畫相位。完成條件：定位到是哪個 scroll／window／sprite 欄位，
+  或證明是 oracle 侷限。見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。
+- [ ] **`tilePixel` region 2（2bpp）的位元次序沒有 oracle 證據**。region 1 已由 Bcan
+  截圖定案為高半位元組先出；region 2 目前維持低位優先，只是沿用而非量到。完成條件：
+  找到實際使用 2bpp tile 的畫面並與 Bcan 同狀態對照。
+- [ ] 在靜止畫面上完成與 Bcan 的逐像素差分並分類每一處差異。目前已能逐位元組相符的
+  是 Boom Zoo 標題的版權文字列與 Sango Fighter 開場旁白的一整行。完成條件：至少一款
+  卡帶的靜止畫面**整張**差異都能逐項標成 renderer 缺陷、oracle 侷限或硬體 unknown。
 - [ ] Sango Fighter 的 ROZ 文字位置：目前只有「取樣到的狀態文字在畫面外」這個觀察，
   沒有證據說算錯。要定案需要 oracle 同一瞬間的 ROZ 暫存器，也就是先解出 Bcan
   `ACANRTS` 的 payload 版面。

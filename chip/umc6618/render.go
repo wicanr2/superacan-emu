@@ -61,9 +61,9 @@ func (d *Device) tilePixel(region, tile, x, y int) uint8 {
 	case 1:
 		value := d.ReadVRAM8(uint32(tile*32 + y*4 + x/2))
 		if x&1 != 0 {
-			return value >> 4
+			return value & 0x0f
 		}
-		return value & 0x0f
+		return value >> 4
 	default:
 		value := d.ReadVRAM8(uint32(tile*16 + y*2 + x/4))
 		return value >> uint((x&3)*2) & 3

@@ -70,9 +70,13 @@ func TestTilePixelPackedModes(t *testing.T) {
 	if got := device.tilePixel(0, 0, 0, 0); got != 0xe4 {
 		t.Fatalf("8bpp pixel=$%02X", got)
 	}
-	if low, high := device.tilePixel(1, 0, 0, 0), device.tilePixel(1, 0, 1, 0); low != 4 || high != 0x0e {
-		t.Fatalf("4bpp pixels=$%X,$%X", low, high)
+	// 4bpp 是高半位元組先出：偶數 x 取 bits 7-4。證據是 Bcan 0.0.8b 的 Boom Zoo
+	// 標題截圖，版權文字那一列在此次序下與本專案逐位元組相同，反過來則每一對
+	// 相鄰欄互換（docs/bcan-oracle-diff.md，confirmed-Bcan）。
+	if even, odd := device.tilePixel(1, 0, 0, 0), device.tilePixel(1, 0, 1, 0); even != 0x0e || odd != 4 {
+		t.Fatalf("4bpp pixels=$%X,$%X", even, odd)
 	}
+	// 2bpp 的位元次序沒有同級證據，先釘住現況（低位優先），見 WORKLIST。
 	for x, want := range []uint8{0, 1, 2, 3} {
 		if got := device.tilePixel(2, 0, x, 0); got != want {
 			t.Fatalf("2bpp x=%d pixel=%d want=%d", x, got, want)

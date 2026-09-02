@@ -23,11 +23,14 @@
 - 三款 ROM 均在 Xvfb 由 Ebitengine 正常執行 1200 frames，指令數與 framebuffer
   SHA-256 和 headless machine core 基準完全一致：
 
-  | ROM | 68000 指令 | framebuffer SHA-256 |
-  |---|---:|---|
-  | Speedy Dragon | 18,515,145 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
-  | Formosa Duel | 19,272,069 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
-  | Boom Zoo | 17,370,088 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
+  | ROM | 68000 指令 |
+  |---|---:|
+  | Speedy Dragon | 18,515,145 |
+  | Formosa Duel | 19,272,069 |
+  | Boom Zoo | 17,370,088 |
+
+  framebuffer SHA-256 的值只記在
+  [`verify-ui.md` 的卡帶基準（C10）](verify-ui.md#卡帶基準c10)。
 
 - 三張 PNG 分別可辨識道路角色、標題／START 與房間場景，不再是早期 88-frame 的
   錯誤重複圖樣。

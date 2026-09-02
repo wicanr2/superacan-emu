@@ -1,17 +1,27 @@
 # Bcan 畫面 oracle 差分
 
-更新日期：2026-09-01
+更新日期：2026-09-02
 
 Bcan 0.0.8b 是目前唯一能直接輸出 UM6618 顯示孔徑原生像素的第三方實作，證據等級
 `confirmed-Bcan`，高於 archived C++ 與 MAME-derived。本文記錄如何重現這條對照管線、
-它能證明與不能證明什麼，以及第一輪的差分結果。
+它能證明與不能證明什麼，以及兩輪的差分結果。
 
 ## 為什麼比截圖對拍更嚴格
 
 Bcan 的截圖直接取自顯示孔徑（二進位字串：「The screenshot aperture is not a valid
 UM6618 display mode」「The screenshot framebuffer is shorter than 320x240」），輸出固定
-320×240 PNG，不含濾鏡、整數縮放與 4:3 修正。本專案 `acan-headless --screenshot-dir`
-輸出的也是同一顆晶片的合成結果，因此兩邊可以逐像素比較，不需要縮放或色彩空間轉換。
+320×240 PNG，不含濾鏡與 4:3 修正。本專案 `acan-headless --screenshot-dir` 輸出的也是
+同一顆晶片的合成結果，因此兩邊可以逐像素比較，不需要色彩空間轉換。
+
+唯一要先還原的是水平方向：**孔徑固定 320 欄，但 UM6618 在 256 模式下只輸出 256 欄，
+Bcan 用最近鄰把它撐滿孔徑**。實測 Boom Zoo 標題（`video_flags=$9ACC`，bit 8 = 0）的
+截圖，第 *x* 欄與第 *x*+1 欄在每一個 *x* ≡ 0 (mod 5) 都完全相同，正好是
+`dst = floor(src × 320 / 256)` 的複製樣式；同一批工具下 Sango Fighter 開場
+（`video_flags=$03C8`，bit 8 = 1，320 模式）的截圖沒有任何一對相鄰欄相同。
+
+`acan-imgdiff --reference-unstretch 256` 取 `src = ceil(dst × 320 / 256)` 把那一欄丟掉，
+還原成 256 欄再比；右側 64 欄補黑，與本專案 256 模式的輸出同框。沒有還原就在比兩張
+幾何不同的圖，量到的差異幾乎全是這個縮放，看不到 renderer 本身的問題。
 
 ## 重現方式
 
@@ -34,11 +44,16 @@ docker run --rm --network none --memory 6g --cpus 4 --pids-limit 1024 \
 
 ```sh
 go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 … \
-    --rom "…/Boom Zoo (Taiwan).bin" --frames 1690 \
-    --screenshot-dir out/boomzoo --screenshot-every 2
-go run ./cmd/acan-imgdiff --reference snap/shot-02.png \
-    --candidate-dir out/boomzoo --width 256 --top 3 --diff diff.png
+    --rom "…/Boom Zoo (Taiwan).bin" --frames 4000 \
+    --screenshot-dir out/boomzoo --screenshot-every 4
+go run ./cmd/acan-imgdiff --reference snap/shot-10.png \
+    --reference-unstretch 256 --width 256 \
+    --candidate-dir out/boomzoo --top 3 --diff diff.png \
+    --reference-out unstretched.png
 ```
+
+`--reference-out` 會寫出還原後的參考圖，用來做並排圖；`--reference-unstretch`
+在 320 模式的畫面不要加。
 
 ### 執行環境的實測限制
 
@@ -52,11 +67,11 @@ go run ./cmd/acan-imgdiff --reference snap/shot-02.png \
 
 ## 兩端可比與不可比的部分
 
-`--width` 存在的理由：UM6618 在 256 模式（video flags bit 8 = 0）下顯示孔徑只有 256
-欄，本專案把右側 64 欄輸出為黑；Bcan 的截圖仍填滿 320 欄。實測 Boom Zoo frame 600
-（`video_flags=$9A8A`，bit 8 = 0）時，兩邊差異的 6,119 個像素落在 `x ≥ 256`。這是兩邊
-孔徑處理不同，不是任一方的圖層錯誤，因此 256 模式的比較一律加 `--width 256`。
-右側 64 欄的硬體真相仍是 `unknown`，不得依 Bcan 截圖改寫本專案 renderer。
+256 模式的比較一律是 `--reference-unstretch 256 --width 256`：前者還原 Bcan 的
+水平放大，後者把右側 64 欄排除在統計外。本專案在 256 模式把右側 64 欄輸出為黑，
+Bcan 撐滿；右側 64 欄的硬體真相仍是 `unknown`，不得依 Bcan 截圖改寫本專案 renderer。
+
+垂直方向沒有這個問題：兩邊都是 240 條，不需要還原。
 
 ## 第一輪結果：5 位元調色盤展開
 
@@ -75,22 +90,52 @@ Bcan 的值等於 `v<<3 | v>>2`，也就是把高 3 位複製到低位，使 `$1
 ROM 的回歸測試。證據等級 `confirmed-Bcan` + `MAME-derived`，尚未有實機量測。
 
 修正後 Boom Zoo 開場同一張 oracle 截圖的差異由 42.51%／平均誤差 13.09 降到
-15.03%／10.54（`--width 256`）；另一張降到 6.84%。剩餘差異主要是動畫相位不同
-（Bcan 在容器內遠低於 60 Hz，取樣時刻對不上硬體 frame），不是已證實的 renderer 缺陷。
+15.03%／10.54，另一張降到 6.84%。這組數字量於只加 `--width 256`、還沒還原 Bcan
+水平放大的時候，不能與下一節的百分比並列；它證明的是「同一條件下修正讓差異變小」，
+不是絕對的相符程度。開場動畫的相位本來就對不上（Bcan 在容器內遠低於 60 Hz），
+所以這一輪只能靠色彩定案，不靠落點。
 
 ### 受影響的既有基準
 
-1200-frame framebuffer SHA-256 全部因此改變，指令數不變（機器行為未動）：
+1200-frame framebuffer SHA-256 全部因此改變，指令數不變（機器行為未動）。現行值見
+[`verify-ui.md` 的卡帶基準（C10）](verify-ui.md#卡帶基準c10)。
 
-| ROM | 68000 指令 | framebuffer SHA-256 |
-|---|---:|---|
-| Speedy Dragon | 18,515,145 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
-| Formosa Duel | 19,272,069 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
-| Boom Zoo | 17,370,088 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
+## 第二輪結果：4bpp 的半位元組次序
 
-## 目前擋住嚴格差分的是 CPU 不是 renderer
+68000 走得到標題畫面之後，靜止的標題選單就能當逐像素基準——它停在原地等輸入，
+沒有相位問題。Boom Zoo 標題的版權文字列在此暴露出一個系統性缺陷：字形位置正確，
+但每一對相鄰欄互換，字母因此裂成一格一格的直條。
 
-最適合逐像素定案的畫面是靜止不動的標題選單，它會停在原地等輸入，沒有相位問題。
-本專案的 68000 在 Boom Zoo 第 1,695 個 frame（第 24,181,668 條指令、PC `$007D2E`）
-遇到未實作的 opcode `$D06A`（`ADD.W (d16,A2),D0`）依約定停止，因此還走不到標題畫面。
-在補上該路徑之前，只能拿開場動畫做對照，而開場的相位差會蓋掉小的 renderer 差異。
+`tilePixel` 的 region 1（4bpp packed，一個位元組兩個像素）原本讓偶數 *x* 取低半
+位元組。改成偶數 *x* 取高半位元組之後，Bcan 第 215–222 條與本專案第 208–215 條
+（同一段 56 欄）**逐位元組相同**；改回去則每一對相鄰欄互換。整張標題的差異由
+27.83% 降到 25.48%（`--reference-unstretch 256 --width 256`）。
+
+第二款：Sango Fighter 開場旁白（320 模式，不需還原）。把畫面下緣 320×44 的文字帶
+單獨比對，同一頁旁白的差異由 16.78% 降到 8.68%，其中**第 206–225 條（20 條掃描線
+乘 320 欄）逐位元組相同**——那是已經打完字的一整行。剩下的差異只有兩處：最上面一行
+被捲動切掉一半，最下面一行兩邊打字進度不同。
+
+證據等級 `confirmed-Bcan`。兩款遊戲一款走 256 模式的 tilemap、一款走 320 模式，
+結論一致。`chip/umc6618` 的 `TestTilePixelPackedModes` 釘住這個次序。
+
+region 2（2bpp，一個位元組四個像素）沒有同級證據。目前維持低位優先，
+列在 `WORKLIST` 待驗。
+
+## 仍未解釋的差異
+
+- **Boom Zoo 標題的元素垂直落點**：logo 那一塊在 Bcan 從第 27 條開始，本專案從第 33
+  條；版權文字列反過來，Bcan 在第 215 條、本專案在第 208 條。整張圖做垂直平移掃描
+  時最佳位移是 0，所以不是整體偏移，而是不同圖層各自差幾條。Bcan 六張間隔 4 秒的
+  標題截圖彼此只差 1–6%，本專案第 3200–3800 個 frame 的落點也不動，兩邊都已靜止，
+  因此不是動畫相位。
+- **Monopoly 的標題背景持續斜向捲動**，沒有任何一個 frame 對得上取樣時刻，
+  這款不適合當逐像素 oracle。
+
+## 已被推翻的斷言
+
+| 原斷言 | 現況 |
+|---|---|
+| Bcan 的 320×240 截圖是原生像素，兩邊可直接逐像素比 | 只有 320 模式成立；256 模式是最近鄰撐滿孔徑，要先 `--reference-unstretch 256` |
+| 256 模式兩邊的差異全部落在 `x ≥ 256` | 只在畫面內容近乎平坦時成立；有細節的畫面，撐滿造成的差異遍佈整行 |
+| 68000 走不到 Boom Zoo 標題畫面 | `$D06A` 之後的路徑已補上，標題可達 |

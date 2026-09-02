@@ -1,5 +1,41 @@
 # 工作歷程
 
+## 2026-09-02：Bcan 對拍找到 4bpp 半位元組次序反了
+
+- **Bcan 的截圖在 256 模式不是原生像素。** 孔徑固定 320 欄，UM6618 在 bit 8 = 0 時
+  只輸出 256 欄，Bcan 用最近鄰撐滿。量法：數相鄰欄完全相同的對數——Boom Zoo 標題
+  （`video_flags=$9ACC`）在每個 *x* ≡ 0 (mod 5) 都成立，Sango Fighter 開場
+  （`$03C8`，320 模式）一對都沒有。`acan-imgdiff` 新增 `--reference-unstretch`
+  還原它，另加 `--reference-out` 輸出還原後的參考圖。
+  沒還原之前是在比兩張幾何不同的圖，量到的差異幾乎全是縮放。
+- **`tilePixel` 的 region 1（4bpp packed）偶數 *x* 取錯半位元組。** 症狀是字形位置
+  正確但每一對相鄰欄互換，字母裂成直條——README 截圖看起來會抖就是這個。
+  改成偶數 *x* 取高半位元組後，Boom Zoo 標題版權文字列（Bcan 第 215–222 條 vs
+  本專案第 208–215 條，56 欄）逐位元組相同；Sango Fighter 開場旁白的文字帶
+  第 206–225 條（20 條掃描線 × 320 欄）也逐位元組相同，差異 16.78% → 8.68%。
+  兩款一款 256 模式、一款 320 模式。`TestTilePixelPackedModes` 釘住次序。
+- **診斷順序的教訓**：一開始把「圖形爛掉」歸給最近改過的 sprite 縮放，
+  但把兩邊同一列印成字元圖之後，錯誤形狀是「相鄰欄兩兩互換」，與縮放無關。
+  形狀先看清楚再猜成因，比先猜再驗便宜。
+- 受影響基準：九款 1200-frame framebuffer SHA-256 除 Super Dragon Force 外全部改變，
+  68000 指令數一個位元都沒動。3600-frame 的非黑像素只有兩款變
+  （Journey to the Laugh 72,298 → 66,897、Super Taiwanese Baseball League
+  62,674 → 62,129）。
+- **雜湊原本抄在五個檔案裡**（`verify-ui.md`、`verify-rom-matrix.md`、
+  `x11-frontend.md`、`ebitengine-frontend.md`、`bcan-oracle-diff.md`），其中三份
+  在這次之前就已經過期（`x11-frontend.md` 與 `verify-rom-matrix.md` 對同一次
+  1200-frame 執行給出不同的 Speedy Dragon 雜湊）。現在只有
+  `verify-ui.md` 的卡帶基準（C10）保存值，其他四份改成指標。
+- 前端等價性以新 renderer 重測：Boom Zoo 與 Sango Fighter 在 Xvfb 下由 `acan-x11`
+  跑 1200 frame，指令數與 framebuffer SHA-256 與 headless 相同，`--screenshot` 的
+  PNG 逐位元組相同。
+- 未解：Boom Zoo 標題各圖層的垂直落點（logo 低 6 條、版權文字高 7 條，整張平移的
+  最佳位移是 0，兩邊都已靜止）。region 2（2bpp）的位元次序沒有同級證據，維持現況。
+  兩項都進 `WORKLIST` D。
+- 重建：AppImage（`5a6b51cc…`）、macOS universal `.app`、Android AAR／APK
+  都以修正後的 renderer 重出；README 的五張畫面由新的 AppImage 重新產生，
+  重現命令寫進 `docs/verify-rom-matrix.md`。
+
 ## 2026-09-02：FRC 週期公式改為 Bcan 版，window 1 致能位元修正
 
 - `chip/frc` 依 Bcan 反編譯改寫（知識庫 `../acan/docs/memory-map.md` §2.2）：

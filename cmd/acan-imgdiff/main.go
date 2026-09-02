@@ -32,6 +32,8 @@ func main() {
 	diffOut := flag.String("diff", "", "write a difference mask PNG for the best candidate")
 	listDifferences := flag.Int("list-differences", 0, "print this many differing pixels of the best candidate as reference/candidate RGB pairs")
 	activeWidth := flag.Int("width", 0, "compare only the leftmost N columns; 0 compares the full image")
+	referenceOut := flag.String("reference-out", "", "write the reference after --reference-unstretch, for side-by-side figures")
+	unstretch := flag.Int("reference-unstretch", 0, "undo the oracle's nearest-neighbour horizontal upscale back to this native width (Bcan writes 256-column output stretched to 320)")
 	flag.Parse()
 
 	if *reference == "" || (*candidate == "" && *candidateDir == "") {
@@ -39,6 +41,12 @@ func main() {
 	}
 
 	referenceImage := loadPNG(*reference)
+	if *unstretch > 0 {
+		referenceImage = unstretchColumns(referenceImage, *unstretch)
+	}
+	if *referenceOut != "" {
+		writePNG(*referenceOut, referenceImage)
+	}
 	var names []string
 	if *candidate != "" {
 		names = append(names, *candidate)
@@ -78,10 +86,10 @@ func main() {
 	}
 
 	if *listDifferences > 0 {
-		printDifferences(referenceImage, loadPNG(results[0].name), *listDifferences)
+		printDifferences(referenceImage, loadPNG(results[0].name), *listDifferences, *activeWidth)
 	}
 	if *diffOut != "" {
-		writeDiff(*diffOut, referenceImage, loadPNG(results[0].name))
+		writeDiff(*diffOut, referenceImage, loadPNG(results[0].name), *activeWidth)
 	}
 }
 
@@ -132,11 +140,12 @@ func absDifference(a, b int) int {
 }
 
 // writeDiff 輸出差異遮罩：相同像素轉灰階並壓暗，不同像素塗紅，方便肉眼定位區塊。
-func writeDiff(name string, reference, candidate image.Image) {
+func writeDiff(name string, reference, candidate image.Image, activeWidth int) {
 	bounds := reference.Bounds()
+	maxX := activeLimit(bounds, activeWidth)
 	out := image.NewRGBA(bounds)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+		for x := bounds.Min.X; x < maxX; x++ {
 			r0, g0, b0 := channels(reference.At(x, y))
 			r1, g1, b1 := channels(candidate.At(x, y))
 			if r0 != r1 || g0 != g1 || b0 != b1 {
@@ -147,26 +156,31 @@ func writeDiff(name string, reference, candidate image.Image) {
 			out.Set(x, y, color.RGBA{R: grey, G: grey, B: grey, A: 255})
 		}
 	}
+	writePNG(name, out)
+}
+
+func writePNG(name string, img image.Image) {
 	output, err := os.Create(name)
 	if err != nil {
-		fail(fmt.Sprintf("create diff: %v", err))
+		fail(fmt.Sprintf("create %s: %v", name, err))
 	}
-	if err := png.Encode(output, out); err != nil {
+	if err := png.Encode(output, img); err != nil {
 		_ = output.Close()
-		fail(fmt.Sprintf("encode diff: %v", err))
+		fail(fmt.Sprintf("encode %s: %v", name, err))
 	}
 	if err := output.Close(); err != nil {
-		fail(fmt.Sprintf("close diff: %v", err))
+		fail(fmt.Sprintf("close %s: %v", name, err))
 	}
 }
 
 // printDifferences 列出前 limit 個相異像素，供人工判讀差異形狀
 // （整片錯色、單一通道偏移、或只有邊界像素不同）。
-func printDifferences(reference, candidate image.Image, limit int) {
+func printDifferences(reference, candidate image.Image, limit, activeWidth int) {
 	bounds := reference.Bounds()
+	maxX := activeLimit(bounds, activeWidth)
 	printed := 0
 	for y := bounds.Min.Y; y < bounds.Max.Y && printed < limit; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X && printed < limit; x++ {
+		for x := bounds.Min.X; x < maxX && printed < limit; x++ {
 			r0, g0, b0 := channels(reference.At(x, y))
 			r1, g1, b1 := channels(candidate.At(x, y))
 			if r0 == r1 && g0 == g1 && b0 == b1 {
@@ -177,6 +191,44 @@ func printDifferences(reference, candidate image.Image, limit int) {
 			printed++
 		}
 	}
+}
+
+// activeLimit 回傳實際要走訪的右界，與 compare 用同一條規則。
+func activeLimit(bounds image.Rectangle, activeWidth int) int {
+	if activeWidth > 0 && bounds.Min.X+activeWidth < bounds.Max.X {
+		return bounds.Min.X + activeWidth
+	}
+	return bounds.Max.X
+}
+
+// unstretchColumns 還原 oracle 的最近鄰水平放大。Bcan 0.0.8b 的截圖固定 320 欄，
+// 但 UM6618 在 256 模式（video flags bit 8 = 0）只輸出 256 欄，Bcan 是把 256 欄
+// 以 dst = floor(src * 320 / 256) 直接複製欄位填滿孔徑，因此每 5 欄就有一對相同。
+// 還原時取 src = ceil(dst * W / native)，即每組 5 欄中丟掉重複的那一欄；
+// 右側補黑，維持與本專案 320 欄輸出（256 模式右側輸出黑）相同的框架。
+func unstretchColumns(source image.Image, native int) image.Image {
+	bounds := source.Bounds()
+	width := bounds.Dx()
+	if native <= 0 || native >= width {
+		return source
+	}
+	out := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			out.Set(x, y, color.RGBA{A: 255})
+		}
+	}
+	for target := range native {
+		sourceX := bounds.Min.X + (target*width+native-1)/native
+		if sourceX >= bounds.Max.X {
+			sourceX = bounds.Max.X - 1
+		}
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			r, g, b := channels(source.At(sourceX, y))
+			out.Set(bounds.Min.X+target, y, color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255})
+		}
+	}
+	return out
 }
 
 func loadPNG(name string) image.Image {

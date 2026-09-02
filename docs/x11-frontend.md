@@ -30,16 +30,25 @@ Linux／BSD 桌面目標需要 cgo：`internal/glfw` 在 darwin 與 windows 走 
 八款 ROM 在 Xvfb 內以 X11 前端執行 1200 frame，68000 指令數與 framebuffer SHA-256 與
 headless 及 Ebitengine 前端三者完全相同：
 
-| ROM | 68000 指令 | framebuffer SHA-256 |
-|---|---:|---|
-| Boom Zoo | 17,369,003 | `3784f8663b1c3a869498d2e14c0b948c598d50d15cf54b6f5380c9b294155562` |
-| Formosa Duel | 19,270,779 | `0856269e7b402158e953de03d0553128d720ef64f29afc97403f93471404d587` |
-| Journey to the Laugh | 17,778,132 | `42285d489bd74a5c5fd0d66700ed7e7c8b2b83f4855612d7dec4db07c30b146e` |
-| Monopoly | 11,827,355 | `c254c50d5f85dd6ede60b82c8b2a07ca2ca8ccd41e9bfbe65a1c45299083d582` |
-| Sango Fighter | 11,634,924 | `412213dac64ec07ef8db6ee69f4a90a351880f11c3229b378647d05f559bd505` |
-| Speedy Dragon | 18,513,698 | `d3e5336af35b4c5bdac93dca6e1f3686be861564f16d69a97ef8fa947a5b7d67` |
-| Super Taiwanese Baseball League | 17,572,195 | `e28f1c411a389ecd46206d8006e1e9b54f62a75047bcb2e64b7f12763f094023` |
-| The Son of Evil | 16,727,440 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
+| ROM | 68000 指令 |
+|---|---:|
+| Boom Zoo | 17,369,003 |
+| Formosa Duel | 19,270,779 |
+| Journey to the Laugh | 17,778,132 |
+| Monopoly | 11,827,355 |
+| Sango Fighter | 11,634,924 |
+| Speedy Dragon | 18,513,698 |
+| Super Taiwanese Baseball League | 17,572,195 |
+| The Son of Evil | 16,727,440 |
+
+framebuffer SHA-256 的值只記在
+[`verify-ui.md` 的卡帶基準（C10）](verify-ui.md#卡帶基準c10)，這裡不再複製一份：
+雜湊綁在 renderer 現況上，抄成多份就會有幾份過期。本前端要證明的是「與 headless
+相同」，那個結論不隨 renderer 改動而失效。
+
+2026-09-02 以帶著 4bpp 半位元組次序修正的 build 重測 Boom Zoo 與 Sango Fighter：
+`instructions=17369003`／`f720c9d1…b92301` 與 `instructions=11634924`／`f5bfffa1…4f9f06`，
+與同一版 headless 的 `--screenshot` PNG 逐位元組相同。
 
 ## 尚未完成
 

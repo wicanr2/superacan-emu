@@ -36,7 +36,7 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650、UM6619 主機端讀取埠 | `$E90004/05`、`$E9000C/0D`、`$E90018/19` 為 MAME-derived，與 Bcan 讀取閂位置一致 |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
-| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 開場與 Bcan 截圖同區域已可逐像素對照；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived，靜態畫面的定案差分待 CPU 走到標題選單 |
+| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 標題的版權文字列與 Sango Fighter 開場旁白的一整行已與 Bcan 逐位元組相同（4bpp 半位元組次序因此定案）；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived；靜止畫面仍有各圖層垂直落點差幾條未解 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置；有界指令回溯、視訊暫存器 dump、存讀檔 | 九款卡帶各完成 3600 frames |
 | save state | `ACANGOS1` 格式、交易式載入、綁定 IPL 與卡帶 SHA-256 | 決定性已用 Boom Zoo 驗證；與 Bcan 的 ACANRTS 不相容 |
 | Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 八款 ROM 各 1200 frames，指令數與 framebuffer SHA-256 均吻合 headless；`CGO_ENABLED=0` 可建 js/wasm 與 windows |
