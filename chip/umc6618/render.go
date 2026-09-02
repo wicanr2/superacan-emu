@@ -126,11 +126,13 @@ func (d *Device) drawTilemap(layer, priority int, indexed []uint16, priorities [
 	if flags&1 != 0 {
 		scrollY ^= ys*8 - 1
 	}
-	mosaic := int(flags&0x001c) >> 2
-	mosaicMask := ^((1 << mosaic) - 1)
+	// mosaic 的塊大小是欄位值 + 1，塊原點是 floor(d/m)×m。Bcan 用的是
+	// `unk_140423508` 起的九張 320 項查表，第 k 張就是 floor(d/k)×k，
+	// 而欄位值 m 取的是第 m+1 張——不是 2 的冪次遮罩（docs/tilemap-format.md）。
+	mosaic := int(flags&0x001c)>>2 + 1
 	wrap := flags&0x20 != 0
 	for y := range Height {
-		realY := (y & mosaicMask) + scrollY
+		realY := y/mosaic*mosaic + scrollY
 		if !wrap && (scrollY+y < 0 || scrollY+y >= ys*8) {
 			continue
 		}
@@ -144,7 +146,7 @@ func (d *Device) drawTilemap(layer, priority int, indexed []uint16, priorities [
 			lineScroll += int(int16(d.vramWord((uint32(d.registers[baseIndex+6]) << 1) + uint32(y))))
 		}
 		for x := range Width {
-			realX := (x & mosaicMask) + lineScroll
+			realX := x/mosaic*mosaic + lineScroll
 			if !wrap && (lineScroll+x < 0 || lineScroll+x >= xs*8) {
 				continue
 			}
@@ -187,7 +189,7 @@ func (d *Device) spriteSource(entry uint16, bank uint32, region, srcX, srcY int)
 	return d.tilePixel(region, tile, px, py), int(entry >> 12)
 }
 
-func (d *Device) drawSprites(sprites []uint16, priorities, masks []uint8) {
+func (d *Device) drawSprites(sprites, backup []uint16, priorities, flags []uint8) {
 	region := 1
 	if d.registers[0x13]&1 != 0 {
 		region = 0
@@ -249,18 +251,24 @@ func (d *Device) drawSprites(sprites []uint16, priorities, masks []uint8) {
 					continue
 				}
 				offset := y*Width + x
+				// mask 模式 2／3 只寫遮罩不畫；模式 1 照畫但留下標記與備份，
+				// 由整幀後處理決定留或丟。判斷不能在這裡做——寫遮罩的 sprite
+				// 可以排在後面（docs/sprite-format.md §5）。
 				if maskMode > 1 {
-					masks[offset] = 1
+					flags[offset] |= 1
 					continue
 				}
-				if maskMode == 1 && masks[offset] == 0 {
-					continue
+				value := uint16(pixel)
+				if region != 0 {
+					value = uint16(palette*16) + uint16(pixel)
 				}
-				if region == 0 {
-					sprites[offset] = uint16(pixel)
+				if maskMode == 1 {
+					backup[offset] = sprites[offset]
+					flags[offset] |= 2
 				} else {
-					sprites[offset] = uint16(palette*16) + uint16(pixel)
+					flags[offset] &^= 2
 				}
+				sprites[offset] = value
 				priorities[offset] = priorities[offset]&0xf0 | uint8(priority)
 			}
 		}
@@ -342,17 +350,20 @@ func (d *Device) drawROZ(priority int, indexed []uint16, priorities []uint8) {
 	scrollY := uint32(d.registers[0xc4])<<16 | uint32(d.registers[0xc5])
 	coefficientA, coefficientB := int32(int16(d.registers[0xc6])), int32(int16(d.registers[0xc7]))
 	coefficientC, coefficientD := int32(int16(d.registers[0xc8])), int32(int16(d.registers[0xc9]))
+	// ROZ 與一般圖層共用同一組 mosaic 查表，兩軸都先量化到塊原點再進仿射變換。
+	mosaic := int32(mode&0x001c)>>2 + 1
 	for y := range Height {
 		lineA, lineScrollX, lineScrollY, enabled := d.rozLineParameters(y, coefficientA, scrollX, scrollY)
 		if !enabled {
 			continue
 		}
-		cx := int32(lineScrollX) + int32(y)*coefficientB
-		cy := int32(lineScrollY) + int32(y)*coefficientD
+		mosaicY := int32(y) / mosaic * mosaic
+		cx := int32(lineScrollX) + mosaicY*coefficientB
+		cy := int32(lineScrollY) + mosaicY*coefficientD
 		for x := range Width {
-			sourceX, sourceY := cx>>8, cy>>8
-			cx += lineA
-			cy += coefficientC
+			mosaicX := int32(x) / mosaic * mosaic
+			sourceX := (cx + mosaicX*lineA) >> 8
+			sourceY := (cy + mosaicX*coefficientC) >> 8
 			if !wrap && (sourceX < 0 || sourceX >= int32(xs*8) || sourceY < 0 || sourceY >= int32(ys*8)) {
 				continue
 			}
@@ -430,12 +441,14 @@ func (d *Device) RenderFrameLayers(layerMask uint8) {
 	indexed := make([]uint16, Width*Height)
 	priorities := make([]uint8, Width*Height)
 	sprites := make([]uint16, Width*Height)
-	masks := make([]uint8, Width*Height)
+	backup := make([]uint16, Width*Height)
+	blend := make([]uint16, Width*Height)
+	flags := make([]uint8, Width*Height)
 	for i := range priorities {
 		priorities[i] = 0xff
 	}
 	if layerMask&LayerSprites != 0 {
-		d.drawSprites(sprites, priorities, masks)
+		d.drawSprites(sprites, backup, priorities, flags)
 	}
 	for priority := 7; priority >= 0; priority-- {
 		for layer := range 3 {
@@ -457,9 +470,31 @@ func (d *Device) RenderFrameLayers(layerMask uint8) {
 		}
 	}
 	if layerMask&LayerSprites != 0 && d.videoFlags&8 != 0 {
+		// 整幀有沒有任何遮罩像素，決定 mask=1 的語意：有遮罩時它是「只留在
+		// 遮罩上」，完全沒有遮罩時它變成半透明混色。這個全域切換是 Bcan 的
+		// 實作事實，不是推測（docs/sprite-format.md §5）。
+		masked := false
+		for _, flag := range flags {
+			if flag&1 != 0 {
+				masked = true
+				break
+			}
+		}
 		for i, pixel := range sprites {
-			if pixel != 0 && priorities[i]&0x0f <= priorities[i]>>4 {
+			if pixel == 0 || priorities[i]&0x0f > priorities[i]>>4 {
+				continue
+			}
+			switch {
+			case flags[i]&2 == 0:
 				indexed[i] = pixel
+			case masked:
+				if flags[i]&1 != 0 {
+					indexed[i] = pixel
+				}
+			case backup[i] != 0:
+				indexed[i] = (pixel + backup[i]) & 0xff
+			default:
+				blend[i] = pixel
 			}
 		}
 	}
@@ -471,15 +506,32 @@ func (d *Device) RenderFrameLayers(layerMask uint8) {
 		for x := range Width {
 			color := uint32(0xff000000)
 			if x < width {
-				entry := d.palette[indexed[y*Width+x]&0xff]
-				r := expand5(uint32(entry & 0x1f))
-				g := expand5(uint32(entry >> 5 & 0x1f))
-				b := expand5(uint32(entry >> 10 & 0x1f))
-				color |= r<<16 | g<<8 | b
+				color |= paletteRGB(d.palette[indexed[y*Width+x]&0xff])
+				if pixel := blend[y*Width+x]; pixel != 0 {
+					color = 0xff000000 | average(color, paletteRGB(d.palette[pixel&0xff]))
+				}
 			}
 			d.framebuffer[y*Width+x] = color
 		}
 	}
+}
+
+// paletteRGB 展開一筆 xBGR555 調色盤值。
+func paletteRGB(entry uint16) uint32 {
+	r := expand5(uint32(entry & 0x1f))
+	g := expand5(uint32(entry >> 5 & 0x1f))
+	b := expand5(uint32(entry >> 10 & 0x1f))
+	return r<<16 | g<<8 | b
+}
+
+// average 逐通道取兩色平均，供 mask=1 的半透明 sprite 使用。
+func average(a, b uint32) uint32 {
+	var out uint32
+	for shift := 0; shift < 24; shift += 8 {
+		channel := ((a >> shift & 0xff) + (b >> shift & 0xff)) >> 1 & 0xff
+		out |= channel << shift
+	}
+	return out
 }
 
 // expand5 把調色盤的 5 位元分量展開成 8 位元，複製高 3 位到低位，

@@ -135,13 +135,13 @@ func TestROZBitmapModeFollowsPixelModeBit3(t *testing.T) {
 func TestSpriteScaleAndMosaicFields(t *testing.T) {
 	// 尺寸公式與 1:1 的值（hscale 5、vscale 2）量自 Bcan，見知識庫 docs/sprite-format.md。
 	for _, c := range []struct{ hscale, vscale, nw, nh, w, h int }{
-		{5, 2, 8, 8, 8, 8},    // 1:1
-		{0, 2, 8, 8, 48, 8},   // 水平放到 6 倍
-		{2, 2, 8, 8, 16, 8},   // 兩倍寬
-		{24, 2, 8, 8, 2, 8},   // 縮到 2 像素
-		{5, 0, 8, 8, 8, 24},   // vscale 0 是三倍高
-		{5, 1, 8, 8, 8, 16},   // 兩倍高
-		{5, 7, 8, 8, 8, 3},    // 壓扁
+		{5, 2, 8, 8, 8, 8},     // 1:1
+		{0, 2, 8, 8, 48, 8},    // 水平放到 6 倍
+		{2, 2, 8, 8, 16, 8},    // 兩倍寬
+		{24, 2, 8, 8, 2, 8},    // 縮到 2 像素
+		{5, 0, 8, 8, 8, 24},    // vscale 0 是三倍高
+		{5, 1, 8, 8, 8, 16},    // 兩倍高
+		{5, 7, 8, 8, 8, 3},     // 壓扁
 		{5, 2, 16, 16, 16, 16}, // 多 tile 的 1:1
 	} {
 		w, h := spriteGeometry(c.hscale, c.vscale, c.nw, c.nh)
@@ -170,7 +170,7 @@ func TestSpriteMosaicSamplesBlockOrigin(t *testing.T) {
 	for i := range priorities {
 		priorities[i] = 0xff
 	}
-	device.drawSprites(sprites, priorities, make([]uint8, Width*Height))
+	device.drawSprites(sprites, make([]uint16, Width*Height), priorities, make([]uint8, Width*Height))
 	// 塊原點是 floor(d/3)*3，不是位元遮罩；第 3、4、5 欄都要取來源第 3 欄。
 	for _, c := range []struct{ x, y, want int }{
 		{0, 0, 1}, {1, 0, 1}, {2, 0, 1},
@@ -276,5 +276,127 @@ func TestRasterAndProgrammableLineIRQs(t *testing.T) {
 	device.AdvanceM68KCycles(174)
 	if device.LinePending() {
 		t.Fatal("line-off target did not clear IRQ5")
+	}
+}
+
+// spriteMaskDevice 準備一台只有 sprite 層的裝置：tile 1 的像素值是索引 + 1、
+// tile 2 是索引 + 65，調色盤把索引原樣放進紅色分量，方便從畫面反推索引。
+func spriteMaskDevice(entries [][4]uint16) *Device {
+	device := New()
+	device.WriteRegister(0x13, 0x0001) // 8bpp
+	device.WriteRegister(0x10, 0x0400) // sprite 表在 VRAM byte $1000
+	device.WriteRegister(0x11, uint16(len(entries)-1))
+	device.videoFlags = 0x0108 // 320 寬、sprite 層開啟
+	for i := range 64 {
+		device.WriteVRAM8(uint32(64+i), uint8(i+1))
+		device.WriteVRAM8(uint32(128+i), uint8(i+65))
+	}
+	for i := range 256 {
+		device.WritePalette(uint16(i), uint16(i&0x1f)|uint16(i>>5)<<5)
+	}
+	for index, entry := range entries {
+		for word, value := range entry {
+			device.WriteVRAM16(uint32(0x1000+index*8+word*2), value)
+		}
+	}
+	return device
+}
+
+func TestSpriteMaskResolvesAfterWholeFrame(t *testing.T) {
+	// 遮罩由排在後面的 sprite 寫入，前面那個 mask=1 仍然要畫在遮罩上：
+	// 判斷若留在繪製迴圈裡，這一格會整片空白（docs/sprite-format.md §5）。
+	device := spriteMaskDevice([][4]uint16{
+		{0x4000, 1 << 8, 0x2800, 0x8001},     // mask=1，(0,0)，tile 1
+		{0x4000, 2 << 8, 0x2800 | 4, 0x8002}, // mask=2，(4,0)，只寫遮罩
+	})
+	device.RenderFrame()
+	frame := device.Framebuffer()
+	for x := range 8 {
+		want := 0xff000000 | paletteRGB(device.palette[0])
+		if x >= 4 {
+			want = 0xff000000 | paletteRGB(device.palette[x+1])
+		}
+		if frame[x] != want {
+			t.Errorf("x=%d → $%08X，預期 $%08X", x, frame[x], want)
+		}
+	}
+}
+
+func TestSpriteMaskModeOneBlendsWithoutAnyMask(t *testing.T) {
+	// 整幀沒有任何遮罩寫入者時，mask=1 轉為半透明：底下有 sprite 就加調色盤索引，
+	// 只有背景就逐通道取平均。
+	device := spriteMaskDevice([][4]uint16{
+		{0x4000, 0, 0x2800, 0x8001},           // mask=0，(0,0)，tile 1
+		{0x4000, 1 << 8, 0x2800, 0x8002},      // mask=1，(0,0)，tile 2，疊在上面
+		{0x4000 | 16, 1 << 8, 0x2800, 0x8002}, // mask=1，(0,16)，只有背景在底下
+	})
+	device.RenderFrame()
+	frame := device.Framebuffer()
+	for x := range 8 {
+		want := 0xff000000 | paletteRGB(device.palette[(x+1+x+65)&0xff])
+		if frame[x] != want {
+			t.Errorf("疊加 x=%d → $%08X，預期 $%08X", x, frame[x], want)
+		}
+		blended := 0xff000000 | average(0xff000000|paletteRGB(device.palette[0]),
+			paletteRGB(device.palette[x+65]))
+		if got := frame[16*Width+x]; got != blended {
+			t.Errorf("平均 x=%d → $%08X，預期 $%08X", x, got, blended)
+		}
+	}
+}
+
+// mosaicExpected 依查表模型算出解碼圖樣的預期像素值：塊原點是 floor(d/m)×m。
+func mosaicExpected(x, y, block int) uint16 {
+	sourceX, sourceY := x/block*block, y/block*block
+	return uint16((sourceY&7)*8 + sourceX&7 + 1)
+}
+
+func TestTilemapMosaicUsesBlockOrigin(t *testing.T) {
+	// mosaic 欄位 2 的塊大小是 3，不是 2 的冪次 4；位元遮罩實作在第 3、6 欄會取錯來源。
+	device := New()
+	device.pixelMode = 0x0002 // gfx mode 2：圖層 0 走 8bpp region
+	for i := range 64 {
+		device.WriteVRAM8(uint32(i), uint8(i+1)) // tile 0：像素值 = 索引 + 1
+	}
+	device.WriteRegister(0x80, 0x0420|(2<<2)) // 32×32、wrap、mosaic 欄位 2
+	device.WriteRegister(0x84, 0x0800)        // map base：word index $1000，內容全 0 → tile 0
+	indexed := make([]uint16, Width*Height)
+	priorities := make([]uint8, Width*Height)
+	for i := range priorities {
+		priorities[i] = 0xff
+	}
+	device.drawTilemap(0, 0, indexed, priorities)
+	for _, c := range []struct{ x, y int }{
+		{0, 0}, {2, 0}, {3, 0}, {5, 0}, {6, 0}, {8, 0}, {9, 0}, {0, 4}, {4, 4}, {7, 7},
+	} {
+		want := mosaicExpected(c.x, c.y, 3)
+		if got := indexed[c.y*Width+c.x]; got != want {
+			t.Errorf("(%d,%d) = %d，預期 %d", c.x, c.y, got, want)
+		}
+	}
+}
+
+func TestROZSharesTheSameMosaicTable(t *testing.T) {
+	device := New()
+	for i := range 64 {
+		device.WriteVRAM8(uint32(i), uint8(i+1))
+	}
+	device.WriteRegister(0xc0, 0x0423|(2<<2)) // region 3（8bpp）、32×32、wrap、mosaic 欄位 2
+	device.WriteRegister(0xc6, 0x0100)        // A：每像素 X 步進 1.0
+	device.WriteRegister(0xc9, 0x0100)        // D：每行 Y 步進 1.0
+	device.WriteRegister(0xca, 0x0800)        // map base：word index $1000
+	indexed := make([]uint16, Width*Height)
+	priorities := make([]uint8, Width*Height)
+	for i := range priorities {
+		priorities[i] = 0xff
+	}
+	device.drawROZ(0, indexed, priorities)
+	for _, c := range []struct{ x, y int }{
+		{0, 0}, {2, 0}, {3, 0}, {8, 0}, {9, 0}, {0, 2}, {0, 3}, {4, 4}, {7, 7},
+	} {
+		want := mosaicExpected(c.x, c.y, 3)
+		if got := indexed[c.y*Width+c.x]; got != want {
+			t.Errorf("(%d,%d) = %d，預期 %d", c.x, c.y, got, want)
+		}
 	}
 }

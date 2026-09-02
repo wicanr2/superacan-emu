@@ -25,12 +25,13 @@ type Device struct {
 
 func New() *Device { return &Device{} }
 
-func (d *Device) Reset()                 { *d = Device{} }
-func (d *Device) Control() uint16        { return d.control }
-func (d *Device) Frequency() uint16      { return d.frequency }
-func (d *Device) Pending() bool          { return d.pending }
-func (d *Device) Active() bool           { return d.active }
-func (d *Device) SupportedMode() bool    { return d.supported }
+func (d *Device) Reset()              { *d = Device{} }
+func (d *Device) Control() uint16     { return d.control }
+func (d *Device) Frequency() uint16   { return d.frequency }
+func (d *Device) Pending() bool       { return d.pending }
+func (d *Device) Active() bool        { return d.active }
+func (d *Device) SupportedMode() bool { return d.supported }
+
 // RemainingMasterTicks 是距離下一次觸發的主時脈 tick 數（master = 68k × 10）。
 func (d *Device) RemainingMasterTicks() int64 { return d.remaining }
 
