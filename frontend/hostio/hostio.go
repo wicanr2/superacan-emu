@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync/atomic"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
@@ -126,7 +127,12 @@ func ReadSaveState(system *machine.System, path string) error {
 // 佇列滿了就丟掉最舊的樣本：播放端的狀態不回饋到模擬器時間線。
 //
 // clip 不為 nil 時同一份重取樣輸出也交給它，播放與錄影因此不會不同步。
-func AudioSink(system *machine.System, command string, clip func([]byte)) (func(), error) {
+//
+// volume 不為 nil 時，送給播放程序的樣本依它縮放（0–100）。縮放做在送出前的
+// 那一段，不做在取樣回呼裡：回呼一秒跑四萬多次，在那裡讀設定會把介面狀態
+// 拉進模擬迴圈。錄影拿到的是未縮放的樣本——靜音是監聽控制，不該讓錄下來的
+// 檔案跟著變成無聲。
+func AudioSink(system *machine.System, command string, clip func([]byte), volume *atomic.Int32) (func(), error) {
 	stream := presentation.NewPCM16StereoStream(48000 / 5)
 	resampler := presentation.NewStereoResampler(umc6619.ClockHz, umc6619.CyclesPerSample, 48000,
 		func(left, right int16) {
@@ -167,6 +173,7 @@ func AudioSink(system *machine.System, command string, clip func([]byte)) (func(
 				if err != nil || n == 0 {
 					continue
 				}
+				scalePCM16(buffer[:n], volume)
 				if _, err := pipe.Write(buffer[:n]); err != nil {
 					_ = pipe.Close()
 					return
@@ -180,6 +187,30 @@ func AudioSink(system *machine.System, command string, clip func([]byte)) (func(
 		_ = process.Process.Kill()
 		_, _ = process.Process.Wait()
 	}, nil
+}
+
+// scalePCM16 就地縮放 16-bit little-endian 樣本。100 直接跳過，
+// 讓預設音量不付任何代價。
+func scalePCM16(buffer []byte, volume *atomic.Int32) {
+	if volume == nil {
+		return
+	}
+	percent := volume.Load()
+	if percent >= 100 {
+		return
+	}
+	if percent <= 0 {
+		for i := range buffer {
+			buffer[i] = 0
+		}
+		return
+	}
+	for i := 0; i+1 < len(buffer); i += 2 {
+		sample := int32(int16(uint16(buffer[i]) | uint16(buffer[i+1])<<8))
+		sample = sample * percent / 100
+		buffer[i] = byte(uint16(int16(sample)))
+		buffer[i+1] = byte(uint16(int16(sample)) >> 8)
+	}
 }
 
 // CaptureSink 把原始 RGBA 幀送給一個外部程序。這條路存在的理由是純 Go 沒有

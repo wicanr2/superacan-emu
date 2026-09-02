@@ -215,3 +215,120 @@ func composeHash(s *Session) string {
 	sum := sha256.Sum256(dst.Pix)
 	return hex.EncodeToString(sum[:])
 }
+
+// 熱鍵要與選單走同一條路：不開選單、只按熱鍵，存檔與讀檔的結果必須相同。
+// 這條在沒有視窗的容器裡跑完整條流程，不靠人在視窗前面按一次。
+func TestHotkeySaveAndLoadRoundTripHeadless(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 4)
+
+	s.Handle(ui.HotkeyEvent{Action: "save_state"})
+	advance(t, s, 1)
+	if s.UI.Visible() {
+		t.Fatal("熱鍵存檔不應該叫出選單")
+	}
+	path := filepath.Join(s.StateDir, SlotFileName(0))
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("熱鍵存檔之後槽 0 應該有檔案：%v", err)
+	}
+	saved := s.System.Instructions
+
+	advance(t, s, 8)
+	if s.System.Instructions == saved {
+		t.Fatal("存檔之後模擬時間應該繼續前進")
+	}
+
+	s.Handle(ui.HotkeyEvent{Action: "load_state"})
+	advance(t, s, 1)
+	if got := s.System.Instructions; got != saved {
+		t.Fatalf("熱鍵讀檔之後指令數 %d，預期退回存檔當下的 %d", got, saved)
+	}
+}
+
+// 換槽熱鍵要真的換掉存檔的目標槽，而不是只改畫面上的數字。
+func TestHotkeyNextSlotChangesTheTarget(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 2)
+
+	s.Handle(ui.HotkeyEvent{Action: "next_slot"})
+	s.Handle(ui.HotkeyEvent{Action: "next_slot"})
+	s.Handle(ui.HotkeyEvent{Action: "save_state"})
+	advance(t, s, 1)
+
+	if _, err := os.Stat(filepath.Join(s.StateDir, SlotFileName(2))); err != nil {
+		t.Fatalf("換兩次槽之後應該存進槽 2：%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(s.StateDir, SlotFileName(0))); err == nil {
+		t.Fatal("槽 0 不該有檔案")
+	}
+}
+
+// 暫停熱鍵要停住模擬時間，再按一次要恢復。
+func TestHotkeyPauseStopsEmulatedTime(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 2)
+
+	s.Handle(ui.HotkeyEvent{Action: "pause"})
+	advance(t, s, 4)
+	paused := s.System.Instructions
+	advance(t, s, 4)
+	if s.System.Instructions != paused {
+		t.Fatalf("暫停之後模擬時間前進了 %d 條指令", s.System.Instructions-paused)
+	}
+
+	s.Handle(ui.HotkeyEvent{Action: "pause"})
+	advance(t, s, 4)
+	if s.System.Instructions == paused {
+		t.Fatal("解除暫停之後模擬時間應該恢復前進")
+	}
+}
+
+// 全速熱鍵改的是主機的節奏，不是模擬器的時間線：同樣的 frame 數要得到同樣的
+// 指令數，否則「全速」就變成改變硬體行為。
+func TestHotkeyFastForwardDoesNotChangeEmulatedWork(t *testing.T) {
+	paced := newTestSession(t)
+	advance(t, paced, 12)
+
+	fast := newTestSession(t)
+	fast.Handle(ui.HotkeyEvent{Action: "fast_forward"})
+	advance(t, fast, 12)
+	if fast.Pacing() {
+		t.Fatal("全速熱鍵沒有關掉節奏")
+	}
+	if got, want := fast.System.Instructions, paced.System.Instructions; got != want {
+		t.Fatalf("全速下 %d 條指令，實時下 %d 條", got, want)
+	}
+
+	fast.Handle(ui.HotkeyEvent{Action: "fast_forward", Released: true})
+	advance(t, fast, 1)
+	if !fast.Pacing() {
+		t.Fatal("放開全速熱鍵沒有回到實時速度")
+	}
+}
+
+// 靜音是主機端的音量，不能影響模擬核心；Volume 同時要反映全速靜音的設定。
+func TestHotkeyMuteOnlyChangesHostVolume(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 2)
+	if got := s.Volume(); got != ui.DefaultConfig().Audio.MasterVolume {
+		t.Fatalf("預設音量 %d", got)
+	}
+
+	s.Handle(ui.HotkeyEvent{Action: "mute"})
+	advance(t, s, 1)
+	if got := s.Volume(); got != 0 {
+		t.Fatalf("靜音後音量 %d，預期 0", got)
+	}
+	s.Handle(ui.HotkeyEvent{Action: "mute"})
+	advance(t, s, 1)
+	if got := s.Volume(); got != ui.DefaultConfig().Audio.MasterVolume {
+		t.Fatalf("解除靜音後音量 %d", got)
+	}
+
+	// MuteOnFastFwd 預設開啟：全速時音量為 0，設定本身不變。
+	s.Handle(ui.HotkeyEvent{Action: "fast_forward"})
+	advance(t, s, 1)
+	if got := s.Volume(); got != 0 {
+		t.Fatalf("全速時音量 %d，預期依 MuteOnFastFwd 靜音", got)
+	}
+}

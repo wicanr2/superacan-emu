@@ -53,6 +53,22 @@ func ParseScript(spec string) (Script, error) {
 		name = strings.ToLower(strings.TrimSpace(name))
 		// raw<code> 送出一個原始按鍵，讓腳本也能走完「指定綁定」這條路；
 		// 前端識別字串由 Session.ScriptFrontend 決定，因為那才是綁定的歸屬。
+		// hk:<動作> 送出一個熱鍵，hkup:<動作> 是按住型放開。熱鍵的名稱表在
+		// ui.Hotkeys，這裡不另外複製一份——複製過的清單會各自過期。
+		if action, isHotkey := strings.CutPrefix(name, "hkup"); isHotkey {
+			if !knownHotkey(action) {
+				return nil, fmt.Errorf("session: script event %q: hkup 之後要接熱鍵動作名稱", name)
+			}
+			script[frame] = append(script[frame], ui.HotkeyEvent{Action: action, Released: true})
+			continue
+		}
+		if action, isHotkey := strings.CutPrefix(name, "hk"); isHotkey {
+			if !knownHotkey(action) {
+				return nil, fmt.Errorf("session: script event %q: hk 之後要接熱鍵動作名稱", name)
+			}
+			script[frame] = append(script[frame], ui.HotkeyEvent{Action: action})
+			continue
+		}
 		if code, isRaw := strings.CutPrefix(name, "raw"); isRaw {
 			value, err := strconv.ParseUint(strings.TrimPrefix(code, "0x"), 16, 32)
 			if err != nil {
@@ -70,6 +86,16 @@ func ParseScript(spec string) (Script, error) {
 	return script, nil
 }
 
+// knownHotkey 回報這是不是 ui.Hotkeys 裡的動作。
+func knownHotkey(action string) bool {
+	for _, name := range ui.Hotkeys {
+		if name == action {
+			return true
+		}
+	}
+	return false
+}
+
 // ScriptEventNames 列出所有事件名稱，供說明文字與錯誤訊息使用。
 func ScriptEventNames() string {
 	names := make([]string, 0, len(scriptEvents))
@@ -77,7 +103,7 @@ func ScriptEventNames() string {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	return strings.Join(names, ", ")
+	return strings.Join(names, ", ") + "，或 hk<動作>／hkup<動作>／raw<十六進位鍵碼>"
 }
 
 // Play 送出這個 frame 的事件。腳本裡的原始按鍵在送出前補上前端識別字串：

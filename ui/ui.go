@@ -39,6 +39,17 @@ type UI struct {
 	intents   []Intent
 	now       time.Duration
 	paused    bool
+
+	// userPaused 是使用者按暫停熱鍵造成的暫停，與「選單開著所以暫停」分開記：
+	// 兩者混成一個旗標的話，開一次選單再關掉就會把使用者的暫停吃掉。
+	userPaused bool
+	// fastForwardLock 是全速鎖定；按住型的全速鍵放開時要回到這個狀態。
+	fastForwardLock bool
+	// defaultHotkeys 是入口的出廠鍵位，只用於顯示；動作要不要生效由入口決定。
+	defaultHotkeys map[string]Binding
+	// mutedVolume 是靜音前的音量。設定檔存的是實際生效的音量，
+	// 所以「靜音前是多少」只活在這一輪。
+	mutedVolume int
 }
 
 // Mode 決定介面的常駐畫面。
@@ -220,8 +231,9 @@ func (u *UI) Close() {
 		return
 	}
 	u.stack = nil
-	u.paused = false
-	u.emit(SetPaused{Paused: false})
+	// 關掉選單回到使用者自己的暫停狀態，不是無條件恢復執行。
+	u.paused = u.userPaused
+	u.emit(SetPaused{Paused: u.userPaused})
 }
 
 func (u *UI) push(s screen) { u.stack = append(u.stack, s) }
@@ -258,6 +270,13 @@ func (u *UI) Handle(ev Event) bool {
 		u.surface = surface
 		u.metrics = MetricsFor(surface.Profile)
 		return true
+	}
+	// 熱鍵有自己的生效條件（見 Hotkey），所以放在覆蓋層可見性的判斷之前。
+	if hotkey, ok := ev.(HotkeyEvent); ok {
+		if hotkey.Released {
+			return u.HotkeyRelease(hotkey.Action)
+		}
+		return u.Hotkey(hotkey.Action)
 	}
 	if life, ok := ev.(Life); ok && life.Kind == LifeBack {
 		return u.handleBack()
@@ -327,6 +346,7 @@ func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
 	// 金手指標記畫在覆蓋層之外：一旦這個工作階段寫過 Work RAM，
 	// 不論選單開不開，畫面上都必須看得出來。
 	u.drawCheatMarker(c)
+	u.drawFPS(c, snap)
 	u.drawErrorBar(c)
 	u.drawToasts(c)
 }

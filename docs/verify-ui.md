@@ -132,6 +132,76 @@ docker/go.sh run ./cmd/acan-headless $BIOS \
 回報 `headless`。診斷的 cgo 欄位跟著建置走，README 的那張以 `ACAN_CGO=0` 產生，
 對應 Linux 與 macOS 實際發行的建置。
 
+## 熱鍵
+
+十七個動作都走 `ui.Hotkey`：介面改自己的設定、送出 Intent、留下提示，前端只把
+「這個鍵剛按下／剛放開」翻譯成動作名稱。因此熱鍵不會有一條繞過 Intent 邊界的
+捷徑，也不必在每個前端各寫一份。
+
+生效條件寫在同一個地方：覆蓋層開著時只有 `menu` 有作用（其餘動作在選單裡有自己
+的入口，兩套同時生效會讓方向鍵與 Enter 有兩種意思），等待指定綁定時全部不生效
+（否則已經被佔用的鍵永遠指定不到）。
+
+### 出廠鍵位
+
+X11 與 macOS 用同一組功能鍵。沒有列出的動作預設不綁鍵——它們要嘛只在診斷時用，
+要嘛容易誤觸，而這一層還沒有修飾鍵的概念；使用者可以在 S5.2 自己指定。
+
+| 鍵 | 動作 | 鍵 | 動作 |
+|---|---|---|---|
+| F1 | 開啟選單 | F8 | 截圖 |
+| F2 | 暫停／繼續 | F9 | 開始／停止錄影 |
+| F3 | 重設主機（軟） | F10 | 顯示／隱藏 FPS |
+| F4 | 靜音 | F11 | 全螢幕 |
+| F5 | 存檔到目前槽 | F12 | 載入卡帶 |
+| F6 | 下一個存檔槽 | Tab | 全速（按住） |
+| F7 | 從目前槽讀檔 | — | 上一個槽、全速鎖定、鎖定金手指、循環圖層遮罩 |
+
+`cmd/acan-x11` 給了 `--state` 時，F5／F7 維持舊的單檔存讀路徑，兩個槽位熱鍵讓開，
+同一個鍵不會有兩種存檔語意。
+
+### 在 headless 驗證
+
+腳本用 `hk<動作>` 送出熱鍵、`hkup<動作>` 送出按住型的放開，所以整條路在沒有視窗
+的容器裡就能跑完。2026-09-02 對 Boom Zoo 的實跑：
+
+| 腳本 | `--frames` | `video_frame` | 判讀 |
+|---|---:|---:|---|
+| （無） | 1200 | 1200 | 基準 |
+| `600:hksave_state,950:hkload_state` | 1200 | 850 | 讀檔生效：600＋(1200−950) |
+| `600:hkpause` | 1200 | 600 | 暫停停住模擬時間 |
+| `600:hkpause,900:hkpause` | 1200 | 900 | 再按一次恢復 |
+| `600:hknext_slot,601:hknext_slot,602:hksave_state` | 700 | 700 | 檔案落在 `slot2.acanstate` |
+
+三條都不開選單（輸出的 `ui_visible=false`），所以量到的是熱鍵本身而不是選單。
+
+不需要商業 ROM 的版本在測試裡：`ui` 的 `TestEveryHotkeyActionIsImplemented` 守著
+「S5.2 列得出來、按下去卻沒作用」，`TestHotkeysAreInertWhileTheOverlayIsOpen` 與
+`TestHotkeysAreInertWhileRebinding` 守著生效條件；`session` 的
+`TestHotkeySaveAndLoadRoundTripHeadless`、`TestHotkeyPauseStopsEmulatedTime` 與
+`TestHotkeyFastForwardDoesNotChangeEmulatedWork` 走完整條路，最後一條同時證明
+全速改的是主機節奏而不是模擬器的時間線：同樣的 frame 數要得到同樣的指令數。
+
+### 音量與 FPS
+
+音量不是設定畫面上的裝飾：`Session.Volume()` 是這一刻該送到主機音訊的百分比，
+`hostio.AudioSink` 依它縮放送出的樣本。縮放做在每 10 ms 送出的那一段，不做在
+一秒四萬多次的取樣回呼裡。錄影拿到的是未縮放的樣本——靜音是監聽控制，不該讓
+錄下來的檔案跟著變成無聲。全速時依 `MuteOnFastFwd` 靜音。
+
+FPS 是常駐指示不是 toast：`ui.drawFPS` 在 `Video.ShowFPS` 為真時畫在右上角，
+與金手指標記讓開。headless 沒有主機迴圈節奏，所以那裡顯示 `0.0 FPS`。
+
+### 長清單
+
+清單比畫面長是常態：熱鍵十七個動作在觸控版面（`RowHeight` 44）一頁放不下，
+金手指清單上限一千多筆。`listWindow` 算出這一次要畫哪一段並把焦點留在可視範圍
+內，S5.1、S5.2 與 S6.2 都走它，清單沒到底時右側畫 ▲▼。S1 卡帶瀏覽器本來就有
+自己的捲動。
+
+畫面雜湊看不出這件事——畫出畫面外的列根本不在畫布上，雜湊一樣穩定。這一項是
+把 PNG 存出來用眼睛看才發現的。
+
 ## 沒有卡帶時的啟動流程
 
 `cmd/acan-x11` 的 `--rom` 變成選用：給 `--rom-dir` 就從 S0 啟動畫面開始，
@@ -312,7 +382,7 @@ Esc 或 Backspace 取消、Del 刪除、Tab 換頁籤。
 | Monopoly – Adventure in Africa | 11,827,355 | 76,800 | `39ae8de2ed83c23de1750e5535f347e2c2466a353f3c5c7f3a69cf595b248f86` |
 | Sango Fighter | 11,634,924 | 50,390 | `412213dac64ec07ef8db6ee69f4a90a351880f11c3229b378647d05f559bd505` |
 | Speedy Dragon | 18,513,698 | 33,125 | `b525266ca176f01613091f059391171fada19a1b3225c4b79fa55857583f2595` |
-| Super Taiwanese Baseball League | 17,572,195 | 45,080 | `23bd031e2b487da63249d6de2b4da6c55a0ef7ce347f253f80b98309f0bb173b` |
+| Super Taiwanese Baseball League | 17,572,195 | 45,084 | `23bd031e2b487da63249d6de2b4da6c55a0ef7ce347f253f80b98309f0bb173b` |
 | The Son of Evil | 16,727,440 | 32,274 | `bbd3a45fb5d27acf8e6caef06f5c9f7d00f8743d2ad42b0bbb8baea2d23bca73` |
 | Super Dragon Force（雙部分 ZIP） | 23,988,611 | 5,066 | `b9bba41025f239508306cd4a8e6d58c632681e05b9e24c997f8695bb40e8eedf` |
 

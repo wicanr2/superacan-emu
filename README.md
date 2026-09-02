@@ -189,13 +189,31 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 - `--save-state <file>` / `--load-state <file>`：寫入／載入本專案的 `ACANEST1`
   格式；不相容 Bcan save state，跨 ROM 使用目前仍在收緊
 - 視窗模式鍵盤：方向鍵 + Z/X/A/S/Q/W = A/B/X/Y/L/R、Enter=Start、右 Shift=Select
-- P2 鍵盤：I/J/K/L、U/O/N/M、逗號/句號、右 Ctrl、左 Shift；F5 存檔、F6 切槽、F7 讀檔
+- P2 鍵盤：I/J/K/L、U/O/N/M、逗號/句號、右 Ctrl、左 Shift
 - 除錯環境變數：`ACAN_DEBUG`、`ACAN_DMA`、`ACAN_WATCH`、`ACAN_TRACE65`、
   `ACAN_DBG65`（65C02 暫存器定期 dump）、`ACAN_LAYERMASK`、
   `ACAN_DUMP=<prefix>`（見 `docs/verify-video.md`）
 
 預期：通過 UMC6650 交握與授權比對後進入卡帶，vblank IRQ 驅動遊戲主迴圈，
 畫面經 SDL2 顯示（Boom Zoo 可見標題「爆爆動物園」）。
+
+## 熱鍵
+
+X11 與 macOS 前端的出廠鍵位。十七個動作都可以在設定 → 熱鍵（S5.2）重新指定；
+沒有列出的四個動作預設不綁鍵，要自己指定。
+
+| 鍵 | 動作 | 鍵 | 動作 |
+|---|---|---|---|
+| F1 | 開啟選單 | F8 | 截圖 |
+| F2 | 暫停／繼續 | F9 | 開始／停止錄影 |
+| F3 | 重設主機（軟） | F10 | 顯示／隱藏 FPS |
+| F4 | 靜音 | F11 | 全螢幕（設定已切換，視窗層尚未套用） |
+| F5 | 存檔到目前槽 | F12 | 載入卡帶 |
+| F6 | 下一個存檔槽 | Tab | 全速（按住） |
+| F7 | 從目前槽讀檔 | | |
+
+`--state` 給了單檔存讀路徑時，F5／F7 維持舊行為，兩個槽位熱鍵讓開。
+驗證方式與 headless 的重現命令見 [`docs/verify-ui.md`](docs/verify-ui.md)。
 
 ## 文件
 

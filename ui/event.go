@@ -1,5 +1,15 @@
 package ui
 
+// HotkeyEvent 是一個熱鍵動作。前端可以自己呼叫 UI.Hotkey，也可以走這條路把
+// 熱鍵和其他輸入用同一個入口送進來——headless 腳本走的就是這一條，因此
+// 「按下熱鍵之後發生什麼」在沒有視窗的容器裡也能驗證。
+//
+// Released 為真時代表按住型熱鍵放開。
+type HotkeyEvent struct {
+	Action   string
+	Released bool
+}
+
 // Event 是前端唯一要產生的東西。前端負責把 X11 keysym、ebiten.Key 或 Android 的
 // KeyEvent 翻成這些型別，ui 不認識任何一種平台代碼。
 type Event interface{ isEvent() }
@@ -128,16 +138,17 @@ type (
 	Life struct{ Kind LifeKind }
 )
 
-func (Nav) isEvent()       {}
-func (Page) isEvent()      {}
-func (Edge) isEvent()      {}
-func (Action) isEvent()    {}
-func (Text) isEvent()      {}
-func (Edit) isEvent()      {}
-func (Pointer) isEvent()   {}
-func (LongPress) isEvent() {}
-func (Wheel) isEvent()     {}
-func (RawKey) isEvent()    {}
-func (RawPad) isEvent()    {}
-func (Surface) isEvent()   {}
-func (Life) isEvent()      {}
+func (Nav) isEvent()         {}
+func (HotkeyEvent) isEvent() {}
+func (Page) isEvent()        {}
+func (Edge) isEvent()        {}
+func (Action) isEvent()      {}
+func (Text) isEvent()        {}
+func (Edit) isEvent()        {}
+func (Pointer) isEvent()     {}
+func (LongPress) isEvent()   {}
+func (Wheel) isEvent()       {}
+func (RawKey) isEvent()      {}
+func (RawPad) isEvent()      {}
+func (Surface) isEvent()     {}
+func (Life) isEvent()        {}

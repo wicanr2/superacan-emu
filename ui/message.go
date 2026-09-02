@@ -1,6 +1,9 @@
 package ui
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Severity 決定訊息的存活時間與可否被抑制。
 type Severity uint8
@@ -92,4 +95,24 @@ func (u *UI) drawErrorBar(c *canvas) {
 	c.rowText(m.PanelPad, y, height, m.BodySize, u.theme.FocusText, u.errorText)
 	label := u.s.DismissError
 	c.rowText(c.width()-m.PanelPad-c.font.Measure(label, m.SmallSize), y, height, m.SmallSize, u.theme.FocusText, label)
+}
+
+// drawFPS 畫主機端的 frame 率。它是常駐指示不是 toast：要看的是持續的數字，
+// 會自己消失的東西沒有用。位置讓開金手指標記，兩者都在右上角。
+func (u *UI) drawFPS(c *canvas, snap Snapshot) {
+	if !u.config.Video.ShowFPS {
+		return
+	}
+	m := u.metrics
+	label := fmt.Sprintf("%.1f FPS", u.diagnostics(snap).HostFPS)
+	width := c.font.Measure(label, m.SmallSize) + m.RowPadX*2
+	y := m.Grid
+	if state := u.cheats(); state.Enabled || state.Wrote {
+		y += m.RowHeight + m.Grid
+	}
+	x := c.width() - width - m.Grid
+	c.rect(x, y, width, m.RowHeight, u.theme.PanelAlt)
+	c.border(x, y, width, m.RowHeight, u.theme.Border)
+	c.textCenter(x, y+(m.RowHeight-c.font.Height(m.SmallSize))/2, width, m.SmallSize,
+		u.theme.Text, label)
 }

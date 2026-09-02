@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
@@ -85,7 +86,7 @@ func main() {
 	}
 	playerOneKeys := bindingsFor(config, 0)
 	playerTwoKeys := bindingsFor(config, 1)
-	menuKey := hotkeyCode(config, "menu", cocoa.KeyF1)
+	hotkeys := hotkeyBindings(config)
 
 	iplBytes := must(hostio.LoadWordSwapped(*iplPath, machine.IPLSize))
 	keyBytes := must(hostio.LoadLinear(*keyPath, 16))
@@ -97,6 +98,9 @@ func main() {
 
 	stopAudio := func() {}
 	var overlay *session.Session
+	// audioVolume 由主迴圈每幀寫入、由音訊送出的那一段讀取。
+	var audioVolume atomic.Int32
+	audioVolume.Store(100)
 	attachAudio := func(system *machine.System) {
 		if *audioSink == "" {
 			return
@@ -106,7 +110,7 @@ func main() {
 			if overlay != nil {
 				overlay.PushCapturePCM(pcm)
 			}
-		})
+		}, &audioVolume)
 		if err != nil {
 			fail(fmt.Sprintf("audio sink: %v", err))
 		}
@@ -183,6 +187,7 @@ func main() {
 	overlay.ConfigPath = settingsPath
 	overlay.ScriptFrontend = frontendName
 	overlay.FrontendName = frontendName
+	overlay.UI.SetDefaultHotkeys(defaultHotkeyBindings())
 	overlay.CaptureDir = *captureDir
 	overlay.Loader = newSystem
 	overlay.Screenshot = func(frame *image.RGBA) error {
@@ -236,11 +241,19 @@ func main() {
 					Frontend: frontendName, Code: code, Label: cocoa.KeyLabel(uint16(code)),
 				})
 			}
-			input.sync(window)
+			input.sync(window, hotkeys)
 		} else {
 			window.TakeKeyPresses()
-			if input.edge(window, menuKey) {
-				overlay.Handle(ui.Action{Kind: ui.ActMenu})
+			// 熱鍵一律走 ui.Hotkey：哪些動作在什麼狀態下生效由介面決定，
+			// 前端只把「這個鍵剛按下／剛放開」翻譯成動作名稱。
+			for _, hotkey := range hotkeys {
+				down, up := input.transition(window, hotkey.code)
+				if down {
+					overlay.UI.Hotkey(hotkey.action)
+				}
+				if up {
+					overlay.UI.HotkeyRelease(hotkey.action)
+				}
 			}
 			if overlay.UI.Visible() {
 				if input.edge(window, cocoa.KeyEscape) {
@@ -252,9 +265,11 @@ func main() {
 					}
 				}
 			} else {
-				input.sync(window)
+				input.sync(window, hotkeys)
 			}
 		}
+		// 音量交給音訊執行緒讀：那一段每 10 ms 跑一次，不能在那裡讀介面狀態。
+		audioVolume.Store(int32(overlay.Volume()))
 
 		overlay.SetPad(0, padState(window, playerOneKeys))
 		overlay.SetPad(1, padState(window, playerTwoKeys))

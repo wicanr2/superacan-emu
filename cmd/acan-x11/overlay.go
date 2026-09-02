@@ -62,6 +62,15 @@ func (o *overlayInput) edge(window *x11.Window, keysym uint32) bool {
 	return now && !was
 }
 
+// transition 回報這個 keysym 的按下與放開瞬間。按住型熱鍵需要兩邊都知道，
+// 而 edge 只回報按下，兩者共用同一份 previous 才不會互相吃掉狀態。
+func (o *overlayInput) transition(window *x11.Window, keysym uint32) (down, up bool) {
+	now := window.KeysymPressed(keysym)
+	was := o.previous[keysym]
+	o.previous[keysym] = now
+	return now && !was, was && !now
+}
+
 // canvas 回傳與視窗同尺寸的合成畫布，重複使用同一張圖。
 func (o *overlayInput) canvas(width, height int) *image.RGBA {
 	if o.surface == nil || o.surface.Bounds().Dx() != width || o.surface.Bounds().Dy() != height {

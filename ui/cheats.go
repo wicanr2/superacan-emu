@@ -259,7 +259,7 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 }
 
 // cheatListScreen 是 S6.2。
-type cheatListScreen struct{ focus int }
+type cheatListScreen struct{ focus, top int }
 
 func (s *cheatListScreen) id() string { return "S6.2" }
 
@@ -335,7 +335,11 @@ func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, u.theme.TextOff, u.s.CheatEmpty)
 		return
 	}
-	for index, entry := range state.Entries {
+	listTop := y
+	first, last := listWindow(&s.top, s.focus, len(state.Entries),
+		c.height()-m.FooterBar-y, m.RowHeight)
+	for index := first; index < last; index++ {
+		entry := state.Entries[index]
 		colour := u.focusRow(c, x, y, width, index == s.focus)
 		lock := "○"
 		if entry.Locked {
@@ -349,6 +353,7 @@ func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		c.rowText(x+width*7/8, y, m.RowHeight, m.SmallSize, colour, entry.Format)
 		y += m.RowHeight
 	}
+	u.listScrollHint(c, x, listTop, width, y-listTop, first, last, len(state.Entries))
 }
 
 func (u *UI) cheats() CheatState {

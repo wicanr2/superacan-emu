@@ -8,6 +8,7 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/wicanr2/superacan-emu/chip/umc6618"
@@ -27,8 +28,17 @@ const (
 	keysymReturn = 0xff0d
 	keysymShiftR = 0xffe2
 	keysymEscape = 0xff1b
+	keysymF2     = 0xffbf
+	keysymF3     = 0xffc0
+	keysymF4     = 0xffc1
 	keysymF5     = 0xffc2
+	keysymF6     = 0xffc3
 	keysymF7     = 0xffc4
+	keysymF8     = 0xffc5
+	keysymF9     = 0xffc6
+	keysymF10    = 0xffc7
+	keysymF11    = 0xffc8
+	keysymF12    = 0xffc9
 	keysymLowerA = 0x0061
 	keysymLowerQ = 0x0071
 	keysymLowerS = 0x0073
@@ -114,7 +124,13 @@ func main() {
 	}
 	playerOneKeys := bindingsFor(config, 0)
 	playerTwoKeys := bindingsFor(config, 1)
-	menuKeysym := hotkeyKeysym(config, "menu", keysymF1)
+	// --state 是覆蓋層之前就有的單檔存讀路徑，仍然佔用 F5／F7。給了它就把
+	// 兩個槽位熱鍵讓開，同一個鍵不會有兩種存檔語意。
+	var skipHotkeys []string
+	if *statePath != "" {
+		skipHotkeys = []string{"save_state", "load_state"}
+	}
+	hotkeys := hotkeyBindings(config, skipHotkeys...)
 
 	// 韌體只讀一次；換卡帶時整台機器重建，但韌體位元組沿用同一份。
 	iplBytes := must(hostio.LoadWordSwapped(*iplPath, machine.IPLSize))
@@ -127,6 +143,9 @@ func main() {
 
 	stopAudio := func() {}
 	var overlayRef *session.Session
+	// audioVolume 由主迴圈每幀寫入、由音訊送出的那一段讀取。
+	var audioVolume atomic.Int32
+	audioVolume.Store(100)
 	attachAudio := func(system *machine.System) {
 		if *audioSink == "" {
 			return
@@ -136,7 +155,7 @@ func main() {
 			if overlayRef != nil {
 				overlayRef.PushCapturePCM(pcm)
 			}
-		})
+		}, &audioVolume)
 		if err != nil {
 			fail(fmt.Sprintf("audio sink: %v", err))
 		}
@@ -221,6 +240,7 @@ func main() {
 	overlay.ConfigPath = settingsPath
 	overlay.CaptureDir = *captureDir
 	overlay.FrontendName = frontendName
+	overlay.UI.SetDefaultHotkeys(defaultHotkeyBindings())
 	if *captureSink != "" {
 		sink, stopSink, sinkErr := hostio.CaptureSink(*captureSink)
 		if sinkErr != nil {
@@ -281,11 +301,21 @@ func main() {
 				input.edge(window, key.keysym)
 			}
 			input.edge(window, keysymEscape)
-			input.edge(window, menuKeysym)
+			for _, hotkey := range hotkeys {
+				input.transition(window, hotkey.keysym)
+			}
 		} else {
 			window.TakeKeyPresses()
-			if input.edge(window, menuKeysym) {
-				overlay.Handle(ui.Action{Kind: ui.ActMenu})
+			// 熱鍵一律走 ui.Hotkey：哪些動作在什麼狀態下生效由介面決定，
+			// 前端只負責把「這個鍵剛按下／剛放開」翻譯成動作名稱。
+			for _, hotkey := range hotkeys {
+				down, up := input.transition(window, hotkey.keysym)
+				if down {
+					overlay.UI.Hotkey(hotkey.action)
+				}
+				if up {
+					overlay.UI.HotkeyRelease(hotkey.action)
+				}
 			}
 		}
 		if overlay.UI.WantsRawInput() {
@@ -306,15 +336,20 @@ func main() {
 			}
 			input.edge(window, keysymEscape)
 		}
-		// 熱鍵取按下的那一瞬間，按著不放不會重複觸發。
-		if pressed := window.KeysymPressed(keysymF5); pressed && !savePressed {
-			reportStateResult("save", hostio.WriteSaveState(overlay.System, *statePath))
+		// --state 的單檔存讀：只在給了路徑時生效，鍵位是 F5／F7。
+		// 取按下的那一瞬間，按著不放不會重複觸發。
+		if *statePath != "" {
+			if pressed := window.KeysymPressed(keysymF5); pressed && !savePressed {
+				reportStateResult("save", hostio.WriteSaveState(overlay.System, *statePath))
+			}
+			savePressed = window.KeysymPressed(keysymF5)
+			if pressed := window.KeysymPressed(keysymF7); pressed && !loadPressed {
+				reportStateResult("load", hostio.ReadSaveState(overlay.System, *statePath))
+			}
+			loadPressed = window.KeysymPressed(keysymF7)
 		}
-		savePressed = window.KeysymPressed(keysymF5)
-		if pressed := window.KeysymPressed(keysymF7); pressed && !loadPressed {
-			reportStateResult("load", hostio.ReadSaveState(overlay.System, *statePath))
-		}
-		loadPressed = window.KeysymPressed(keysymF7)
+		// 音量交給音訊執行緒讀：那一段每 10 ms 跑一次，不能在那裡讀介面狀態。
+		audioVolume.Store(int32(overlay.Volume()))
 		overlay.SetPad(0, padState(window, playerOneKeys))
 		overlay.SetPad(1, padState(window, playerTwoKeys))
 		advanced, err := overlay.Advance(time.Since(started))

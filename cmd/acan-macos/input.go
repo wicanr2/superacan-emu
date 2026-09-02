@@ -30,13 +30,24 @@ func (i *inputState) edge(window *cocoa.Window, code uint32) bool {
 	return now && !was
 }
 
+// transition 回報這個鍵的按下與放開瞬間。按住型熱鍵兩邊都要知道，
+// 而 edge 只回報按下，兩者共用同一份 previous 才不會互相吃掉狀態。
+func (i *inputState) transition(window *cocoa.Window, code uint32) (down, up bool) {
+	now := window.KeysymPressed(code)
+	was := i.previous[code]
+	i.previous[code] = now
+	return now && !was, was && !now
+}
+
 // sync 在不產生事件的情況下更新邊緣狀態，否則關掉選單之後第一次按鍵會被吃掉。
-func (i *inputState) sync(window *cocoa.Window) {
+func (i *inputState) sync(window *cocoa.Window, hotkeys []hotkeyBinding) {
 	for _, key := range overlayKeys {
 		i.previous[key.code] = window.KeysymPressed(key.code)
 	}
 	i.previous[cocoa.KeyEscape] = window.KeysymPressed(cocoa.KeyEscape)
-	i.previous[cocoa.KeyF1] = window.KeysymPressed(cocoa.KeyF1)
+	for _, hotkey := range hotkeys {
+		i.previous[hotkey.code] = window.KeysymPressed(hotkey.code)
+	}
 }
 
 func padState(window *cocoa.Window, bindings []keyBinding) uint16 {

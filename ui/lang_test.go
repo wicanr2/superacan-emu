@@ -130,6 +130,8 @@ func TestNoScreenOverflowsInAnyLanguage(t *testing.T) {
 					Diagnostics: fixedDiagnostics{}, Cheats: fixedCheats{enabled: true},
 				})
 				u.Update(0)
+				// 出廠鍵位也會出現在 S5.2 的鍵位欄，用最長的鍵名壓一次版面。
+				u.SetDefaultHotkeys(longestKeyNameDefaults())
 				u.SetMode(ModeShell, "停止原因")
 				u.stack = []screen{build()}
 				render(t, name+"-"+string(language), u, surface.surface)
@@ -149,4 +151,13 @@ func TestLanguageScreenRenders(t *testing.T) {
 	u.push(&languageScreen{})
 	checkHash(t, "S5.5/"+surfaceCases[0].name,
 		render(t, "S5.5/"+surfaceCases[0].name, u, surfaceCases[0].surface))
+}
+
+// longestKeyNameDefaults 用最長的鍵名填滿每一個熱鍵，讓版面測試量到最壞情況。
+func longestKeyNameDefaults() map[string]Binding {
+	defaults := make(map[string]Binding, len(Hotkeys))
+	for index, action := range Hotkeys {
+		defaults[action] = Binding{Frontend: "test", Code: uint32(index + 1), Label: "RightShift"}
+	}
+	return defaults
 }

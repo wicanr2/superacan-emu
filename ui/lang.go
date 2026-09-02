@@ -234,6 +234,11 @@ var translations = []translation{
 	{"TouchStickMode", [5]string{"Stick mode", "Mode stick", "Modo stick", "搖桿模式", "摇杆模式"}},
 	{"StageStickMode", [5]string{"stick mode is not implemented", "le mode stick n'est pas implémenté", "el modo stick no está implementado", "搖桿模式尚未實作", "摇杆模式尚未实作"}},
 	{"TouchHaptics", [5]string{"Haptics", "Retour haptique", "Vibración", "觸覺回饋", "触觉回馈"}},
+	{"HotkeyToast", [5]string{"%s: %s", "%s : %s", "%s: %s", "%s：%s", "%s：%s"}},
+	{"HotkeyResumed", [5]string{"Resumed", "Reprise", "Reanudado", "已繼續", "已继续"}},
+	{"HotkeyFastForward", [5]string{"Fast forward", "Avance rapide", "Avance rápido", "全速", "全速"}},
+	{"HotkeyMute", [5]string{"Mute", "Silence", "Silencio", "靜音", "静音"}},
+	{"HotkeySlot", [5]string{"Slot %d", "Emplacement %d", "Ranura %d", "存檔槽 %d", "存档槽 %d"}},
 	{"TouchNote", [5]string{"The overlay menu hides the virtual pad: two control schemes at once fight over the same touches.", "Le menu masque la manette virtuelle : deux schémas de contrôle se disputeraient les mêmes contacts.", "El menú oculta el mando virtual: dos esquemas de control competirían por los mismos toques.", "覆蓋選單開著時虛擬手把隱藏：兩套控制同時存在會互相搶觸點。", "覆盖选单开着时虚拟手把隐藏：两套控制同时存在会互相抢触点。"}},
 }
 

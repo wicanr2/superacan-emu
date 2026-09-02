@@ -131,6 +131,26 @@ func (s *Session) Snapshot() ui.Snapshot {
 // Paused 回報模擬時間是否停住。覆蓋層開著時一定是停住的。
 func (s *Session) Paused() bool { return s.System == nil || s.paused || s.UI.Visible() }
 
+// Pacing 回報是否依實時速度執行；false 是全速。
+func (s *Session) Pacing() bool { return s.pacing }
+
+// Volume 是這一刻應該送到主機音訊的音量百分比。全速時依 MuteOnFastFwd 靜音：
+// 全速下送出的取樣密度與實時不同，照放只會是雜訊。
+func (s *Session) Volume() int {
+	config := s.UI.Config()
+	if !s.pacing && config.Audio.MuteOnFastFwd {
+		return 0
+	}
+	switch volume := config.Audio.MasterVolume; {
+	case volume < 0:
+		return 0
+	case volume > 100:
+		return 100
+	default:
+		return volume
+	}
+}
+
 // Quitting 回報使用者是否要求離開。
 func (s *Session) Quitting() bool { return s.quit }
 

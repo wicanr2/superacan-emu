@@ -52,6 +52,62 @@ func bindingsFor(config ui.Config, player int) []keyBinding {
 	return out
 }
 
+// defaultHotkeyKeysyms 是出廠的熱鍵鍵位。沒有列在這裡的動作預設不綁鍵：
+// 它們要嘛只在診斷時用（圖層遮罩），要嘛需要一個修飾鍵才不會誤觸（上一個槽），
+// 而這一層還沒有修飾鍵的概念。使用者可以在 S5.2 自己指定。
+var defaultHotkeyKeysyms = map[string]uint32{
+	"menu":           keysymF1,
+	"pause":          keysymF2,
+	"soft_reset":     keysymF3,
+	"mute":           keysymF4,
+	"save_state":     keysymF5,
+	"next_slot":      keysymF6,
+	"load_state":     keysymF7,
+	"screenshot":     keysymF8,
+	"capture":        keysymF9,
+	"show_fps":       keysymF10,
+	"fullscreen":     keysymF11,
+	"load_cartridge": keysymF12,
+	"fast_forward":   keysymTab,
+}
+
+// defaultHotkeyBindings 是交給介面顯示的出廠鍵位。設定畫面顯示的必須是實際
+// 生效的鍵，而不是「設定檔裡有沒有寫」。
+func defaultHotkeyBindings() map[string]ui.Binding {
+	out := make(map[string]ui.Binding, len(defaultHotkeyKeysyms))
+	for action, keysym := range defaultHotkeyKeysyms {
+		out[action] = ui.Binding{Frontend: frontendName, Code: keysym, Label: keysymLabel(keysym)}
+	}
+	return out
+}
+
+// hotkeyBinding 是一個已解析到鍵碼的熱鍵動作。
+type hotkeyBinding struct {
+	action string
+	keysym uint32
+}
+
+// hotkeyBindings 依 ui.Hotkeys 的順序解析全部熱鍵。順序固定，遍歷才可重現；
+// 設定檔裡屬於別的前端的綁定不套用，那組鍵碼在 X11 底下沒有意義。
+func hotkeyBindings(config ui.Config, skip ...string) []hotkeyBinding {
+	skipped := make(map[string]bool, len(skip))
+	for _, name := range skip {
+		skipped[name] = true
+	}
+	out := make([]hotkeyBinding, 0, len(ui.Hotkeys))
+	for _, action := range ui.Hotkeys {
+		if skipped[action] {
+			continue
+		}
+		keysym := hotkeyKeysym(config, action, defaultHotkeyKeysyms[action])
+		if keysym == 0 {
+			continue
+		}
+		out = append(out, hotkeyBinding{action: action, keysym: keysym})
+	}
+	return out
+}
+
 // hotkeyKeysym 取一個熱鍵的 keysym，設定檔沒有可用的就回傳預設值。
 func hotkeyKeysym(config ui.Config, name string, fallback uint32) uint32 {
 	if binding, ok := config.Input.Hotkeys[name]; ok && binding.Usable(frontendName) {
@@ -65,7 +121,9 @@ func hotkeyKeysym(config ui.Config, name string, fallback uint32) uint32 {
 var keysymNames = map[uint32]string{
 	keysymLeft: "Left", keysymUp: "Up", keysymRight: "Right", keysymDown: "Down",
 	keysymReturn: "Enter", keysymShiftR: "RightShift", keysymEscape: "Escape",
-	keysymF1: "F1", keysymF5: "F5", keysymF7: "F7",
+	keysymF1: "F1", keysymF2: "F2", keysymF3: "F3", keysymF4: "F4",
+	keysymF5: "F5", keysymF6: "F6", keysymF7: "F7", keysymF8: "F8",
+	keysymF9: "F9", keysymF10: "F10", keysymF11: "F11", keysymF12: "F12",
 	keysymTab: "Tab", keysymBackspace: "Backspace", keysymDelete: "Delete",
 	keysymHome: "Home", keysymEnd: "End",
 }

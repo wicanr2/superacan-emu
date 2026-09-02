@@ -201,4 +201,10 @@ type Strings struct {
 	StageStickMode string
 	TouchHaptics string
 	TouchNote string
+
+	HotkeyToast string
+	HotkeyResumed string
+	HotkeyFastForward string
+	HotkeyMute string
+	HotkeySlot string
 }

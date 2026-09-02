@@ -86,6 +86,7 @@ type bindingScreen struct {
 	player  int
 	gamepad bool
 	focus   int
+	top     int
 	waiting bool
 }
 
@@ -213,8 +214,11 @@ func (b *bindingScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	c.rowText(columnKeyboard, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnKeyboard)
 	c.rowText(columnGamepad, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnGamepad)
 	y := top + m.RowHeight
+	listTop := y
+	first, last := listWindow(&b.top, b.focus, len(rows), c.height()-m.FooterBar-y, m.RowHeight)
 
-	for index, row := range rows {
+	for index := first; index < last; index++ {
+		row := rows[index]
 		colour := u.focusRow(c, x, y, width, index == b.focus)
 		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, row.label)
 
@@ -239,11 +243,13 @@ func (b *bindingScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		}
 		y += m.RowHeight
 	}
+	u.listScrollHint(c, x, listTop, width, y-listTop, first, last, len(rows))
 }
 
 // hotkeyScreen 是 S5.2 熱鍵設定。
 type hotkeyScreen struct {
 	focus   int
+	top     int
 	waiting bool
 }
 
@@ -255,7 +261,7 @@ func (h *hotkeyScreen) rows(u *UI) []bindingRow {
 	rows := make([]bindingRow, 0, len(Hotkeys))
 	for _, key := range Hotkeys {
 		rows = append(rows, bindingRow{
-			key: key, label: hotkeyLabels[key], keyboard: u.config.Input.Hotkeys[key],
+			key: key, label: hotkeyLabels[key], keyboard: u.hotkeyBinding(key),
 		})
 	}
 	return rows
@@ -327,8 +333,11 @@ func (h *hotkeyScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	c.rowText(x+m.RowPadX, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnAction)
 	c.rowText(columnKeyboard, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.ColumnKeyboard)
 	y := top + m.RowHeight
+	listTop := y
+	first, last := listWindow(&h.top, h.focus, len(rows), c.height()-m.FooterBar-y, m.RowHeight)
 
-	for index, row := range rows {
+	for index := first; index < last; index++ {
+		row := rows[index]
 		colour := u.focusRow(c, x, y, width, index == h.focus)
 		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, row.label)
 		text := bindingText(u.s, row.keyboard)
@@ -341,6 +350,7 @@ func (h *hotkeyScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		}
 		y += m.RowHeight
 	}
+	u.listScrollHint(c, x, listTop, width, y-listTop, first, last, len(rows))
 }
 
 func bindingText(strings Strings, binding Binding) string {
