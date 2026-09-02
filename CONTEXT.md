@@ -36,7 +36,7 @@ read／write、internal cycle 與 IRQ poll phase 推進整機 scheduler，確保
 | machine bus | ROM 雙視圖、IPL 雙 overlay、Work/sound RAM、SRAM、`$E90B3C`、UMC6650、UM6619 主機端讀取埠 | `$E90004/05`、`$E9000C/0D`、`$E90018/19` 為 MAME-derived，與 Bcan 讀取閂位置一致 |
 | UMC6650 | 位址／資料埠、唯讀 key、32-byte RAM 與 output registers | IPL/Bcan (a) 級 port 契約 |
 | UMC6619 | 16-channel PCM、timer、DMA、IRQ、原生樣本與 48 kHz 呈現重取樣 | 三款 ROM 有非零音訊；envelope／實機混音與削波仍未知 |
-| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | Boom Zoo 標題整個顯示區與 Bcan 逐像素相同（0 / 57,344，4bpp 半位元組次序因此定案），Sango Fighter 開場文字帶亦然；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived；顯示區為何是第 8 條起的 224 條仍是 unknown |
+| UM6618 | register／palette／128 KiB VRAM、684／728-cycle scanline、IRQ4／5／7；sprite DMA bus master；tilemap／sprite／window／ROZ framebuffer 與逐行 ROZ 表 | 四款卡帶共 19 張實際畫面與 Bcan 逐像素相同（4bpp 半位元組次序因此定案）；IRQ7 真實受理，IRQ4／5 僅合成驗證；逐行表為 MAME-derived；顯示區為何是第 8 條起的 224 條仍是 unknown；已知一處真差異是 sprite 沒有被 letterbox 切掉 |
 | headless runner | 可載入外部 IPL/key/ROM 並有界執行雙 CPU 與裝置；有界指令回溯、視訊暫存器 dump、存讀檔 | 九款卡帶各完成 3600 frames |
 | save state | `ACANGOS1` 格式、交易式載入、綁定 IPL 與卡帶 SHA-256 | 決定性已用 Boom Zoo 驗證；與 Bcan 的 ACANRTS 不相容 |
 | Ebitengine frontend | P1 鍵盤、320×240 framebuffer、48 kHz audio、frame-bound runner、PNG smoke | 八款 ROM 各 1200 frames，指令數與 framebuffer SHA-256 均吻合 headless；`CGO_ENABLED=0` 可建 js/wasm 與 windows |
@@ -108,11 +108,13 @@ framebuffer；三款亦有非零音訊資料。
 的指令數與 framebuffer SHA-256 完全一致。完整矩陣見
 [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)。
 
-像素層級的正確性已經有第一個定案：Boom Zoo 標題整個顯示區（256×224）與 Bcan 0.0.8b
-**逐像素相同**（0 / 57,344），Sango Fighter 開場旁白的文字帶（320×40）也是 0 差異。
+像素層級的正確性已經有一批定案：八款卡帶各跑一次 Bcan 0.0.8b oracle 共 96 張截圖，
+其中 **19 張有實際內容的畫面整個顯示區逐像素相同**（橫跨 Boom Zoo、Formosa Duel、
+Speedy Dragon 與 Super Taiwanese Baseball League 四款，含各自的標題與選單）。
 前提是先還原 Bcan 截圖的孔徑縮放——它把實際顯示區以最近鄰撐滿 320×240，兩個軸都要
-還原。其餘畫面仍停在「可辨識、可操作」這一級，主要卡在動畫相位對不上取樣時刻。
-管線見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。禁 cgo 政策已落地：`cmd/acan-x11` 與 `cmd/acan-macos` 都在
+還原。對不上的多半是動畫相位；目前只定位到一處真差異（Boom Zoo 開場的 sprite 沒有
+被 letterbox 切掉，88–352 個像素）。管線見
+[`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。禁 cgo 政策已落地：`cmd/acan-x11` 與 `cmd/acan-macos` 都在
 `CGO_ENABLED=0` 下建置，覆蓋層介面（P0–P8）與 `session` 的 Intent 邊界已完成。
 平行未完成的是實機音訊（目前交給外部播放程序）、macOS 實機 smoke、Android 平台層
 與發行包。尚未被遊戲覆蓋的 ISA／硬體模式保留明確證據限制。

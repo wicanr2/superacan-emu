@@ -160,9 +160,18 @@
   截圖定案為高半位元組先出；region 2 目前維持低位優先，只是沿用而非量到。完成條件：
   找到實際使用 2bpp tile 的畫面並與 Bcan 同狀態對照。
 - [x] 在靜止畫面上完成與 Bcan 的逐像素差分：Boom Zoo 標題整個顯示區 0 / 57,344。
-- [ ] 把逐像素定案擴到第二款的**整張**畫面。Sango Fighter 的開場文字帶已經是 0 差異，
-  但整張差 73%，差異在天空淡入的配色；第 2000–2200 個 frame 逐幀搜過都對不上 Bcan
-  的取樣時刻。完成條件：找到一款有靜止整屏且非捲動背景的畫面並做到 0 差異。
+- [x] 把逐像素定案擴到多款卡帶：八款各跑一次 oracle 共 96 張，27 張 0 差異，
+  扣掉單色畫面還有 19 張是實際畫面，橫跨 Boom Zoo、Formosa Duel、Speedy Dragon 與
+  Super Taiwanese Baseball League 四款。見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。
+- [ ] **Boom Zoo 開場的 sprite 沒有被 letterbox 黑條切掉**（`bz-02` 差 88 像素、
+  `bz-03` 差 352 像素，全部在第 152–159 條）。黑條上緣兩邊都在第 152 條，差的是越過
+  黑條的 sprite：Bcan 切齊，本專案畫在上面。第 0–2400 幀逐幀搜過都對不上，不是相位。
+  已排除「window 與 sprite 同優先度時誰蓋誰」——把比較從 `>=` 改成 `>` 一個像素都沒變，
+  代表該 sprite 的優先度嚴格高於 window 0（`$F001D0 = $29AF`，優先度 1）。
+  完成條件：定位到實際機制（sprite 的 mask 模式、window 對 sprite 的裁切、或 raster 分割）。
+- [ ] **Super Taiwanese Baseball League 在 4000 frame 無輸入下走到的畫面與 Bcan 不同**
+  （oracle 第 4 張之後差 50–88%）。要先確認兩邊在同一個流程位置，才知道是流程差異
+  還是 renderer 差異。
 - [ ] Sango Fighter 的 ROZ 文字位置：目前只有「取樣到的狀態文字在畫面外」這個觀察，
   沒有證據說算錯。要定案需要 oracle 同一瞬間的 ROZ 暫存器，也就是先解出 Bcan
   `ACANRTS` 的 payload 版面。
