@@ -32,9 +32,14 @@
 - 未解：Boom Zoo 標題各圖層的垂直落點（logo 低 6 條、版權文字高 7 條，整張平移的
   最佳位移是 0，兩邊都已靜止）。region 2（2bpp）的位元次序沒有同級證據，維持現況。
   兩項都進 `WORKLIST` D。
-- 重建：AppImage（`5a6b51cc…`）、macOS universal `.app`、Android AAR／APK
-  都以修正後的 renderer 重出；README 的五張畫面由新的 AppImage 重新產生，
-  重現命令寫進 `docs/verify-rom-matrix.md`。
+- 重建：AppImage、macOS universal `.app`、Android AAR／APK 都以修正後的 renderer
+  重出；README 的九張畫面（五張遊戲、四張介面）重新產生，遊戲畫面的重現命令寫進
+  `docs/verify-rom-matrix.md`。
+- 以發行的 AppImage（`29350d20…f16aae`）複驗一次：它自己產生的對拍畫面與原始碼樹
+  的數字完全相同（Boom Zoo 標題 25.48%、Sango 文字帶 8.68%，兩段逐位元組相同的
+  區塊都還在），1200-frame 的兩款雜湊與 C10 基準相同，`--screenshot` 的 PNG 與
+  headless 逐位元組相同。並排圖收在
+  `docs/screenshots/appimage/boomzoo-title-bcan-vs-appimage.png`。
 
 ## 2026-09-02：FRC 週期公式改為 Bcan 版，window 1 致能位元修正
 

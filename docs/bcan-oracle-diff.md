@@ -122,6 +122,25 @@ ROM 的回歸測試。證據等級 `confirmed-Bcan` + `MAME-derived`，尚未有
 region 2（2bpp，一個位元組四個像素）沒有同級證據。目前維持低位優先，
 列在 `WORKLIST` 待驗。
 
+### 以發行的 AppImage 複驗
+
+修正之後重打 AppImage（SHA-256 `29350d20…f16aae`），**用那個 AppImage 自己**產生
+對拍畫面，得到與原始碼樹完全相同的結果：
+
+| 檢查 | 結果 |
+|---|---|
+| Boom Zoo 1200 frame | `instructions=17369003`、`f720c9d1…b92301`，與 C10 基準相同 |
+| Sango Fighter 1200 frame | `instructions=11634924`、`f5bfffa1…4f9f06`，與 C10 基準相同 |
+| AppImage 與 headless 的 `--screenshot` PNG | 兩款都逐位元組相同 |
+| Boom Zoo 標題 vs `bz-10` | 25.48%（`--reference-unstretch 256 --width 256`）|
+| Sango 文字帶 vs `sango-06` | 8.68% |
+| Boom Zoo 版權文字列（Bcan 第 215–222 條 vs AppImage 第 208–215 條，56 欄）| 逐位元組相同 |
+| Sango 文字帶第 206–225 條（20×320）| 逐位元組相同 |
+
+並排圖：`docs/screenshots/appimage/boomzoo-title-bcan-vs-appimage.png`，左為還原後的
+Bcan、右為 AppImage。字形兩邊已經一致，看得出來的只剩整塊標題的垂直落點與球的
+旋轉相位。
+
 ## 仍未解釋的差異
 
 - **Boom Zoo 標題的元素垂直落點**：logo 那一塊在 Bcan 從第 27 條開始，本專案從第 33
