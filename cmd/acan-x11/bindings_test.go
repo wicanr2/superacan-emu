@@ -120,3 +120,37 @@ func indexOfAction(action string) int {
 	}
 	return -1
 }
+
+// 手把狀態是 active-low：按下是把位元清掉。這條擋的是「從 PadReleased 開始再 OR
+// 上按鍵位元」——那樣寫編得過、跑得動、看起來合理，但因為那些位元本來就全是 1，
+// 結果永遠是「全部放開」，鍵盤等於沒有接上。
+func TestPadStateClearsBitsForPressedKeys(t *testing.T) {
+	bindings := bindingsFor(ui.DefaultConfig(), 0)
+	if len(bindings) == 0 {
+		t.Fatal("預設鍵位是空的")
+	}
+
+	if got := padStateFor(bindings, func(uint32) bool { return false }); got != machine.PadReleased {
+		t.Fatalf("沒有按鍵時是 %#x，預期 %#x", got, machine.PadReleased)
+	}
+
+	// 只按住第一個綁定的鍵：它的位元要被清掉，其餘維持 1。
+	first := bindings[0]
+	state := padStateFor(bindings, func(keysym uint32) bool { return keysym == first.keysym })
+	if state&first.button != 0 {
+		t.Fatalf("按住之後 %#x 的位元沒有被清掉：%#x", first.button, state)
+	}
+	if state|first.button != machine.PadReleased {
+		t.Fatalf("除了被按的鍵之外還動到別的位元：%#x", state)
+	}
+
+	// 全部按住：十二個按鈕的位元都要清掉。
+	all := padStateFor(bindings, func(uint32) bool { return true })
+	var everything uint16
+	for _, binding := range bindings {
+		everything |= binding.button
+	}
+	if all != machine.PadState(everything) {
+		t.Fatalf("全部按住時是 %#x，預期 %#x", all, machine.PadState(everything))
+	}
+}

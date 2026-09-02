@@ -424,13 +424,23 @@ func main() {
 }
 
 func padState(window *x11.Window, bindings []keyBinding) uint16 {
-	state := machine.PadReleased
+	return padStateFor(bindings, window.KeysymPressed)
+}
+
+// padStateFor 把「哪些鍵正被按著」組成手把狀態。手把狀態是 active-low：按下是把
+// 位元清掉，所以先用「按下的位元」組出正常邏輯的值，最後交給 machine.PadState
+// 反相。
+//
+// 從 PadReleased 開始再 OR 上按鍵位元是不會有作用的——那些位元本來就全是 1，
+// 結果永遠是「全部放開」。
+func padStateFor(bindings []keyBinding, down func(uint32) bool) uint16 {
+	var pressed uint16
 	for _, binding := range bindings {
-		if window.KeysymPressed(binding.keysym) {
-			state |= binding.button
+		if binding.keysym != 0 && down(binding.keysym) {
+			pressed |= binding.button
 		}
 	}
-	return state
+	return machine.PadState(pressed)
 }
 
 func fail(message string) {

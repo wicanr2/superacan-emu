@@ -50,14 +50,19 @@ func (i *inputState) sync(window *cocoa.Window, hotkeys []hotkeyBinding) {
 	}
 }
 
+// padState 把「哪些鍵正被按著」組成手把狀態。手把狀態是 active-low：按下是把
+// 位元清掉，所以要先用「按下的位元」組出正常邏輯的值，最後交給
+// machine.PadState 反相。
+//
+// 從 PadReleased 開始再 OR 上按鍵位元是不會有作用的——那些位元本來就全是 1。
 func padState(window *cocoa.Window, bindings []keyBinding) uint16 {
-	state := machine.PadReleased
+	var pressed uint16
 	for _, binding := range bindings {
 		if binding.code != 0 && window.KeysymPressed(binding.code) {
-			state |= binding.button
+			pressed |= binding.button
 		}
 	}
-	return state
+	return machine.PadState(pressed)
 }
 
 func splitList(spec string) []string {
