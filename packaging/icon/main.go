@@ -1,4 +1,5 @@
-// Command icon 產生發行包用的圖示。圖示是建置產物，所以它必須能從原始碼重現，
+// Command icon 產生發行包用的圖示：副檔名是 .icns 就寫 macOS 的圖示容器，
+// 其餘寫 256×256 的 PNG（AppImage 用）。圖示是建置產物，所以它必須能從原始碼重現，
 // 而不是某次手工畫好之後就沒人知道怎麼來的檔案。
 //
 // 圖案是主機本身：一塊 4:3 的畫面，裡面是三層 tilemap 疊出來的色帶與一個 sprite。
@@ -6,11 +7,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"os"
+	"path/filepath"
 )
 
 const size = 256
@@ -58,16 +62,74 @@ func main() {
 	}
 	outline(img, screen, 2, border)
 
-	file, err := os.Create(os.Args[1])
+	var err error
+	if filepath.Ext(os.Args[1]) == ".icns" {
+		err = writeICNS(os.Args[1], img)
+	} else {
+		err = writePNG(os.Args[1], img)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "icon:", err)
 		os.Exit(1)
 	}
-	defer file.Close()
-	if err := png.Encode(file, img); err != nil {
-		fmt.Fprintln(os.Stderr, "icon:", err)
-		os.Exit(1)
+}
+
+func writePNG(path string, img *image.RGBA) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
 	}
+	defer file.Close()
+	return png.Encode(file, img)
+}
+
+// icnsEntries 是要寫進 .icns 的尺寸與它們的型別碼。全部由 256×256 的原圖以整數
+// 倍最近鄰縮放而來——圖案本來就是像素塊，插值只會把邊緣糊掉。
+var icnsEntries = []struct {
+	kind string
+	size int
+}{
+	{"ic07", 128},
+	{"ic08", 256},
+	{"ic09", 512},
+	{"ic10", 1024},
+}
+
+// writeICNS 寫出 macOS 的圖示容器。格式是「'icns' + 總長度」之後接一串
+// 「型別碼 + 長度 + 資料」，而 ic07 之後的型別碼直接吃 PNG，所以不需要
+// Apple 的工具就寫得出來。
+func writeICNS(path string, img *image.RGBA) error {
+	var body bytes.Buffer
+	for _, entry := range icnsEntries {
+		var encoded bytes.Buffer
+		if err := png.Encode(&encoded, scaleNearest(img, entry.size)); err != nil {
+			return err
+		}
+		body.WriteString(entry.kind)
+		if err := binary.Write(&body, binary.BigEndian, uint32(encoded.Len()+8)); err != nil {
+			return err
+		}
+		body.Write(encoded.Bytes())
+	}
+	var out bytes.Buffer
+	out.WriteString("icns")
+	if err := binary.Write(&out, binary.BigEndian, uint32(body.Len()+8)); err != nil {
+		return err
+	}
+	out.Write(body.Bytes())
+	return os.WriteFile(path, out.Bytes(), 0o644)
+}
+
+// scaleNearest 以最近鄰縮放到指定邊長。
+func scaleNearest(src *image.RGBA, side int) *image.RGBA {
+	dst := image.NewRGBA(image.Rect(0, 0, side, side))
+	width := src.Bounds().Dx()
+	for y := 0; y < side; y++ {
+		for x := 0; x < side; x++ {
+			dst.SetRGBA(x, y, src.RGBAAt(x*width/side, y*width/side))
+		}
+	}
+	return dst
 }
 
 func fill(img *image.RGBA, rect image.Rectangle, c color.RGBA) {

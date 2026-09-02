@@ -88,6 +88,54 @@ DISPLAY=:99 ./SuperACan-x86_64.AppImage --ipl … --key … --sound-bios1 … --
 OFL-1.1 的原文不在 bitmapfont 模組內，本專案也還沒把它取進來。在補上之前，
 這個 AppImage 只能自用與內部驗證，不可對外散布。
 
+## macOS
+
+macOS 的 `.app` 不需要 osxcross 或 cctools。本專案的 macOS 執行檔是
+`CGO_ENABLED=0` 的純 Go，Go 自己就產 Mach-O——osxcross 缺的那三樣（SDK 標頭檔、
+Mach-O 連結器、旗標 wrapper）在這裡一樣都用不到。剩下的只有兩件檔案格式操作，
+用標準庫寫比把整套 Apple 工具鏈搬進來划算：
+
+- `packaging/macho fat` 合成 universal binary。fat binary 就是一個 big-endian 的
+  header 加上幾個對齊過的切片；對齊要照架構的頁大小（arm64 是 2^14、x86_64 是
+  2^12），寫錯的話 dyld 會拒絕載入而檔案本身看起來完全正常。
+- `packaging/macho check` 做靜態驗收，見下。
+- `packaging/zipdir` 壓成 zip 並保留權限位元：`.app` 只有在
+  `Contents/MacOS` 底下那個檔案帶著執行位元時才點得開。
+
+```sh
+for arch in arm64 amd64; do
+  ACAN_GOOS=darwin ACAN_GOARCH=$arch ACAN_CGO=0 docker/go.sh build       -ldflags "-s -w" -o /src/build/acan-macos-$arch ./cmd/acan-macos/
+done
+docker/go.sh run ./packaging/icon /src/packaging/superacan-emu.icns
+packaging/macos-app.sh build/macos          # 在 superacan-package image 內
+```
+
+### 靜態驗收
+
+Linux 上執行不了 macOS 執行檔，所以「編得出來」與「跑得起來」之間這一段只能靠
+靜態檢查補。2026-09-02 的結果：
+
+| 檢查 | 結果 |
+|---|---|
+| 雙弧 | `Mach-O universal binary with 2 architectures: [arm64] [x86_64]` |
+| arm64 有 `LC_CODE_SIGNATURE` | 有（Go 的連結器自己加的 ad-hoc 簽章） |
+| 最低系統版本 | 12.0.0（與 `Info.plist` 的 `LSMinimumSystemVersion` 一致） |
+| 相依只在系統路徑 | `/usr/lib/libSystem.B.dylib`、`/usr/lib/libresolv.9.dylib` |
+
+**arm64 的簽章是硬條件**：Apple 從 arm64 開始強制簽章，沒有簽章的執行檔在 Apple
+Silicon 上會被核心直接殺掉（`Killed: 9`），而檔案格式完全正常，在 Linux 這端一點
+異狀都看不到。x86_64 沒有這個限制。
+
+**這些全過只代表不會因為結構問題開不起來**，不代表功能正常；實機驗證仍然需要一台
+Mac，步驟見 [`macos-frontend.md`](macos-frontend.md)。
+
+### 沒有簽章的 bundle
+
+`codesign` 只在 macOS 上有，所以 `_CodeSignature/CodeResources` 在 Linux 這端做不
+出來，bundle 是未簽的。未簽勝過壞簽：壞簽會被 Gatekeeper 直接拒絕，未簽只是第一次
+開啟要「右鍵 → 打開」。要對外散布必須在 Mac 上重簽並公證（notarization 一定要 Mac，
+交叉編這條路做不到）。
+
 ## 展示影片
 
 影片是用**發行的 AppImage** 錄的，不是用開發中的執行檔：跑的就是那個檔案，
