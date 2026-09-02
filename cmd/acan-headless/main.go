@@ -177,6 +177,8 @@ func main() {
 			})
 			// 存檔槽的時間戳是環境不是行為，固定它才能對合成畫面取雜湊。
 			overlay.Stamp = func(os.FileInfo) string { return "01-01 00:00" }
+			// 診斷畫面要回報這一輪是哪個入口跑的；名稱是常數，不影響雜湊的可重現性。
+			overlay.FrontendName = "headless"
 		}
 		p1, p2 := machine.PadReleased, machine.PadReleased
 		for frame := uint64(0); frame < *frames; frame++ {

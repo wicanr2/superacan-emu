@@ -543,3 +543,53 @@
 - 下一個最小行動：C 節的平台層——先做 macOS 的 purego 視窗，再做 Android。
 - Docker 清理：本輪全部 `docker run --rm`；一個逾時的 Xvfb 容器由 `docker stop`
   停掉（本輪自己建立的），沒有留下本專案容器。
+
+## 2026-09-02：macOS purego 視窗層、歷史清理與 README 介面畫面
+
+- macOS 前端不走 Ebitengine。量過才決定：`CGO_ENABLED=0 GOOS=darwin` 會停在 Metal
+  的 `view_macos`／`displaylink_macos` 與 GLFW，而這一層真正需要的只有「開視窗、
+  貼圖、收鍵盤」。`frontend/cocoa` 用 `purego/objc` 直接呼叫 Objective-C runtime：
+  `NSWindow` 開窗、每幀把畫面包成 `NSBitmapImageRep` 取 `CGImage` 設進
+  `layer.contents`、`nextEventMatchingMask:` 收鍵盤、`objc.RegisterClass` 註冊視窗代理。
+- 兩個刻意的取捨寫在 `docs/macos-frontend.md`：`NSBitmapImageRep` 不複製 plane，
+  所以前端自己留一份像素；`hasAlpha:false` 配 `bitsPerPixel:32`，第四個 byte 是填充。
+- 桌面兩個入口共用的主機端 I/O 抽成 `frontend/hostio`（載入、截圖、卡帶存檔、
+  save state、音訊與錄影 sink），全部回傳 error 不自行結束程式。`cmd/acan-x11`
+  從 542 行降到 385 行，三款卡帶 1200-frame 重跑與基準逐位元相同。
+- macOS 鍵碼用 `kVK_*` 常數並附單元測試：虛擬鍵碼描述的是實體位置不是印上去的字母，
+  照字母猜會在非 QWERTY 版面錯位。**沒有實機 smoke**，交叉編譯只證明組得起來。
+- 歷史清理：`9b0971d` 誤入的 9.3 MB Mach-O（`acan-macos`）以 `git filter-branch
+  --index-filter` 從全部 107 個 commit 移除後 force push。改寫在獨立 clone 內做，
+  主工作樹只用 `git reset --soft` 對齊，避免碰到另一個工作階段的未提交變更。
+  驗證：107 筆 commit 的作者／日期／訊息逐筆相同、HEAD 根樹雜湊一致
+  （`5d6f385c…`）、最大 blob 從 9,291,378 降到 102,410（`docs/ui-design.md`）、
+  `.git` 15 MB → 1 MB。改寫前的完整歷史留了一份 bundle。
+- README 新增介面畫面：五張 PNG 由 `cmd/acan-headless --ui-compose` 產生，
+  與桌面視窗共用同一個 `session.Compose`，所以不是另外畫的示意圖。重現命令寫進
+  `docs/verify-ui.md`。headless 的診斷畫面補上 `FrontendName = "headless"`——
+  原本那格是空的，而診斷畫面的職責就是回報事實。
+
+### 教訓：這個 repo 同時有別的工作階段在動
+
+- **`git add -A` 在共用工作樹裡不安全**，`git commit -a` 同理。要提交什麼就逐一
+  列出路徑；`git status --porcelain` 先看過，不是自己改的就不要碰。
+  `9b0971d` 就是這樣同時掃進建置產物與別人未提交的 143 行 sprite 幾何重構。
+- **別人的未提交變更被誤提交之後不要 revert。** revert 會把那份工作從樹上刪掉，
+  比錯誤的歸屬更糟。正確處置是留著、驗證輸出等價（九款卡帶 1200-frame 重跑
+  指令數與 framebuffer SHA-256 全數相同）、把事實寫下來。
+- **建置輸出寫在 repo 根目錄時，`.gitignore` 要跟著新入口一起加。** 當時只列了
+  `/acan`、`/acan-x11`、`/acan-headless`，新的 `/acan-macos` 沒人補。
+- **commit message 說「寫進 WORKLOG」就要真的寫。** `f231f0a` 的訊息這樣寫，
+  但那個 commit 只動了 `.gitignore`，紀錄到這一輪才補上。
+
+### 本輪收尾
+
+- HEAD：`5acfe63`（改寫後），與 `origin/master` 同步。
+- 驗證：`docker/go.sh vet ./cmd/... ./session/... ./ui/...` 無輸出；
+  `docker/go.sh test ./ui/ ./session/ -count=1` 全綠。介面畫面五張逐張目視檢查過。
+- 未證實：macOS 實機 smoke（步驟在 `docs/macos-frontend.md`）；Android 平台層未開始；
+  音訊輸出仍靠外部播放程序。
+- 下一個最小行動：把十六個熱鍵動作接上入口（目前只有「開啟選單」有效），
+  再進 Android 平台層。
+- Docker 清理：本輪全部 `docker run --rm`；一次 Bash 逾時中斷的 headless 執行由
+  `--rm` 自行清掉，`docker ps` 確認沒有殘留本專案容器。

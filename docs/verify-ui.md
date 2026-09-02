@@ -94,6 +94,44 @@ frame 904 讀檔之後機器退回存檔當下，再往前 296 個 frame，600�
 指令數、frame 與 framebuffer SHA-256 完全相同，`TestOverlayGatesPadInput` 證明選單
 開著時 machine 收到的是「全部放開」。
 
+## README 的介面畫面
+
+README 的介面畫面不是手動截的，是 `--ui-compose` 的輸出，因此可以重現。
+`cmd/acan-x11`、`cmd/acan-macos` 與 headless 共用同一個 `session.Compose`，
+所以這些 PNG 與桌面視窗上的像素是同一份合成結果。
+
+```sh
+export ACAN_MEDIA_DIR=…/Bcan008b/ROMS ACAN_BIOS_DIR=…/bios
+BIOS="--ipl /bios/internal_68k.bin --key /bios/umc6650.bin \
+      --sound-bios1 /bios/internal_6502_1.bin --sound-bios2 /bios/internal_6502_2.bin"
+
+# 存檔槽畫面要有東西可看，先在槽 0 存一次
+docker/go.sh run ./cmd/acan-headless $BIOS \
+    --rom "/media/Monopoly - Adventure in Africa (Taiwan).bin" --frames 3620 \
+    --ui-state-dir /gowork/states-shot \
+    --ui-script "3600:menu,3601:down,3602:confirm,3603:confirm"
+
+# ui-menu-boomzoo.png
+docker/go.sh run ./cmd/acan-headless $BIOS --rom "/media/Boom Zoo (Taiwan).bin" \
+    --frames 6010 --ui-state-dir /gowork/states-shot --ui-script "6000:menu" \
+    --ui-compose /src/build/uishots/ui-menu.png
+
+# ui-slots-monopoly.png（選單第 2 項＝讀檔）
+docker/go.sh run ./cmd/acan-headless $BIOS \
+    --rom "/media/Monopoly - Adventure in Africa (Taiwan).bin" --frames 3620 \
+    --ui-state-dir /gowork/states-shot \
+    --ui-script "3600:menu,3601:down,3602:down,3603:confirm" \
+    --ui-compose /src/build/uishots/ui-slots.png
+
+# ui-settings.png（第 5 項）、ui-diagnostics-boomzoo.png（第 6 項，ACAN_CGO=0）
+# ui-touch-monopoly.png：--ui-touch --ui-surface 1280x720，不開選單
+```
+
+兩個欄位在 headless 路徑是固定值，不是缺陷：存檔槽時間戳固定成 `01-01 00:00`
+（時間戳是環境不是介面行為，固定它 `ui_sha256` 才可比），診斷畫面的前端固定
+回報 `headless`。診斷的 cgo 欄位跟著建置走，README 的那張以 `ACAN_CGO=0` 產生，
+對應 Linux 與 macOS 實際發行的建置。
+
 ## 沒有卡帶時的啟動流程
 
 `cmd/acan-x11` 的 `--rom` 變成選用：給 `--rom-dir` 就從 S0 啟動畫面開始，

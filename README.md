@@ -60,6 +60,27 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 詳細現況以 [`CONTEXT.md`](CONTEXT.md) 為準，可執行待辦只看
 [`WORKLIST.md`](WORKLIST.md)。
 
+## 介面畫面
+
+覆蓋層畫在表面的原生解析度，再與遊戲畫面合成；`cmd/acan-x11`、`cmd/acan-macos`
+與 `cmd/acan-headless` 共用同一個 `session.Compose`，所以下列由 headless
+`--ui-compose` 在容器內產生的 PNG，就是桌面視窗上顯示的同一份合成結果。
+存檔槽的時間戳在 headless 路徑固定為佔位值，好讓合成畫面可以取雜湊比對；
+產生方式見 [`docs/verify-ui.md`](docs/verify-ui.md)。
+
+| 覆蓋選單（Boom Zoo 執行中，frame 6000） | 存檔槽（Monopoly，槽 0 已存檔並可讀取） |
+|---|---|
+| ![覆蓋選單](docs/screenshots/ui-menu-boomzoo.png) | ![存檔槽](docs/screenshots/ui-slots-monopoly.png) |
+
+| 設定 | 診斷（`CGO_ENABLED=0` 建置） |
+|---|---|
+| ![設定](docs/screenshots/ui-settings.png) | ![診斷](docs/screenshots/ui-diagnostics-boomzoo.png) |
+
+觸控版面把 4:3 畫面置中，方向鍵、四顆面鍵、L／R 與 Start／Select 分置兩側與下緣；
+1280×720 橫向、預設 60% 不透明度：
+
+![觸控版面](docs/screenshots/ui-touch-monopoly.png)
+
 ## 遊戲截圖（開發驗證用途）
 
 > 截圖為各遊戲之版權畫面，僅供模擬器開發驗證，不作其他用途。

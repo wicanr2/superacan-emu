@@ -1,6 +1,6 @@
 # Super A'Can 模擬器目前脈絡
 
-更新日期：2026-09-01
+更新日期：2026-09-02
 
 ## 專案定位
 
@@ -72,7 +72,7 @@ MAME 的核心觀念適用於本專案：模擬器原始碼同時是硬體文件
 | 輸入 | P1、P2 鍵盤與 headless 注入已接 | P1 正常路徑較完整；P2 只驗證資料路徑，未驗證完整雙人遊戲 |
 | Save state | 自訂 `ACANEST1` 格式與 CLI／熱鍵已寫入 | Boom Zoo 3000→存檔→載入→60 幀截圖相同；格式不相容 Bcan |
 | FRC IRQ3 | 依 MAME case 表實作 | MAME 自身標為 HACK，真實硬體公式未知 |
-| 平台 | Linux SDL2／headless | macOS 尚未建立可重現編譯與實機 smoke |
+| 平台 | Linux：Ebitengine／純 Go X11／headless；macOS：purego Cocoa 視窗層 | macOS 只有 `CGO_ENABLED=0` 交叉編譯與 vet，沒有實機 smoke；Android 尚未開始 |
 
 ## 已確認的重要勘誤
 
@@ -111,6 +111,7 @@ framebuffer；三款亦有非零音訊資料。
 下一個交付閘門是像素層級的正確性：以 Bcan 0.0.8b 作同畫面 oracle，逐項定位 UM6618
 圖層、優先度與調色差異，取代目前「畫面可辨識、可操作」這種只到構圖層級的證據。
 Boom Zoo 標題畫面目前與 Bcan 差 43.48%（`--width 256`），調色盤數值兩邊相同，差異在
-像素落點。管線見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。平行未完成的是禁 cgo 政策落地（純 Go 桌面呈現層）與實機音訊、
-鍵盤驗收；之後才進入 Linux 發行包與 macOS 工具鏈。尚未被遊戲覆蓋的 ISA／硬體模式
-保留明確證據限制。
+像素落點。管線見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。禁 cgo 政策已落地：`cmd/acan-x11` 與 `cmd/acan-macos` 都在
+`CGO_ENABLED=0` 下建置，覆蓋層介面（P0–P8）與 `session` 的 Intent 邊界已完成。
+平行未完成的是實機音訊（目前交給外部播放程序）、macOS 實機 smoke、Android 平台層
+與發行包。尚未被遊戲覆蓋的 ISA／硬體模式保留明確證據限制。
