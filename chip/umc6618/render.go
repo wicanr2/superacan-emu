@@ -449,7 +449,10 @@ func (d *Device) RenderFrameLayers(layerMask uint8) {
 		if layerMask&LayerWindows != 0 && d.videoFlags&2 != 0 {
 			d.drawWindow(0, priority, indexed, priorities)
 		}
-		if layerMask&LayerWindows != 0 && d.videoFlags&2 != 0 && d.registers[0xec] != 0 {
+		// window 1 的致能位元是 flags bit0，不是 window 0 的 bit1（Bcan 的每幀
+		// snapshot：+160 由 v2&2 致能、+170 由 v2&1）。本地八款都沒設過 bit0，
+		// 所以這個修正對它們無影響——但接錯位元會讓 window 0 順帶把 window 1 也畫出來。
+		if layerMask&LayerWindows != 0 && d.videoFlags&1 != 0 && d.registers[0xec] != 0 {
 			d.drawWindow(1, priority, indexed, priorities)
 		}
 	}

@@ -1,5 +1,15 @@
 # 工作歷程
 
+## 2026-09-02：FRC 週期公式改為 Bcan 版，window 1 致能位元修正
+
+- `chip/frc` 依 Bcan 反編譯改寫（知識庫 `../acan/docs/memory-map.md` §2.2）：
+  改記主時脈 tick（master = 68k × 10）、週期算 `(n+1)`、倍率 12×1024 與 12×9040。
+  原本是 MAME 衍生的 `1024×n`／`8192×n` 且以 68k cycle 計。
+- `chip/umc6618` 的 window 1 致能位元由 `videoFlags&2` 改為 `&1`。Bcan 的 snapshot
+  builder 是 `+160←v2&2`（window 0）、`+170←v2&1`（window 1）。
+- 兩項對本地九款都是 no-op：沒有遊戲用 FRC 模式 `$1`／`$F`，也沒有遊戲設 window 1 的
+  致能位元。純正確性修正。
+
 ## 2026-09-02：sprite 表的縮放與 mosaic 補上
 
 - `drawSprites()` 原本把 `word0` bit14 當致能位元、忽略 `word2` 高 5 位與 `word1`

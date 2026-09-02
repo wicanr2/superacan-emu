@@ -190,21 +190,21 @@ func TestFRCIRQ3UsesSharedTimelineAndHoldAcknowledge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = system.Bus.Write16(0xe90016, 1)
+	_ = system.Bus.Write16(0xe90016, 4)
 	_ = system.Bus.Write16(0xe90014, 0xa201)
-	want := int64(1024 * 1)
+	want := int64(12 * 1024 * 5) // master tick，週期算 (n+1)；取 10 的倍數以免整數除法截斷
 	if err := system.Timeline.Advance(m68k.Phase{Kind: m68k.PhaseInternal, Cycles: 4}); err != nil {
 		t.Fatal(err)
 	}
-	if system.Bus.FRC().RemainingCycles() != want-4 {
-		t.Fatalf("shared timeline remaining=%d", system.Bus.FRC().RemainingCycles())
+	if system.Bus.FRC().RemainingMasterTicks() != want-4*10 {
+		t.Fatalf("shared timeline remaining=%d", system.Bus.FRC().RemainingMasterTicks())
 	}
-	system.Bus.FRC().AdvanceM68KCycles(uint64(want - 4))
+	system.Bus.FRC().AdvanceM68KCycles(uint64(want/10 - 4))
 	if !system.Bus.FRC().Pending() || system.highestIRQLevel() != 3 {
 		t.Fatalf("pending=%v level=%d", system.Bus.FRC().Pending(), system.highestIRQLevel())
 	}
 	system.acknowledgeIRQ(3)
-	if system.Bus.FRC().Pending() || system.Bus.FRC().RemainingCycles() != want || system.IRQAcknowledgements[3] != 1 {
-		t.Fatalf("pending=%v remaining=%d ack=%d", system.Bus.FRC().Pending(), system.Bus.FRC().RemainingCycles(), system.IRQAcknowledgements[3])
+	if system.Bus.FRC().Pending() || system.Bus.FRC().RemainingMasterTicks() != want || system.IRQAcknowledgements[3] != 1 {
+		t.Fatalf("pending=%v remaining=%d ack=%d", system.Bus.FRC().Pending(), system.Bus.FRC().RemainingMasterTicks(), system.IRQAcknowledgements[3])
 	}
 }

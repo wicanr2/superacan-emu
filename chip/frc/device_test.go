@@ -4,13 +4,13 @@ import "testing"
 
 func TestModeOneRaisesLevelUntilAcknowledgeAndReschedules(t *testing.T) {
 	d := New()
-	d.WriteFrequency(2)
+	d.WriteFrequency(4)
 	d.WriteControl(0xa201)
-	want := int64(1024 * 2)
-	if !d.Active() || !d.SupportedMode() || d.RemainingCycles() != want {
+	want := mode1MasterTicks * 5 // 週期算 (n+1)；取 10 的倍數以免整數除法截斷
+	if !d.Active() || !d.SupportedMode() || d.RemainingMasterTicks() != want {
 		t.Fatalf("initial device=%+v", *d)
 	}
-	d.AdvanceM68KCycles(uint64(want))
+	d.AdvanceM68KCycles(uint64(want / masterTicksPerM68KCycle))
 	if !d.Pending() || d.Active() {
 		t.Fatalf("expired device=%+v", *d)
 	}
@@ -19,7 +19,7 @@ func TestModeOneRaisesLevelUntilAcknowledgeAndReschedules(t *testing.T) {
 		t.Fatal("pending IRQ was not level-held")
 	}
 	d.Acknowledge()
-	if d.Pending() || !d.Active() || d.RemainingCycles() != want {
+	if d.Pending() || !d.Active() || d.RemainingMasterTicks() != want {
 		t.Fatalf("acknowledged device=%+v", *d)
 	}
 }
@@ -27,13 +27,13 @@ func TestModeOneRaisesLevelUntilAcknowledgeAndReschedules(t *testing.T) {
 func TestKnownModesAndUnknownModeFailClosed(t *testing.T) {
 	d := New()
 	d.WriteControl(0xa200)
-	if d.RemainingCycles() != OneHzM68KCycles {
-		t.Fatalf("mode 0 cycles=%d", d.RemainingCycles())
+	if d.RemainingMasterTicks() != oneSecondMasterTicks {
+		t.Fatalf("mode 0 ticks=%d", d.RemainingMasterTicks())
 	}
 	d.WriteFrequency(3)
 	d.WriteControl(0xa20f)
-	if d.RemainingCycles() != 8192*3 {
-		t.Fatalf("mode F cycles=%d", d.RemainingCycles())
+	if d.RemainingMasterTicks() != modeFMasterTicks*4 {
+		t.Fatalf("mode F ticks=%d", d.RemainingMasterTicks())
 	}
 	d.WriteControl(0xa202)
 	if d.Active() || d.SupportedMode() {

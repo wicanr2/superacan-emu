@@ -1,9 +1,18 @@
-// Package frc models the Super A'Can host free-running counter/timer exposed
-// at $E90014/$E90016. Its period table is MAME-derived and intentionally kept
-// separate from confirmed hardware contracts.
+// Package frc models the Super A'Can host counter/timer exposed at
+// $E90014/$E90016. The period formula is decompiled from Bcan 0.0.8b
+// (sub_1400A7420/sub_1400A7510); see the knowledge base, docs/memory-map.md.
 package frc
 
-const OneHzM68KCycles int64 = 10_738_635
+const (
+	// The counter's input clock is master/12. Bcan expresses every interval in
+	// master ticks, so this device does too and converts at the call boundary.
+	masterTicksPerM68KCycle int64 = 10
+	oneSecondMasterTicks    int64 = 107_386_350
+	// Mode $1 counts 1024 input ticks per unit, mode $F counts 9040; ×12 turns
+	// each into master ticks.
+	mode1MasterTicks int64 = 12 * 1024
+	modeFMasterTicks int64 = 12 * 9040
+)
 
 type Device struct {
 	control   uint16
@@ -22,7 +31,8 @@ func (d *Device) Frequency() uint16      { return d.frequency }
 func (d *Device) Pending() bool          { return d.pending }
 func (d *Device) Active() bool           { return d.active }
 func (d *Device) SupportedMode() bool    { return d.supported }
-func (d *Device) RemainingCycles() int64 { return d.remaining }
+// RemainingMasterTicks 是距離下一次觸發的主時脈 tick 數（master = 68k × 10）。
+func (d *Device) RemainingMasterTicks() int64 { return d.remaining }
 
 func (d *Device) WriteControl(value uint16) {
 	d.control = value
@@ -38,7 +48,7 @@ func (d *Device) AdvanceM68KCycles(cycles uint64) {
 	if !d.active || d.pending {
 		return
 	}
-	d.remaining -= int64(cycles)
+	d.remaining -= int64(cycles) * masterTicksPerM68KCycle
 	if d.remaining <= 0 {
 		d.remaining = 0
 		d.active = false
@@ -63,21 +73,17 @@ func (d *Device) schedule() {
 	if d.control&0xff00 != 0xa200 {
 		return
 	}
-	// MAME writes `((m_frc_control & 0xff << 16) | m_frc_frequency)`. C++ operator
-	// precedence makes that `m_frc_control & 0x00ff0000`, which is always 0 for the
-	// 16-bit control register, so the pinned oracle's effective period is the
-	// frequency register alone. Its case-by-case timings (magipool $a201/$0104 etc.)
-	// were calibrated against that effective value, so we follow it rather than the
-	// 24-bit combination the expression appears to intend.
-	period := int64(d.frequency)
+	// Bcan：控制暫存器高位元組必須是 $A2，低 4 bit 選速率，週期一律算 (n+1)。
+	// 常數是 1024×master 與 9040×master 除以 ⌊master/12⌋，C 會約掉，剩下純 tick 數。
+	period := int64(d.frequency) + 1
 	var cycles int64
 	switch d.control & 0x000f {
 	case 0:
-		cycles = OneHzM68KCycles
+		cycles = oneSecondMasterTicks // 固定一秒，與週期暫存器無關
 	case 1:
-		cycles = 1024 * period
+		cycles = mode1MasterTicks * period
 	case 0x0f:
-		cycles = 8192 * period
+		cycles = modeFMasterTicks * period
 	default:
 		return
 	}
