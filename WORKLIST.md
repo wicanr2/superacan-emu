@@ -124,15 +124,16 @@
   架構上 `CGO_ENABLED=0` 建置與 vet 通過，鍵碼表有單元測試。**還沒在真實 macOS 上
   跑過**——交叉編譯只證明組得起來，證明不了 Objective-C 呼叫慣例與事件迴圈的實機
   行為。實機 smoke 步驟見 [`docs/macos-frontend.md`](docs/macos-frontend.md)。
-- [~] Android 平台層：`frontend/mobile`（表面尺寸政策與檔案位置）在
-  `GOOS=android CGO_ENABLED=0` 下建置通過並有單元測試；生命週期（離開前景落地＋
-  叫出選單、返回鍵）在 `session` 有測試；`mobile/acan` 的 `ebiten.Game`、觸控與
-  音訊只有 linux＋cgo 的建置與 vet。**缺 Android NDK，`ebitenmobile bind` 沒有跑過，
-  APK 與實機行為全部未驗證。** 契約、量測與實機 smoke 清單見
+- [~] Android 平台層：`frontend/mobile` 在 `GOOS=android CGO_ENABLED=0` 下建置通過
+  並有單元測試；生命週期（離開前景落地＋叫出選單、返回鍵）在 `session` 有測試；
+  `mobile/acan` 已用 NDK 編成 `arm64-v8a`／`armeabi-v7a`／`x86_64` 三份
+  `libgojni.so`，包成 AAR 與可側載的 APK（簽章 v1/v2/v3，min 21 / target 34）。
+  **沒有在任何實機或模擬器上跑過**：觸控、音訊延遲、旋轉與返回鍵全部未驗證。
+  契約、量測與實機 smoke 清單見
   [`docs/android-frontend.md`](docs/android-frontend.md)。
-- [ ] Android 工具鏈 image（JDK 17＋cmdline-tools＋platform 34＋build-tools＋NDK，
-  約 5–6 GB）。這台機器同時放著其他專案的 image，而清理映像不是本專案能自行決定
-  的事，所以要先取得同意。有了它才能跑 `ebitenmobile bind` 與實機 smoke。
+- [x] Android 工具鏈 image（`docker/android.Dockerfile`：JDK 17＋cmdline-tools＋
+  platform 34＋build-tools 34＋NDK 27.2＋ebitenmobile）。整個 image 5.69 GB，
+  新增層約 2.9 GB。
 - [~] 三個平台的可重現發行包與第三方授權清單；只含程式，不含 ROM／BIOS／遊戲畫面。
   Linux 的 AppImage 已可重現產出（`packaging/appimage.sh`，不需要 appimagetool），
   跑出來的指令數與 framebuffer 雜湊與 headless 基準相同；預設路徑走 XDG，缺韌體
@@ -140,7 +141,8 @@
   （`packaging/THIRD-PARTY-LICENSES`），含 Baekmuk 授權原文與商標標示、M+ 授權
   原文、bitmapfont 的 Apache-2.0 原文。**還缺**：OFL-1.1 的原文不在 bitmapfont
   模組內，四份 OFL 來源因此尚未符合散布條件——**補上之前這個包不可對外散布**；
-  macOS 與 Android 的包還沒做。見
+  macOS 出 universal `.app`（arm64＋x86_64，未簽），Android 出 AAR 與除錯金鑰簽的
+  APK。三個平台的包都缺 OFL-1.1 原文。見
   [`docs/release-packaging.md`](docs/release-packaging.md)。
 - [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
   Android 不受此檢查；模擬核心則在五個目標上都要通過。

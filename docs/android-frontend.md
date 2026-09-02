@@ -112,13 +112,12 @@ Android 建議的最小觸控尺寸。密度高的螢幕因此得到「一樣大
 加起來的 image 約 5–6 GB。**這台機器同時放著其他專案的 image，而清理映像不是本
 專案可以自行決定的事**，所以這一步要先取得同意再做。
 
-工具鏈就位之後：
+工具鏈在 `docker/android.Dockerfile`，建置流程與踩過的坑見
+[`release-packaging.md`](release-packaging.md)：
 
 ```sh
-go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
-ebitenmobile bind -target android -androidapi 21 \
-    -javapkg tw.wicanr2.superacan -o acan.aar \
-    github.com/wicanr2/superacan-emu/mobile/acan
+packaging/android-aar.sh build/android    # ebitenmobile bind → AAR
+packaging/android-apk.sh build/android    # AAR + Activity → 可側載的 APK
 ```
 
 產出的 `acan.aar` 含 `EbitenView`（Ebitengine 產生的）與 `Acan`（gomobile 由本套件
@@ -150,9 +149,10 @@ public class MainActivity extends Activity {
 |---|---|
 | `frontend/mobile`（表面政策、檔案位置） | `GOOS=android CGO_ENABLED=0` 建置通過，有單元測試 |
 | 生命週期（暫停／恢復／落地／返回鍵） | `session` 的單元測試涵蓋，與平台無關 |
-| `mobile/acan`（ebiten.Game、觸控、音訊） | 只有 linux + cgo 的建置與 vet；**沒有在 Android 上跑過** |
-| `ebitenmobile bind` | **沒有跑過**，缺 NDK |
-| APK、實機觸控、音訊延遲、旋轉、返回鍵 | **全部未驗證** |
+| `mobile/acan`（ebiten.Game、觸控、音訊） | 已用 NDK 編成三個 ABI 的 `libgojni.so`；**沒有在 Android 上跑過** |
+| `ebitenmobile bind` | 通過，產出 28.9 MB 的 AAR |
+| APK | 通過，28.5 MB，簽章 v1/v2/v3，min 21 / target 34 |
+| 實機觸控、音訊延遲、旋轉、返回鍵 | **全部未驗證** |
 
 實機 smoke 的最小清單（工具鏈就位之後）：載入韌體與卡帶各一次、虛擬手把六個按鍵
 各按一次、開選單存讀檔各一次、切到背景再回來確認電池記憶體有寫出去、轉一次螢幕

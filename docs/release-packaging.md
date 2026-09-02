@@ -136,6 +136,56 @@ Mac，步驟見 [`macos-frontend.md`](macos-frontend.md)。
 開啟要「右鍵 → 打開」。要對外散布必須在 Mac 上重簽並公證（notarization 一定要 Mac，
 交叉編這條路做不到）。
 
+## Android
+
+Android 是唯一開 cgo 例外的目標，所以它需要自己的工具鏈 image
+（`docker/android.Dockerfile`）：JDK 17、NDK 27.2.12479018、platform android-34、
+build-tools 34.0.0、`ebitenmobile`。整個 image 5.69 GB，其中新增層約 2.9 GB。
+
+```sh
+packaging/android-aar.sh build/android    # ebitenmobile bind → AAR
+packaging/android-apk.sh build/android    # AAR + Activity → 可側載的 APK
+```
+
+AAR 裡是每個 ABI 一份 `libgojni.so` 加上 gomobile 產生的 Java 綁定與
+Ebitengine 的 `EbitenView`。APK 不走 Gradle：這個 app 只有一個 Activity、一份
+manifest 與一張圖示，用 build-tools 自己的 `aapt2`／`d8`／`zipalign`／`apksigner`
+就組得完，步驟也因此看得見。
+
+### 三個會讓人找錯方向的坑
+
+- **`gomobile init` 要寫 `$GOPATH/pkg/gomobile`。** 容器以非 root UID 執行時
+  image 內的 `/go` 不可寫，錯誤是 `mkdir /go/pkg/gomobile: permission denied`。
+  GOPATH 要指到掛進去的可寫目錄。
+- **gomobile 會把 Go 的文件註解原樣搬進產生的 Java。** 本專案的註解是中文，而
+  JDK 17 的預設來源編碼跟著 locale 走（JEP 400 是 18 才預設 UTF-8）。沒設
+  locale 的容器裡 javac 會對每個非 ASCII 位元組報 `unmappable character`——
+  錯誤指著 `Acan.java`，看起來像 gomobile 產出壞檔。image 裡設 `LANG=C.UTF-8`。
+- **`javac` 的 `-bootclasspath` 只在 `-source 8` 以下可用。** Android 的平台類別
+  要由 `android.jar` 提供而不是 JDK 的，所以用 `-source 8 -target 8
+  -bootclasspath android.jar`；改用 `--release` 會把 JDK 自己的平台類別帶進來，
+  編得過但可能用到 Android 上不存在的 API。
+- 字串資源裡的撇號要跳脫（`Super A\'Can`），否則 `aapt2` 判成未結束的引號。
+
+### 靜態驗收
+
+2026-09-02 的結果：
+
+| 檢查 | 結果 |
+|---|---|
+| 簽章 | v1（JAR）、v2、v3 皆通過（除錯金鑰） |
+| 套件與進入點 | `tw.wicanr2.superacan.app` / `.MainActivity` |
+| SDK 範圍 | min 21、target 34 |
+| 原生程式庫 | `arm64-v8a`、`armeabi-v7a`、`x86_64` |
+| `.so` 真的含這份程式碼 | `libgojni.so` 內找得到 `superacan-emu/chip/umc6618.*`、`ACANGOS1`、五種語言的字串 |
+
+最後一項是「編到舊版原始碼卻沒發現」的守門：在 binary 裡找一定會出現的字串，
+比對它是不是這一份。
+
+**簽的是除錯金鑰，只夠側載安裝**；上架或對外散布要換成自己的發行金鑰。
+**沒有在任何實機或模擬器上跑過**——以上全過只代表包得起來、裝得上去，
+不代表跑得起來。實機 smoke 清單見 [`android-frontend.md`](android-frontend.md)。
+
 ## 展示影片
 
 影片是用**發行的 AppImage** 錄的，不是用開發中的執行檔：跑的就是那個檔案，

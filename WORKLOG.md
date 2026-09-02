@@ -764,3 +764,48 @@
 - 下一個最小行動：補 OFL-1.1 原文，或等 Android 工具鏈的決定。
 - Docker 清理：本輪自建 `superacan-package:v1`（比基礎 image 多 264 MB），
   其餘全部 `docker run --rm`；`docker ps` 沒有殘留本專案容器。
+
+## 2026-09-02（續）：macOS 與 Android 的發行包
+
+- **macOS 不需要 osxcross。** 那套工具鏈補的是 SDK 標頭檔、Mach-O 連結器與旗標
+  wrapper 三樣，而本專案的 macOS 執行檔是 `CGO_ENABLED=0` 的純 Go，Go 自己就產
+  Mach-O，三樣都用不到。剩下的只有兩件檔案格式操作，用標準庫寫：
+  `packaging/macho fat` 合成 universal binary、`packaging/macho check` 做靜態驗收、
+  `packaging/zipdir` 壓縮並保留權限位元。
+- fat binary 的對齊要照架構的頁大小（arm64 是 2^14、x86_64 是 2^12）。寫錯的話
+  dyld 會拒絕載入，而檔案本身看起來完全正常。
+- **arm64 的 `LC_CODE_SIGNATURE` 是硬條件**：Apple 從 arm64 開始強制簽章，沒有簽章
+  的執行檔在 Apple Silicon 上會被核心直接殺掉（`Killed: 9`），在 Linux 這端一點
+  異狀都看不到。Go 的連結器會自己加 ad-hoc 簽章——但要驗過才知道。實測有。
+- Android 的工具鏈 image 5.69 GB（新增層約 2.9 GB）。AAR 28.9 MB，APK 28.5 MB，
+  三個 ABI，簽章 v1/v2/v3 皆通過，min 21 / target 34。APK 不走 Gradle：只有一個
+  Activity、一份 manifest 與一張圖示，用 build-tools 的 `aapt2`／`d8`／`zipalign`／
+  `apksigner` 就組得完。
+
+### 三個「錯誤指著別的地方」的坑
+
+- `gomobile init` 要寫 `$GOPATH/pkg/gomobile`。容器以非 root 執行時 image 內的
+  `/go` 不可寫，錯誤是 `mkdir /go/pkg/gomobile: permission denied`。
+- **gomobile 會把 Go 的文件註解原樣搬進產生的 Java。** 本專案的註解是中文，而
+  JDK 17 的預設來源編碼跟著 locale 走。沒設 locale 的容器裡 javac 對每個非 ASCII
+  位元組報 `unmappable character`，825 個錯誤全指著 `Acan.java`——看起來像
+  gomobile 產出壞檔，其實是 image 少了 `LANG=C.UTF-8`。
+- `javac` 的 `-bootclasspath` 只在 `-source 8` 以下可用，錯誤是
+  `option --boot-class-path not allowed with target 11`。Android 的平台類別要由
+  `android.jar` 提供而不是 JDK 的，所以只能用 source 8 這條路。
+
+### 本輪收尾
+
+- HEAD：`8111de7`（macOS）之後再加這一次。
+- 驗證：`test ./...`、`vet ./...` 全綠。macOS：`file` 認定雙弧 universal binary、
+  arm64 有 `LC_CODE_SIGNATURE`、最低系統 12.0.0、相依只有 `/usr/lib` 底下兩個。
+  Android：簽章 v1/v2/v3 通過、`native-code` 三個 ABI、`libgojni.so` 內找得到
+  `superacan-emu/chip/umc6618.*` 與 `ACANGOS1`、五種語言的字串——證明這份 binary
+  真的含這一份程式碼。
+- 未證實：**兩個包都沒有在實機上跑過。** macOS 的 bundle 未簽（`codesign` 只在
+  macOS 上有），Android 用除錯金鑰簽只夠側載。靜態驗收全過只代表不會因為結構
+  問題開不起來，不代表功能正常。
+- **三個平台的包都還缺 OFL-1.1 原文**，在補上之前不可對外散布。
+- 下一個最小行動：補 OFL-1.1 原文；之後是 CI 守住三個平台的建置。
+- Docker 清理：本輪自建 `superacan-android:v1`（5.69 GB），其餘全部
+  `docker run --rm`；`docker ps` 沒有殘留本專案容器。

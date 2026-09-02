@@ -211,6 +211,15 @@ Linux 的發行形式是 AppImage：單一檔案、不需要安裝、不依賴�
 ROM 與 BIOS 不隨發行包散布。建置方式與展示影片的錄製流程見
 [`docs/release-packaging.md`](docs/release-packaging.md)。
 
+## 發行包（macOS、Android）
+
+macOS 是 universal `.app`（arm64 + x86_64），Android 是三個 ABI 的 APK。兩者都在
+容器內交叉編出來，建置方式、靜態驗收結果與踩過的坑見
+[`docs/release-packaging.md`](docs/release-packaging.md)。
+
+**兩個包都沒有在實機上跑過**：macOS 的 `.app` 未簽章（`codesign` 只在 macOS 上有），
+Android 的 APK 用除錯金鑰簽只夠側載。靜態驗收全過只代表不會因為結構問題開不起來。
+
 ## 熱鍵
 
 X11 與 macOS 前端的出廠鍵位。十七個動作都可以在設定 → 熱鍵（S5.2）重新指定；

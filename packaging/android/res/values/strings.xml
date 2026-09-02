@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 撇號在 Android 的字串資源裡要跳脫，否則 aapt2 會判成未結束的引號。 -->
+    <string name="app_name">Super A\'Can</string>
+</resources>
