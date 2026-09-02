@@ -248,11 +248,18 @@ docker run --rm --network none --memory 6g --cpus 4 --pids-limit 256 \
 pack 只有幾百 KB。所以影片放 GitHub Release 的附件：
 
 ```sh
-gh release upload <tag> build/promo/superacan-emu-promo-repo.mp4#superacan-emu-promo.mp4 --clobber
+cp build/promo/superacan-emu-promo-repo.mp4 /tmp/superacan-emu-promo.mp4
+gh release upload promo /tmp/superacan-emu-promo.mp4 --clobber
 ```
 
-`#` 後面是附件顯示的檔名，固定成 `superacan-emu-promo.mp4`，README 才能一直指向
-`releases/latest/download/superacan-emu-promo.mp4` 這個不會變的網址。
+兩個會讓網址失效的坑：
+
+- **附件的下載檔名就是上傳檔案的檔名。** `gh` 的 `檔案#名稱` 語法設的是顯示標籤，
+  不是檔名；直接傳 `repo-crf26.mp4` 上去，下載連結就會是那個名字。要先改名。
+- **`releases/latest/download/…` 對 prerelease 不生效**（回 404）。所以影片固定掛在
+  tag `promo` 上，網址寫死成
+  `releases/download/promo/superacan-emu-promo.mp4`，重錄時 `--clobber` 覆蓋同一個
+  tag，網址不變；Release 的說明裡記當次的 AppImage SHA-256 與日期。
 
 上傳的是 `-repo` 那一份而不是 crf 20 的原檔：`-tune animation` 對這種大面積平色的
 畫面有效，crf 26 下介面文字與 crf 20 逐字比肉眼無異，體積少一半（12.4 MB → 5.0 MB）。

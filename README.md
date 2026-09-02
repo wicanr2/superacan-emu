@@ -62,13 +62,14 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 ## 展示影片
 
-[下載展示影片](https://github.com/wicanr2/superacan-emu/releases/latest/download/superacan-emu-promo.mp4)
+[下載展示影片](https://github.com/wicanr2/superacan-emu/releases/download/promo/superacan-emu-promo.mp4)
 （70 秒、960×720、含聲音，約 5 MB）——多款卡帶輪播、介面巡覽與實際遊玩。影片是用
 發行的 AppImage 錄的，不是開發中的執行檔：輸入是腳本，同一份腳本在同一份 AppImage
 上會錄出同一段影片。
 
-影片放在 GitHub Release 的附件而不是版控裡：二進位檔不做差分，每重錄一次就會在
-git 歷程多留一份完整副本。錄製、轉檔與上傳方式見
+影片放在 GitHub Release（tag `promo`）的附件而不是版控裡：二進位檔不做差分，
+每重錄一次就會在 git 歷程多留一份完整副本。重錄時覆蓋同一個 tag，上面的網址不變。
+錄製、轉檔與上傳方式見
 [`docs/release-packaging.md`](docs/release-packaging.md)。
 
 > 影片含各遊戲之版權畫面，僅供模擬器功能展示，不作其他用途。

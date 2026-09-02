@@ -9,9 +9,12 @@
   肉眼無異；crf 30（3.3 MB）的文字開始變軟，所以停在 26。
 - **影片走 GitHub Release 附件，不進版控**（使用者 2026-09-02 決定）。這個 repo 的
   pack 只有 791 KB，而二進位檔不做差分——每重錄一次就在歷程多留一份完整副本。
-  附件檔名固定成 `superacan-emu-promo.mp4`，README 指向
-  `releases/latest/download/superacan-emu-promo.mp4`，重錄只要 `--clobber` 覆蓋，
+  影片固定掛在 tag `promo` 上，網址是
+  `releases/download/promo/superacan-emu-promo.mp4`，重錄只要 `--clobber` 覆蓋，
   網址不變。`packaging/promo.sh` 多產一份 `-repo` 檔供上傳。
+- 踩到兩個會讓網址失效的坑：`gh` 的 `檔案#名稱` 設的是顯示標籤不是檔名（附件會叫
+  `repo-crf26.mp4`），以及 `releases/latest/download/…` 對 prerelease 回 404。
+  兩件都已寫進 `docs/release-packaging.md`。
 
 ## 2026-09-02（續）：八款卡帶逐張對拍，19 張實際畫面與 Bcan 逐像素相同
 
