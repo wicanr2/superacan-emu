@@ -59,11 +59,11 @@ func main() {
 	if (*soundBIOS1Path == "") != (*soundBIOS2Path == "") {
 		fail("--sound-bios1 and --sound-bios2 must be supplied together")
 	}
-	presses, err := parsePresses(*press)
+	presses, err := session.ParsePresses(*press)
 	if err != nil {
 		fail(err.Error())
 	}
-	presses2, err := parsePresses(*press2)
+	presses2, err := session.ParsePresses(*press2)
 	if err != nil {
 		fail(err.Error())
 	}
@@ -182,8 +182,8 @@ func main() {
 		}
 		p1, p2 := machine.PadReleased, machine.PadReleased
 		for frame := uint64(0); frame < *frames; frame++ {
-			p1 = applyPresses(frame, p1, presses)
-			p2 = applyPresses(frame, p2, presses2)
+			p1 = session.ApplyPresses(frame, p1, presses)
+			p2 = session.ApplyPresses(frame, p2, presses2)
 			if overlay != nil {
 				overlay.Play(script, frame)
 				overlay.SetPad(0, p1)

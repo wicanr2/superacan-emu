@@ -708,3 +708,59 @@
 - 下一個最小行動：等 Android 工具鏈的決定；在那之前可做的是三平台發行包與第三方
   授權清單。
 - Docker 清理：本輪全部 `docker run --rm`，`docker ps` 沒有殘留本專案容器。
+
+## 2026-09-02（續）：Linux AppImage 與展示影片
+
+- **AppImage 不需要 appimagetool。** type-2 的結構就是「static-pie 的 runtime ELF」
+  接上「一個 squashfs」，所以在沒有網路的容器裡自己組就好：`mksquashfs` 之後
+  `cat runtime payload > out.AppImage`。runtime 從既有的 AppImage 前面切下來——
+  切點要用 `--appimage-offset` 印出來的長度，**不能 grep squashfs 的 `hsqs` 魔數**：
+  那四個位元組會在 runtime 內部出現，切出來的檔案看起來像 ELF，`file` 卻會抱怨
+  section header 落在檔案之外。
+- 打包／編碼工具鏈另建一個 image（`docker/package.Dockerfile`，從 Go image 延伸），
+  只多 `squashfs-tools`、`ffmpeg`、`xvfb`、`file`，實測多 264 MB。
+- 發行包要能直接點兩下就開，所以 `--ipl`／`--key`／`--rom` 全部變成選用，
+  預設走 XDG（`~/.local/share/superacan-emu/`）；讀不到韌體不再是啟動失敗，
+  改由啟動畫面列出四份韌體各自的狀態與雜湊。
+- 驗證：AppImage 在 Xvfb 內跑 300 frame 得到
+  `instructions=4364786 framebuffer_sha256=defbd19a…885c6`，與 headless 基準相同，
+  所以打包流程沒有改變執行檔的行為。
+- 影片錄的是**合成後的視窗**（遊戲畫面加覆蓋層），與截圖那條路不共用：後者取的是
+  UM6618 顯示孔徑、不含覆蓋層，是給畫面證據用的。合成這條**不能當畫面證據**。
+  取樣節奏是主機迴圈而不是模擬 frame，否則走選單那一段在影片裡會是靜止的。
+
+### 這一輪修掉的兩個真缺陷
+
+- **AVI 音訊串流的時間單位用錯。** 原本 `dwScale=1`／`dwRate=每秒位元組`／
+  `dwSampleSize=1`，等於「一個位元組是一個取樣」。那樣自洽、也讀得回原始資料，
+  但不是 VfW 的慣例：解碼器算不出串流長度（ffprobe 的 duration 是 N/A），
+  有視訊一起轉檔時音訊會被截掉——量到的是 68.3 秒的畫面配 17.1 秒的音訊。
+  改成 `dwScale=dwSampleSize=nBlockAlign`、`dwLength` 以 block 計之後，
+  轉檔後兩條串流都是 70.000 秒。
+- **合成錄影的音訊只補不削。** 覆蓋層開著時沒有樣本要補靜音，這一半原本就有；
+  但重取樣一幀不會剛好是 800 個取樣，多出來的不削掉會單向累積——量到四百幀多
+  181 個 block，換算到一分鐘就是幾十毫秒的偏移。
+
+### 教訓
+
+- **錄影／驗證之前先重建。** 影片的內容來自 AppImage 裡的執行檔，不是工作區裡的
+  原始碼。修好音訊補齊之後直接重錄，錄到的是舊行為，而影片看起來完全正常，
+  只有量音訊長度才發現。`packaging/promo.sh` 現在會印出它用的 AppImage 雜湊。
+- **腳本不要依賴會累積的狀態。** 存檔槽索引是設定檔裡的值，換卡帶不重設；腳本
+  切過一次「下一個槽」之後，後面每一片卡帶都跟著偏，偏到不存在的槽就跳出錯誤列，
+  而錯誤列會吃掉下一個確認鍵（那是正確行為），整條腳本從那裡開始失準。
+  現在只用槽 0。
+- **逐幀看過才算驗證。** 四次錄影裡，音畫長度、存檔槽偏移、按鍵時機三個問題都是
+  把影格存成 PNG 用眼睛看才發現的；檔案大小、退出碼、幀數全部正常。
+
+### 本輪收尾
+
+- HEAD：`0adf532` 之後（另有另一個工作階段的 FRC／window 1 修正在同一分支）。
+- 驗證：`test ./...` 與 `vet ./...` 全綠；九款卡帶 1200-frame 與基準完全相同；
+  影片 4200 幀／70.000 秒，音訊 70.000 秒，AVI 的 PCM 恰為 4200×3200 位元組，
+  音量 mean −16.9 dB（不是靜音）；十一個時間點的影格逐張目視檢查過。
+- 未證實：Android 實機一切；macOS 實機 smoke；全螢幕。
+- **不可對外散布**：OFL-1.1 的授權原文尚未進包（見 `packaging/THIRD-PARTY-LICENSES`）。
+- 下一個最小行動：補 OFL-1.1 原文，或等 Android 工具鏈的決定。
+- Docker 清理：本輪自建 `superacan-package:v1`（比基礎 image 多 264 MB），
+  其餘全部 `docker run --rm`；`docker ps` 沒有殘留本專案容器。

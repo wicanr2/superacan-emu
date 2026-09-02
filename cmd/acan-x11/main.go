@@ -79,6 +79,9 @@ func main() {
 	audioSink := flag.String("audio-sink", "", "shell command receiving 48000 Hz signed 16-bit stereo PCM on stdin, for example \"aplay -f cd -t raw\"")
 	stateDir := flag.String("state-dir", "", "directory holding the ten save-state slots the overlay menu reads and writes")
 	uiScript := flag.String("ui-script", "", "scripted overlay events for smoke runs: frame:EVENT,... where EVENT is one of "+session.ScriptEventNames())
+	press := flag.String("press", "", "P1 input timeline: tick:BUTTON+BUTTON[*frames],... for scripted runs")
+	press2 := flag.String("press2", "", "P2 input timeline, same syntax as --press")
+	record := flag.String("record", "", "record the composed window (game plus overlay) to this AVI file")
 	romDirs := flag.String("rom-dir", "", "comma-separated directories the cartridge browser scans")
 	stateRoot := flag.String("state-root", "", "root directory for per-cartridge save-state directories")
 	saveDir := flag.String("save-dir", "", "directory holding per-cartridge battery files")
@@ -88,11 +91,15 @@ func main() {
 	maxTicks := flag.Uint64("max-ticks", 0, "exit after this many host loop iterations regardless of pause state; for scripted smoke runs")
 	flag.Parse()
 
-	if *iplPath == "" || *keyPath == "" {
-		fail("--ipl and --key are required")
+	// 沒給路徑時用使用者資料目錄底下的預設位置。發行包要能直接點兩下就開，
+	// 缺韌體或缺卡帶不是啟動失敗——介面本來就有啟動畫面與韌體畫面會說明缺什麼。
+	defaults := defaultPaths()
+	if *iplPath == "" {
+		*iplPath, *keyPath = defaults.ipl, defaults.key
+		*soundBIOS1Path, *soundBIOS2Path = defaults.soundA, defaults.soundB
 	}
 	if *romPath == "" && *romDirs == "" {
-		fail("--rom or --rom-dir is required")
+		*romDirs = defaults.cartridges
 	}
 	if (*soundBIOS1Path == "") != (*soundBIOS2Path == "") {
 		fail("--sound-bios1 and --sound-bios2 must be supplied together")
@@ -133,12 +140,14 @@ func main() {
 	hotkeys := hotkeyBindings(config, skipHotkeys...)
 
 	// 韌體只讀一次；換卡帶時整台機器重建，但韌體位元組沿用同一份。
-	iplBytes := must(hostio.LoadWordSwapped(*iplPath, machine.IPLSize))
-	keyBytes := must(hostio.LoadLinear(*keyPath, 16))
+	// 讀不到不是錯誤：DescribeFirmwareSet 會把缺哪一份寫在啟動畫面上，
+	// 那比啟動失敗有用——使用者要知道檔案該放到哪裡。
+	iplBytes, _ := hostio.LoadWordSwapped(*iplPath, machine.IPLSize)
+	keyBytes, _ := hostio.LoadLinear(*keyPath, 16)
 	var soundBIOS [2][]byte
 	if *soundBIOS1Path != "" {
-		soundBIOS[0] = must(hostio.LoadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize))
-		soundBIOS[1] = must(hostio.LoadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize))
+		soundBIOS[0], _ = hostio.LoadLinear(*soundBIOS1Path, machine.SoundBIOSBankSize)
+		soundBIOS[1], _ = hostio.LoadLinear(*soundBIOS2Path, machine.SoundBIOSBankSize)
 	}
 
 	stopAudio := func() {}
@@ -167,6 +176,9 @@ func main() {
 	var current *machine.System
 	var currentSave string
 	newSystem := func(path string) (*machine.System, string, error) {
+		if iplBytes == nil || keyBytes == nil {
+			return nil, "", fmt.Errorf("韌體不齊，無法啟動卡帶")
+		}
 		image, err := hostio.LoadCartridge(path)
 		if err != nil {
 			return nil, "", err
@@ -259,6 +271,23 @@ func main() {
 	if err != nil {
 		fail(err.Error())
 	}
+	presses, err := session.ParsePresses(*press)
+	if err != nil {
+		fail(err.Error())
+	}
+	presses2, err := session.ParsePresses(*press2)
+	if err != nil {
+		fail(err.Error())
+	}
+	// 錄的是合成後的視窗：展示影片要看得到覆蓋層與觸控版面，
+	// 而不含覆蓋層的那一條是給畫面證據用的，兩者不共用。
+	if *record != "" {
+		overlay.SetCaptureComposed(windowW, windowH)
+		if err := overlay.StartCapture(*record); err != nil {
+			fail(err.Error())
+		}
+	}
+	injected, injected2 := machine.PadReleased, machine.PadReleased
 
 	// SetTPS 的等價物：主機以 60 Hz 請求下一個硬體 frame，硬體 frame 邊界仍由
 	// cycle scheduler 決定，不用改變核心 cycle 數來配合主機。
@@ -279,7 +308,9 @@ func main() {
 		}
 		// 腳本以主機迴圈的次數計時，不用模擬 frame 數：覆蓋層開著時模擬時間
 		// 停住，用 frame 數當索引會讓腳本永遠等不到下一個事件。
-		overlay.Play(script, tick)
+		// 腳本與按鍵注入用同一個計數，否則同一份時間表在兩邊會差一拍。
+		now := tick
+		overlay.Play(script, now)
 		tick++
 		// --frames 只數真正跑掉的 frame，覆蓋層開著時它不會前進。腳本會停在
 		// 選單裡，所以還需要一個不受暫停影響的上限，否則 smoke run 不會結束。
@@ -350,8 +381,11 @@ func main() {
 		}
 		// 音量交給音訊執行緒讀：那一段每 10 ms 跑一次，不能在那裡讀介面狀態。
 		audioVolume.Store(int32(overlay.Volume()))
-		overlay.SetPad(0, padState(window, playerOneKeys))
-		overlay.SetPad(1, padState(window, playerTwoKeys))
+		// 注入與鍵盤是聯集：兩者都是 active-low，AND 起來就是「任一按下即按下」。
+		injected = session.ApplyPresses(now, injected, presses)
+		injected2 = session.ApplyPresses(now, injected2, presses2)
+		overlay.SetPad(0, padState(window, playerOneKeys)&injected)
+		overlay.SetPad(1, padState(window, playerTwoKeys)&injected2)
 		advanced, err := overlay.Advance(time.Since(started))
 		if err != nil {
 			fail(err.Error())
@@ -397,13 +431,6 @@ func padState(window *x11.Window, bindings []keyBinding) uint16 {
 		}
 	}
 	return state
-}
-
-func must[T any](value T, err error) T {
-	if err != nil {
-		fail(err.Error())
-	}
-	return value
 }
 
 func fail(message string) {

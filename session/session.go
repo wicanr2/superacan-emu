@@ -191,10 +191,14 @@ func (s *Session) Advance(now time.Duration) (bool, error) {
 		return false, err
 	}
 	if s.System == nil {
+		// 錄合成畫面時連沒有卡帶的畫面都要錄：啟動畫面與卡帶瀏覽器本來就是
+		// 要展示的東西。取樣節奏是主機迴圈，不是模擬 frame。
+		s.captureComposedTick()
 		return false, nil
 	}
 	if s.Paused() || s.halt != ui.HaltNone {
 		s.applyPads(true)
+		s.captureComposedTick()
 		return false, nil
 	}
 	s.applyPads(false)
@@ -208,6 +212,7 @@ func (s *Session) Advance(now time.Duration) (bool, error) {
 		return false, err
 	}
 	s.captureFrame()
+	s.padCaptureAudio()
 	return true, nil
 }
 

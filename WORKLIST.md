@@ -133,7 +133,15 @@
 - [ ] Android 工具鏈 image（JDK 17＋cmdline-tools＋platform 34＋build-tools＋NDK，
   約 5–6 GB）。這台機器同時放著其他專案的 image，而清理映像不是本專案能自行決定
   的事，所以要先取得同意。有了它才能跑 `ebitenmobile bind` 與實機 smoke。
-- [ ] 三個平台的可重現發行包與第三方授權清單；只含程式，不含 ROM／BIOS／遊戲畫面。
+- [~] 三個平台的可重現發行包與第三方授權清單；只含程式，不含 ROM／BIOS／遊戲畫面。
+  Linux 的 AppImage 已可重現產出（`packaging/appimage.sh`，不需要 appimagetool），
+  跑出來的指令數與 framebuffer 雜湊與 headless 基準相同；預設路徑走 XDG，缺韌體
+  改由啟動畫面說明而不是啟動失敗。第三方授權清單已進包
+  （`packaging/THIRD-PARTY-LICENSES`），含 Baekmuk 授權原文與商標標示、M+ 授權
+  原文、bitmapfont 的 Apache-2.0 原文。**還缺**：OFL-1.1 的原文不在 bitmapfont
+  模組內，四份 OFL 來源因此尚未符合散布條件——**補上之前這個包不可對外散布**；
+  macOS 與 Android 的包還沒做。見
+  [`docs/release-packaging.md`](docs/release-packaging.md)。
 - [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
   Android 不受此檢查；模擬核心則在五個目標上都要通過。
 

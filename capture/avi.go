@@ -24,6 +24,8 @@ const (
 	AudioSampleRate = 48000
 	AudioChannels   = 2
 	AudioBits       = 16
+	// AudioBlockAlign 是一組左右聲道取樣的位元組數，也是 AVI 音訊串流的時間單位。
+	AudioBlockAlign = AudioChannels * AudioBits / 8
 )
 
 // Recorder 寫出一個 AVI 檔。大小欄位要在結束時回填，所以它需要可 seek 的目的地。

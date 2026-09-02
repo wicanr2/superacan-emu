@@ -139,9 +139,24 @@ func TestRecorderWritesConsistentHeaders(t *testing.T) {
 	if videoLength != frames {
 		t.Fatalf("視訊 dwLength=%d，want %d", videoLength, frames)
 	}
-	audioLength := binary.LittleEndian.Uint32(find(streams[1].children, "strh").payload[32:36])
-	if audioLength != uint32(frames*audioPerFrame) {
-		t.Fatalf("音訊 dwLength=%d，want %d", audioLength, frames*audioPerFrame)
+	// 音訊串流的時間單位是 block（一組左右聲道取樣），不是位元組：dwScale 與
+	// dwSampleSize 都是 nBlockAlign，dwLength 因此以 block 計，dwRate/dwScale
+	// 相除要等於取樣率。用位元組當單位也讀得回資料，但解碼器算不出串流長度，
+	// 有視訊一起轉檔時音訊會被截掉一大截。
+	audioHeader := find(streams[1].children, "strh").payload
+	audioScale := binary.LittleEndian.Uint32(audioHeader[20:24])
+	audioRate := binary.LittleEndian.Uint32(audioHeader[24:28])
+	audioLength := binary.LittleEndian.Uint32(audioHeader[32:36])
+	audioSampleSize := binary.LittleEndian.Uint32(audioHeader[44:48])
+	if audioScale != AudioBlockAlign || audioSampleSize != AudioBlockAlign {
+		t.Fatalf("dwScale=%d dwSampleSize=%d，兩者都應該是 nBlockAlign %d",
+			audioScale, audioSampleSize, AudioBlockAlign)
+	}
+	if audioRate/audioScale != AudioSampleRate {
+		t.Fatalf("dwRate/dwScale=%d，應該是取樣率 %d", audioRate/audioScale, AudioSampleRate)
+	}
+	if want := uint32(frames * audioPerFrame / AudioBlockAlign); audioLength != want {
+		t.Fatalf("音訊 dwLength=%d block，want %d", audioLength, want)
 	}
 
 	var moviNode *riffNode

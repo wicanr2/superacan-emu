@@ -393,3 +393,76 @@ func TestBackIsStillHandledByTheInterface(t *testing.T) {
 		t.Fatal("遊戲中按返回鍵應該開啟選單")
 	}
 }
+
+// 合成錄影的音訊必須與畫面等長。覆蓋層開著時畫面照錄但模擬時間停住，那些幀
+// 沒有樣本；不補的後果不是「那一段沒聲音」，而是整份錄影從那裡開始音畫不同步。
+func TestComposedCaptureKeepsAudioAlignedWithVideo(t *testing.T) {
+	s := newTestSession(t)
+	path := filepath.Join(t.TempDir(), "clip.avi")
+	s.SetCaptureComposed(320, 240)
+	if err := s.StartCapture(path); err != nil {
+		t.Fatalf("StartCapture：%v", err)
+	}
+
+	// 一半的 tick 在跑，一半停在覆蓋選單裡。
+	advance(t, s, 10)
+	s.Handle(ui.Action{Kind: ui.ActMenu})
+	advance(t, s, 10)
+	if !s.UI.Visible() {
+		t.Fatal("選單應該開著")
+	}
+	s.UI.Close()
+	advance(t, s, 10)
+
+	frames := s.CaptureFrames()
+	if frames != 30 {
+		t.Fatalf("錄了 %d 幀，預期 30（覆蓋層開著時也要錄）", frames)
+	}
+	if err := s.StopCapture(); err != nil {
+		t.Fatalf("StopCapture：%v", err)
+	}
+
+	// 每幀 48000/60 個取樣、每個取樣四個位元組。
+	const bytesPerFrame = 48000 / 60 * 4
+	if got, want := s.CapturePCMBytes(), frames*bytesPerFrame; got != want {
+		t.Fatalf("音訊 %d 位元組，預期與 %d 幀等長的 %d 位元組", got, frames, want)
+	}
+}
+
+// 補齊只會補不會削的話誤差會單向累積，所以多出來的樣本要丟掉。
+func TestComposedCaptureTrimsSurplusAudio(t *testing.T) {
+	s := newTestSession(t)
+	path := filepath.Join(t.TempDir(), "clip.avi")
+	s.SetCaptureComposed(320, 240)
+	if err := s.StartCapture(path); err != nil {
+		t.Fatalf("StartCapture：%v", err)
+	}
+	advance(t, s, 3)
+	// 灌進遠超過三幀份量的音訊。
+	s.PushCapturePCM(make([]byte, 1<<20))
+	frames := s.CaptureFrames()
+	const bytesPerFrame = 48000 / 60 * 4
+	if got, max := s.CapturePCMBytes(), (frames+1)*bytesPerFrame; got > max {
+		t.Fatalf("音訊 %d 位元組，超過 %d 幀允許的上限 %d", got, frames, max)
+	}
+	if err := s.StopCapture(); err != nil {
+		t.Fatalf("StopCapture：%v", err)
+	}
+}
+
+// 預設的錄影來源（不含覆蓋層）不補音訊：那一條是給畫面證據用的，
+// 它的音訊就是模擬器實際產生的樣本，不能摻進靜音。
+func TestPlainCaptureDoesNotPadAudio(t *testing.T) {
+	s := newTestSession(t)
+	path := filepath.Join(t.TempDir(), "clip.avi")
+	if err := s.StartCapture(path); err != nil {
+		t.Fatalf("StartCapture：%v", err)
+	}
+	advance(t, s, 5)
+	if err := s.StopCapture(); err != nil {
+		t.Fatalf("StopCapture：%v", err)
+	}
+	if got := s.CapturePCMBytes(); got != 0 {
+		t.Fatalf("沒有前端推入 PCM 時音訊應該是 0 位元組，得到 %d", got)
+	}
+}

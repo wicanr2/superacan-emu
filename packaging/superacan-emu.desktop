@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Super A'Can Emulator
+Name[zh_TW]=Super A'Can 模擬器
+Comment=Open source emulator for the Super A'Can console
+Comment[zh_TW]=Super A'Can 主機的開源模擬器
+Exec=acan-x11
+Icon=superacan-emu
+Categories=Game;Emulator;
+Terminal=false

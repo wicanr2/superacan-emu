@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/wicanr2/superacan-emu/machine"
 	"github.com/wicanr2/superacan-emu/ui"
 )
@@ -137,4 +140,35 @@ func keysymLabel(keysym uint32) string {
 		return string(rune(keysym))
 	}
 	return ""
+}
+
+// paths 是沒有給命令列旗標時的預設位置。發行包（AppImage）要能直接點兩下就開，
+// 所以每一個路徑都要有一個可預期而且寫得下來的預設值。
+type paths struct {
+	ipl, key, soundA, soundB string
+	cartridges               string
+	root                     string
+}
+
+// defaultPaths 依 XDG 慣例組出預設位置。受版權保護的韌體與卡帶由使用者自己放進去；
+// 程式不隨附也不代為下載。
+func defaultPaths() paths {
+	root := os.Getenv("XDG_DATA_HOME")
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		root = filepath.Join(home, ".local", "share")
+	}
+	root = filepath.Join(root, "superacan-emu")
+	firmware := filepath.Join(root, "firmware")
+	return paths{
+		ipl:        filepath.Join(firmware, "internal_68k.bin"),
+		key:        filepath.Join(firmware, "umc6650.bin"),
+		soundA:     filepath.Join(firmware, "internal_6502_1.bin"),
+		soundB:     filepath.Join(firmware, "internal_6502_2.bin"),
+		cartridges: filepath.Join(root, "cartridges"),
+		root:       root,
+	}
 }

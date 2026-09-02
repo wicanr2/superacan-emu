@@ -56,9 +56,9 @@ func (r *Recorder) writeHeaders() error {
 	putU32(&out, 0x10) // dwFlags: AVIF_HASINDEX
 	r.offsets.totalFrames = int64(out.Len())
 	putU32(&out, 0) // dwTotalFrames，之後回填
-	putU32(&out, 0)                 // dwInitialFrames
-	putU32(&out, 2)                 // dwStreams
-	putU32(&out, 0)                 // dwSuggestedBufferSize，之後回填
+	putU32(&out, 0) // dwInitialFrames
+	putU32(&out, 2) // dwStreams
+	putU32(&out, 0) // dwSuggestedBufferSize，之後回填
 	putU32(&out, uint32(r.width))
 	putU32(&out, uint32(r.height))
 	for i := 0; i < 4; i++ {
@@ -116,15 +116,22 @@ func (r *Recorder) writeHeaders() error {
 	putU32(&out, 0) // dwFlags
 	putU16(&out, 0)
 	putU16(&out, 0)
-	putU32(&out, 0)                                  // dwInitialFrames
-	putU32(&out, 1)                                  // dwScale
-	putU32(&out, AudioSampleRate*AudioChannels*AudioBits/8) // dwRate：每秒位元組
-	putU32(&out, 0) // dwStart
+	putU32(&out, 0) // dwInitialFrames
+	// PCM 串流的時間單位是「一個 block（一組左右聲道取樣）」，不是位元組：
+	// dwScale 取 nBlockAlign、dwRate 取每秒位元組，兩者相除就是取樣率；
+	// dwSampleSize 同樣是 nBlockAlign，dwLength 因此以 block 計。
+	//
+	// 用「一個位元組當一個取樣」也自洽，讀得回原始資料，但那不是 VfW 的慣例：
+	// 解碼器算不出串流長度（ffprobe 的 duration 是 N/A），在有視訊一起轉檔時
+	// 會把音訊截掉一大截。
+	putU32(&out, AudioBlockAlign)                 // dwScale
+	putU32(&out, AudioSampleRate*AudioBlockAlign) // dwRate
+	putU32(&out, 0)                               // dwStart
 	r.offsets.audioLength = int64(out.Len())
-	putU32(&out, 0) // dwLength，之後回填
-	putU32(&out, 0)                                  // dwSuggestedBufferSize
-	putU32(&out, 0)                                  // dwQuality
-	putU32(&out, 1)                                  // dwSampleSize：以位元組計
+	putU32(&out, 0)               // dwLength，之後回填（以 block 計）
+	putU32(&out, 0)               // dwSuggestedBufferSize
+	putU32(&out, 0)               // dwQuality
+	putU32(&out, AudioBlockAlign) // dwSampleSize
 	putU16(&out, 0)
 	putU16(&out, 0)
 	putU16(&out, 0)
@@ -190,7 +197,8 @@ func (r *Recorder) patchHeaders() error {
 		{r.offsets.maxBytes, uint32(r.maxJPEG)},
 		{r.offsets.totalFrames, uint32(r.frames)},
 		{r.offsets.videoLength, uint32(r.frames)},
-		{r.offsets.audioLength, uint32(r.audioBytes)},
+		// dwLength 以 block 計，與 strh 的 dwScale／dwSampleSize 同單位。
+		{r.offsets.audioLength, uint32(r.audioBytes / AudioBlockAlign)},
 		{r.offsets.moviSize, uint32(moviSize)},
 	}
 	for _, patch := range patches {

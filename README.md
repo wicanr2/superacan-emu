@@ -197,6 +197,20 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 預期：通過 UMC6650 交握與授權比對後進入卡帶，vblank IRQ 驅動遊戲主迴圈，
 畫面經 SDL2 顯示（Boom Zoo 可見標題「爆爆動物園」）。
 
+## 發行包（Linux）
+
+Linux 的發行形式是 AppImage：單一檔案、不需要安裝、不依賴發行版的套件庫，裡面是
+`CGO_ENABLED=0` 的純 Go 執行檔。沒有給旗標時韌體與卡帶的預設位置是：
+
+```
+~/.local/share/superacan-emu/firmware/    internal_68k.bin、umc6650.bin、internal_6502_1.bin、internal_6502_2.bin
+~/.local/share/superacan-emu/cartridges/  卡帶
+```
+
+缺韌體或缺卡帶不是啟動失敗——啟動畫面會列出四份韌體各自的狀態與雜湊。
+ROM 與 BIOS 不隨發行包散布。建置方式與展示影片的錄製流程見
+[`docs/release-packaging.md`](docs/release-packaging.md)。
+
 ## 熱鍵
 
 X11 與 macOS 前端的出廠鍵位。十七個動作都可以在設定 → 熱鍵（S5.2）重新指定；
@@ -247,6 +261,8 @@ X11 與 macOS 前端的出廠鍵位。十七個動作都可以在設定 → 熱�
 - [`docs/macos-frontend.md`](docs/macos-frontend.md)：macOS 的 purego 視窗層與實機 smoke 步驟
 - [`docs/android-frontend.md`](docs/android-frontend.md)：Android 的兩層切法、cgo 量測、
   表面尺寸政策、生命週期與返回鍵語意、工具鏈需求
+- [`docs/release-packaging.md`](docs/release-packaging.md)：AppImage 的組法與驗證、
+  展示影片的錄製管線（合成錄影、音訊補齊、為什麼用讀檔）
 - [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、

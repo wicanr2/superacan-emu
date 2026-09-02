@@ -1,0 +1,4 @@
+#!/bin/sh
+# AppImage 的進入點。掛載點的位置每次執行都不同，所以路徑要從自己的位置推出來。
+HERE=$(dirname "$(readlink -f "$0")")
+exec "$HERE/usr/bin/acan-x11" "$@"
