@@ -60,6 +60,19 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 詳細現況以 [`CONTEXT.md`](CONTEXT.md) 為準，可執行待辦只看
 [`WORKLIST.md`](WORKLIST.md)。
 
+## 展示影片
+
+[下載展示影片](https://github.com/wicanr2/superacan-emu/releases/latest/download/superacan-emu-promo.mp4)
+（70 秒、960×720、含聲音，約 5 MB）——多款卡帶輪播、介面巡覽與實際遊玩。影片是用
+發行的 AppImage 錄的，不是開發中的執行檔：輸入是腳本，同一份腳本在同一份 AppImage
+上會錄出同一段影片。
+
+影片放在 GitHub Release 的附件而不是版控裡：二進位檔不做差分，每重錄一次就會在
+git 歷程多留一份完整副本。錄製、轉檔與上傳方式見
+[`docs/release-packaging.md`](docs/release-packaging.md)。
+
+> 影片含各遊戲之版權畫面，僅供模擬器功能展示，不作其他用途。
+
 ## 介面畫面
 
 覆蓋層畫在表面的原生解析度，再與遊戲畫面合成；`cmd/acan-x11`、`cmd/acan-macos`
@@ -309,8 +322,8 @@ PCM 合成模型（通道/period/音量/key/DMA/timer 暫存器語意與混音�
 - ROM、BIOS（`internal_68k.bin`、`internal_6502_*.bin`、`umc6650.bin`）皆為
   UMC/Funtech 受版權保護內容，本 repo 不收錄；`.gitignore` 已排除
   `*.bin`/`*.zip`/`ROMS/`/`bios/`。
-- `docs/screenshots/` 內的截圖為遊戲執行畫面（遊戲內容仍屬原廠商版權），
-  **僅供開發驗證用途**，請勿另作散布。
+- `docs/screenshots/` 內的截圖與 Release 附件的展示影片為遊戲執行畫面
+  （遊戲內容仍屬原廠商版權），**僅供開發驗證與功能展示用途**，請勿另作散布。
 - 硬體規格結論引自知識庫 `acan/docs/`（對 Bcan 0.0.8b 的逆向分析）。
 
 ## 授權

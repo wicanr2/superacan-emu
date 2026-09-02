@@ -86,5 +86,15 @@ ffmpeg -loglevel error -y -i "$OUT/promo.avi" \
     -c:a aac -b:a 128k -movflags +faststart \
     "$OUT/superacan-emu-promo.mp4"
 ls -l "$OUT/superacan-emu-promo.mp4"
+
+# 進版控的那一份另外壓一次。二進位檔每重錄一次就在 git 歷程留一份完整副本，
+# 所以進 repo 的版本要小；`-tune animation` 對這種大面積平色的畫面有效，
+# crf 26 下介面文字與 crf 20 肉眼無異，體積約少一半。
+echo "=== 轉成進版控用的 MP4"
+ffmpeg -loglevel error -y -i "$OUT/promo.avi" \
+    -c:v libx264 -preset veryslow -tune animation -crf 26 -pix_fmt yuv420p \
+    -c:a aac -b:a 96k -movflags +faststart \
+    "$OUT/superacan-emu-promo-repo.mp4"
+ls -l "$OUT/superacan-emu-promo-repo.mp4"
 ffprobe -loglevel error -show_entries format=duration:stream=codec_name,width,height,r_frame_rate \
     -of default=noprint_wrappers=1 "$OUT/superacan-emu-promo.mp4"

@@ -1,5 +1,18 @@
 # 工作歷程
 
+## 2026-09-02（續）：推廣影片重錄並進版控
+
+- 用發行的 AppImage（`29350d20…f16aae`）重錄一次，70 秒、960×720、60 fps、含聲音；
+  預建存檔與錄影都在容器內，輸入是腳本，可重現。
+- **進版控的版本另外壓一次**：`-preset veryslow -tune animation -crf 26`，
+  12.4 MB → 5.0 MB。逐幀比過介面文字（卡帶瀏覽器那一段最吃細節），crf 26 與 crf 20
+  肉眼無異；crf 30（3.3 MB）的文字開始變軟，所以停在 26。
+- **影片走 GitHub Release 附件，不進版控**（使用者 2026-09-02 決定）。這個 repo 的
+  pack 只有 791 KB，而二進位檔不做差分——每重錄一次就在歷程多留一份完整副本。
+  附件檔名固定成 `superacan-emu-promo.mp4`，README 指向
+  `releases/latest/download/superacan-emu-promo.mp4`，重錄只要 `--clobber` 覆蓋，
+  網址不變。`packaging/promo.sh` 多產一份 `-repo` 檔供上傳。
+
 ## 2026-09-02（續）：八款卡帶逐張對拍，19 張實際畫面與 Bcan 逐像素相同
 
 - 八款各跑一次 oracle（不送輸入，12–14 張、間隔 4–5 秒）共 96 張，每張都用兩種孔徑

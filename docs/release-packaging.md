@@ -237,6 +237,23 @@ docker run --rm --network none --memory 6g --cpus 4 --pids-limit 256 \
     superacan-package:v1 sh -c 'packaging/promo.sh /build/promo'
 ```
 
-產物是 `promo.avi`（MJPEG＋PCM，純 Go 錄出來的）與 `superacan-emu-promo.mp4`
-（H.264＋AAC）。**影片含遊戲執行畫面，版權仍屬原廠商**，與 `docs/screenshots/`
-同一個限制。
+產物三個：`promo.avi`（MJPEG＋PCM，純 Go 錄出來的原始錄影，約 330 MB）、
+`superacan-emu-promo.mp4`（H.264 crf 20＋AAC 128k，約 12 MB）與
+`superacan-emu-promo-repo.mp4`（H.264 crf 26 `-tune animation`＋AAC 96k，約 5 MB）。
+**影片含遊戲執行畫面，版權仍屬原廠商**，與 `docs/screenshots/` 同一個限制。
+
+### 影片走 Release 附件，不進版控
+
+二進位檔不做差分，**每重錄一次就會在 git 歷程留一份完整副本**，而這個 repo 的
+pack 只有幾百 KB。所以影片放 GitHub Release 的附件：
+
+```sh
+gh release upload <tag> build/promo/superacan-emu-promo-repo.mp4#superacan-emu-promo.mp4 --clobber
+```
+
+`#` 後面是附件顯示的檔名，固定成 `superacan-emu-promo.mp4`，README 才能一直指向
+`releases/latest/download/superacan-emu-promo.mp4` 這個不會變的網址。
+
+上傳的是 `-repo` 那一份而不是 crf 20 的原檔：`-tune animation` 對這種大面積平色的
+畫面有效，crf 26 下介面文字與 crf 20 逐字比肉眼無異，體積少一半（12.4 MB → 5.0 MB）。
+crf 30 只有 3.3 MB，但卡帶瀏覽器那一段的介面文字開始變軟，所以停在 26。
