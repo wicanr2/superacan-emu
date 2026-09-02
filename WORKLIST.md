@@ -149,16 +149,20 @@
 
 ## D. 模擬正確性
 
-- [ ] **Boom Zoo 標題各圖層的垂直落點**：logo 那一塊本專案比 Bcan 低 6 條，版權文字列
-  高 7 條，整張圖平移掃描的最佳位移是 0，所以是不同圖層各差幾條，不是整體偏移。
-  兩邊都已靜止，排除動畫相位。完成條件：定位到是哪個 scroll／window／sprite 欄位，
-  或證明是 oracle 侷限。見 [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。
+- [x] Boom Zoo 標題各圖層的垂直落點：是 Bcan 截圖把 224 條撐成 240 條造成的假偏移，
+  不是 renderer 缺陷。兩軸都還原後整張 0 差異，見
+  [`docs/bcan-oracle-diff.md`](docs/bcan-oracle-diff.md)。
+- [ ] **顯示區為什麼是第 8 條起的 224 條**。Bcan 的孔徑只涵蓋本專案 framebuffer 的
+  第 8–231 條，上下各 8 條在 oracle 這一側看不到；這是垂直方向的「右側 64 欄」問題。
+  完成條件：實機或掃描線層級的證據說明可見區的起點與行數，在那之前維持 `unknown`，
+  不依 oracle 的取景改 renderer。
 - [ ] **`tilePixel` region 2（2bpp）的位元次序沒有 oracle 證據**。region 1 已由 Bcan
   截圖定案為高半位元組先出；region 2 目前維持低位優先，只是沿用而非量到。完成條件：
   找到實際使用 2bpp tile 的畫面並與 Bcan 同狀態對照。
-- [ ] 在靜止畫面上完成與 Bcan 的逐像素差分並分類每一處差異。目前已能逐位元組相符的
-  是 Boom Zoo 標題的版權文字列與 Sango Fighter 開場旁白的一整行。完成條件：至少一款
-  卡帶的靜止畫面**整張**差異都能逐項標成 renderer 缺陷、oracle 侷限或硬體 unknown。
+- [x] 在靜止畫面上完成與 Bcan 的逐像素差分：Boom Zoo 標題整個顯示區 0 / 57,344。
+- [ ] 把逐像素定案擴到第二款的**整張**畫面。Sango Fighter 的開場文字帶已經是 0 差異，
+  但整張差 73%，差異在天空淡入的配色；第 2000–2200 個 frame 逐幀搜過都對不上 Bcan
+  的取樣時刻。完成條件：找到一款有靜止整屏且非捲動背景的畫面並做到 0 差異。
 - [ ] Sango Fighter 的 ROZ 文字位置：目前只有「取樣到的狀態文字在畫面外」這個觀察，
   沒有證據說算錯。要定案需要 oracle 同一瞬間的 ROZ 暫存器，也就是先解出 Bcan
   `ACANRTS` 的 payload 版面。

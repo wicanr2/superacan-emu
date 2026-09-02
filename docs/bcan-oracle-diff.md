@@ -13,15 +13,23 @@ UM6618 display mode」「The screenshot framebuffer is shorter than 320x240」�
 320×240 PNG，不含濾鏡與 4:3 修正。本專案 `acan-headless --screenshot-dir` 輸出的也是
 同一顆晶片的合成結果，因此兩邊可以逐像素比較，不需要色彩空間轉換。
 
-唯一要先還原的是水平方向：**孔徑固定 320 欄，但 UM6618 在 256 模式下只輸出 256 欄，
-Bcan 用最近鄰把它撐滿孔徑**。實測 Boom Zoo 標題（`video_flags=$9ACC`，bit 8 = 0）的
-截圖，第 *x* 欄與第 *x*+1 欄在每一個 *x* ≡ 0 (mod 5) 都完全相同，正好是
-`dst = floor(src × 320 / 256)` 的複製樣式；同一批工具下 Sango Fighter 開場
-（`video_flags=$03C8`，bit 8 = 1，320 模式）的截圖沒有任何一對相鄰欄相同。
+要先還原的是幾何：**孔徑固定 320×240，實際顯示區比它小，Bcan 用最近鄰把兩個軸都
+撐滿孔徑**。量法是數「完全相同的相鄰欄／列」——單色的列要先排除，否則平坦區域會
+混進來：
 
-`acan-imgdiff --reference-unstretch 256` 取 `src = ceil(dst × 320 / 256)` 把那一欄丟掉，
-還原成 256 欄再比；右側 64 欄補黑，與本專案 256 模式的輸出同框。沒有還原就在比兩張
-幾何不同的圖，量到的差異幾乎全是這個縮放，看不到 renderer 本身的問題。
+| 軸 | 量到的複製樣式 | 推回的原生尺寸 |
+|---|---|---|
+| 水平（256 模式，Boom Zoo `video_flags=$9ACC`）| 每個 *x* ≡ 0 (mod 5) 與 *x*+1 相同 | 256 欄，`dst = floor(src × 320 / 256)` |
+| 水平（320 模式，Sango `$03C8`）| 一對都沒有 | 320 欄，不縮放 |
+| 垂直（兩款都是）| *y* = 30, 45, 60, …, 210 與 *y*+1 相同 | 224 列，`dst = floor(src × 240 / 224)` |
+
+還原取 `src = ceil(dst × 孔徑 / 原生)`，也就是每一組重複裡丟掉多出來的那一份。
+本專案的 framebuffer 是 320×240，內容落在**第 8 條起的 224 條**，所以完整的還原
+規格是 `--reference-unstretch 256x224+0+8`（320 模式是 `320x224+0+8`）：
+把原生畫面擺回本專案的座標系，並以那個矩形當比較範圍。
+
+只還原一個軸不夠。Boom Zoo 標題只還原水平時差異 25.48%，兩軸都還原後降到 6.47%，
+而那 6.47% 全部落在會旋轉的球上；`--reference-out` 可以輸出還原後的參考圖做並排。
 
 ## 重現方式
 
@@ -47,13 +55,13 @@ go run ./cmd/acan-headless --ipl … --key … --sound-bios1 … --sound-bios2 �
     --rom "…/Boom Zoo (Taiwan).bin" --frames 4000 \
     --screenshot-dir out/boomzoo --screenshot-every 4
 go run ./cmd/acan-imgdiff --reference snap/shot-10.png \
-    --reference-unstretch 256 --width 256 \
+    --reference-unstretch 256x224+0+8 \
     --candidate-dir out/boomzoo --top 3 --diff diff.png \
     --reference-out unstretched.png
 ```
 
-`--reference-out` 會寫出還原後的參考圖，用來做並排圖；`--reference-unstretch`
-在 320 模式的畫面不要加。
+`--reference-unstretch` 的幾何同時就是比較範圍，所以不必再加 `--width`；
+320 模式的畫面用 `320x224+0+8`。`--reference-out` 會寫出還原後的參考圖做並排。
 
 ### 執行環境的實測限制
 
@@ -67,11 +75,9 @@ go run ./cmd/acan-imgdiff --reference snap/shot-10.png \
 
 ## 兩端可比與不可比的部分
 
-256 模式的比較一律是 `--reference-unstretch 256 --width 256`：前者還原 Bcan 的
-水平放大，後者把右側 64 欄排除在統計外。本專案在 256 模式把右側 64 欄輸出為黑，
-Bcan 撐滿；右側 64 欄的硬體真相仍是 `unknown`，不得依 Bcan 截圖改寫本專案 renderer。
-
-垂直方向沒有這個問題：兩邊都是 240 條，不需要還原。
+比較範圍由 `--reference-unstretch` 的幾何決定，範圍外不列入統計：256 模式下
+本專案右側 64 欄輸出為黑而 Bcan 撐滿，垂直方向本專案上下各有 8 條在 Bcan 的孔徑
+之外。這兩處的硬體真相都是 `unknown`，不得依 Bcan 截圖改寫本專案 renderer。
 
 ## 第一輪結果：5 位元調色盤展開
 
@@ -109,7 +115,7 @@ ROM 的回歸測試。證據等級 `confirmed-Bcan` + `MAME-derived`，尚未有
 `tilePixel` 的 region 1（4bpp packed，一個位元組兩個像素）原本讓偶數 *x* 取低半
 位元組。改成偶數 *x* 取高半位元組之後，Bcan 第 215–222 條與本專案第 208–215 條
 （同一段 56 欄）**逐位元組相同**；改回去則每一對相鄰欄互換。整張標題的差異由
-27.83% 降到 25.48%（`--reference-unstretch 256 --width 256`）。
+27.83% 降到 25.48%（當時只還原水平軸；兩軸都還原後見下一節）。
 
 第二款：Sango Fighter 開場旁白（320 模式，不需還原）。把畫面下緣 320×44 的文字帶
 單獨比對，同一頁旁白的差異由 16.78% 降到 8.68%，其中**第 206–225 條（20 條掃描線
@@ -132,22 +138,33 @@ region 2（2bpp，一個位元組四個像素）沒有同級證據。目前維�
 | Boom Zoo 1200 frame | `instructions=17369003`、`f720c9d1…b92301`，與 C10 基準相同 |
 | Sango Fighter 1200 frame | `instructions=11634924`、`f5bfffa1…4f9f06`，與 C10 基準相同 |
 | AppImage 與 headless 的 `--screenshot` PNG | 兩款都逐位元組相同 |
-| Boom Zoo 標題 vs `bz-10` | 25.48%（`--reference-unstretch 256 --width 256`）|
-| Sango 文字帶 vs `sango-06` | 8.68% |
-| Boom Zoo 版權文字列（Bcan 第 215–222 條 vs AppImage 第 208–215 條，56 欄）| 逐位元組相同 |
-| Sango 文字帶第 206–225 條（20×320）| 逐位元組相同 |
 
-並排圖：`docs/screenshots/appimage/boomzoo-title-bcan-vs-appimage.png`，左為還原後的
-Bcan、右為 AppImage。字形兩邊已經一致，看得出來的只剩整塊標題的垂直落點與球的
-旋轉相位。
+## 第三輪結果：整張標題與 oracle 完全相同
+
+幾何還原正確之後，Boom Zoo 標題不再有任何差異：
+
+| 對照 | 範圍 | 差異 |
+|---|---|---|
+| Bcan `bz-10` vs 本專案 frame 2336 | 256×224 全畫面（57,344 像素）| **0** |
+| Bcan `sango-06` 的旁白文字帶 vs 本專案 frame 2104 | 320×40（12,800 像素）| **0** |
+
+Boom Zoo 那一張是整個顯示區逐像素相同，包含 logo、中文副標、選單文字、版權行與
+舷窗。要對上的只有球的旋轉相位：拿同一段執行的其他 frame 去搜，第 2336、2340、
+2456、2460、2576 個 frame 都是 0 差異，其他 frame 的差異全部集中在球上。
+
+並排圖：`docs/screenshots/appimage/boomzoo-title-bcan-vs-appimage.png`，左為 Bcan 的
+原始截圖（320×240，兩軸都被撐開），右為本專案的 frame 2336（320×240，內容是
+256×224 擺在第 8 條起）。看起來的尺寸差就是孔徑縮放；還原之後兩張逐像素相同。
 
 ## 仍未解釋的差異
 
-- **Boom Zoo 標題的元素垂直落點**：logo 那一塊在 Bcan 從第 27 條開始，本專案從第 33
-  條；版權文字列反過來，Bcan 在第 215 條、本專案在第 208 條。整張圖做垂直平移掃描
-  時最佳位移是 0，所以不是整體偏移，而是不同圖層各自差幾條。Bcan 六張間隔 4 秒的
-  標題截圖彼此只差 1–6%，本專案第 3200–3800 個 frame 的落點也不動，兩邊都已靜止，
-  因此不是動畫相位。
+- **顯示區為什麼是 224 條、又為什麼從第 8 條起**：Bcan 的孔徑只涵蓋本專案第 8–231
+  條，上下各 8 條在 oracle 這一側看不到。這是垂直方向的「右側 64 欄」問題——同樣是
+  `unknown`，不得依 oracle 的取景改寫 renderer。要定案需要實機或掃描線層級的證據。
+- **Sango Fighter 開場全畫面**：旁白文字帶已經是 0 差異，但整張差 73%，差異集中在
+  天空的淡入配色。第 2000–2200 個 frame 逐幀搜過，沒有一個 frame 的淡入階段對得上
+  Bcan 的取樣時刻（Bcan 在容器內遠低於 60 Hz）。這是相位不是缺陷，但也因此無法用
+  這個畫面定案整張。
 - **Monopoly 的標題背景持續斜向捲動**，沒有任何一個 frame 對得上取樣時刻，
   這款不適合當逐像素 oracle。
 
@@ -157,4 +174,6 @@ Bcan、右為 AppImage。字形兩邊已經一致，看得出來的只剩整塊�
 |---|---|
 | Bcan 的 320×240 截圖是原生像素，兩邊可直接逐像素比 | 只有 320 模式成立；256 模式是最近鄰撐滿孔徑，要先 `--reference-unstretch 256` |
 | 256 模式兩邊的差異全部落在 `x ≥ 256` | 只在畫面內容近乎平坦時成立；有細節的畫面，撐滿造成的差異遍佈整行 |
+| 只還原水平就可以比 | 垂直也被撐開（224 → 240），只還原一個軸會留下隨畫面高度變化的假偏移 |
+| Boom Zoo 標題各圖層的垂直落點不同，原因不明 | 那是垂直撐滿造成的假象；兩軸都還原後整張 0 差異 |
 | 68000 走不到 Boom Zoo 標題畫面 | `$D06A` 之後的路徑已補上，標題可達 |

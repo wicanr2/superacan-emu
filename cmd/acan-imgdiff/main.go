@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 )
 
 type comparison struct {
@@ -33,7 +34,7 @@ func main() {
 	listDifferences := flag.Int("list-differences", 0, "print this many differing pixels of the best candidate as reference/candidate RGB pairs")
 	activeWidth := flag.Int("width", 0, "compare only the leftmost N columns; 0 compares the full image")
 	referenceOut := flag.String("reference-out", "", "write the reference after --reference-unstretch, for side-by-side figures")
-	unstretch := flag.Int("reference-unstretch", 0, "undo the oracle's nearest-neighbour horizontal upscale back to this native width (Bcan writes 256-column output stretched to 320)")
+	unstretch := flag.String("reference-unstretch", "", "undo the oracle's nearest-neighbour upscale: N for width only, or WxH+X+Y to undo both axes and place the native picture at (X,Y); the geometry also becomes the compared region")
 	flag.Parse()
 
 	if *reference == "" || (*candidate == "" && *candidateDir == "") {
@@ -41,8 +42,14 @@ func main() {
 	}
 
 	referenceImage := loadPNG(*reference)
-	if *unstretch > 0 {
-		referenceImage = unstretchColumns(referenceImage, *unstretch)
+	region := referenceImage.Bounds()
+	if *unstretch != "" {
+		native, placement := parseUnstretch(*unstretch, referenceImage.Bounds())
+		referenceImage = unstretchNearest(referenceImage, native, placement)
+		region = placement
+	}
+	if *activeWidth > 0 && region.Min.X+*activeWidth < region.Max.X {
+		region.Max.X = region.Min.X + *activeWidth
 	}
 	if *referenceOut != "" {
 		writePNG(*referenceOut, referenceImage)
@@ -69,7 +76,7 @@ func main() {
 
 	results := make([]comparison, 0, len(names))
 	for _, name := range names {
-		results = append(results, compare(referenceImage, loadPNG(name), name, *activeWidth))
+		results = append(results, compare(referenceImage, loadPNG(name), name, region))
 	}
 	// 以平均通道誤差排序：畫面幾乎一定有整張不同的候選，mismatch 會全部是 100%，
 	// 只有平均誤差能分辨「接近但有幾處錯」與「完全不同的畫面」。
@@ -86,29 +93,24 @@ func main() {
 	}
 
 	if *listDifferences > 0 {
-		printDifferences(referenceImage, loadPNG(results[0].name), *listDifferences, *activeWidth)
+		printDifferences(referenceImage, loadPNG(results[0].name), *listDifferences, region)
 	}
 	if *diffOut != "" {
-		writeDiff(*diffOut, referenceImage, loadPNG(results[0].name), *activeWidth)
+		writeDiff(*diffOut, referenceImage, loadPNG(results[0].name), region)
 	}
 }
 
 // compare 逐像素比對 RGB 三通道；alpha 不比較，因為兩端來源的 alpha 語意不同。
-// activeWidth 大於零時只比較最左邊那些欄：UM6618 在 256 模式下的顯示孔徑比
-// oracle 截圖的固定 320 欄窄，右側欄位在兩邊沒有相同語意，不應計入差異。
-func compare(reference, candidate image.Image, name string, activeWidth int) comparison {
-	bounds := reference.Bounds()
-	if candidate.Bounds() != bounds {
-		fail(fmt.Sprintf("%s has bounds %v, reference has %v", name, candidate.Bounds(), bounds))
+// region 是有意義的比較範圍：oracle 截圖固定 320×240，實際顯示區可能更窄或更矮，
+// 範圍外的像素在兩邊沒有相同語意，不應計入差異。
+func compare(reference, candidate image.Image, name string, region image.Rectangle) comparison {
+	if candidate.Bounds() != reference.Bounds() {
+		fail(fmt.Sprintf("%s has bounds %v, reference has %v", name, candidate.Bounds(), reference.Bounds()))
 	}
-	maxX := bounds.Max.X
-	if activeWidth > 0 && bounds.Min.X+activeWidth < maxX {
-		maxX = bounds.Min.X + activeWidth
-	}
-	result := comparison{name: name, total: (maxX - bounds.Min.X) * bounds.Dy()}
+	result := comparison{name: name, total: region.Dx() * region.Dy()}
 	var accumulated float64
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < maxX; x++ {
+	for y := region.Min.Y; y < region.Max.Y; y++ {
+		for x := region.Min.X; x < region.Max.X; x++ {
 			r0, g0, b0 := channels(reference.At(x, y))
 			r1, g1, b1 := channels(candidate.At(x, y))
 			difference := absDifference(r0, r1) + absDifference(g0, g1) + absDifference(b0, b1)
@@ -140,12 +142,10 @@ func absDifference(a, b int) int {
 }
 
 // writeDiff 輸出差異遮罩：相同像素轉灰階並壓暗，不同像素塗紅，方便肉眼定位區塊。
-func writeDiff(name string, reference, candidate image.Image, activeWidth int) {
-	bounds := reference.Bounds()
-	maxX := activeLimit(bounds, activeWidth)
-	out := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < maxX; x++ {
+func writeDiff(name string, reference, candidate image.Image, region image.Rectangle) {
+	out := image.NewRGBA(reference.Bounds())
+	for y := region.Min.Y; y < region.Max.Y; y++ {
+		for x := region.Min.X; x < region.Max.X; x++ {
 			r0, g0, b0 := channels(reference.At(x, y))
 			r1, g1, b1 := channels(candidate.At(x, y))
 			if r0 != r1 || g0 != g1 || b0 != b1 {
@@ -175,12 +175,10 @@ func writePNG(name string, img image.Image) {
 
 // printDifferences 列出前 limit 個相異像素，供人工判讀差異形狀
 // （整片錯色、單一通道偏移、或只有邊界像素不同）。
-func printDifferences(reference, candidate image.Image, limit, activeWidth int) {
-	bounds := reference.Bounds()
-	maxX := activeLimit(bounds, activeWidth)
+func printDifferences(reference, candidate image.Image, limit int, region image.Rectangle) {
 	printed := 0
-	for y := bounds.Min.Y; y < bounds.Max.Y && printed < limit; y++ {
-		for x := bounds.Min.X; x < maxX && printed < limit; x++ {
+	for y := region.Min.Y; y < region.Max.Y && printed < limit; y++ {
+		for x := region.Min.X; x < region.Max.X && printed < limit; x++ {
 			r0, g0, b0 := channels(reference.At(x, y))
 			r1, g1, b1 := channels(candidate.At(x, y))
 			if r0 == r1 && g0 == g1 && b0 == b1 {
@@ -193,42 +191,57 @@ func printDifferences(reference, candidate image.Image, limit, activeWidth int) 
 	}
 }
 
-// activeLimit 回傳實際要走訪的右界，與 compare 用同一條規則。
-func activeLimit(bounds image.Rectangle, activeWidth int) int {
-	if activeWidth > 0 && bounds.Min.X+activeWidth < bounds.Max.X {
-		return bounds.Min.X + activeWidth
+// parseUnstretch 解析 --reference-unstretch。接受兩種寫法：只給寬度的 "256"
+// （高度不動、原地擺放），或完整幾何 "256x224+0+8"。回傳原生尺寸與擺放位置，
+// 擺放位置同時就是有意義的比較範圍。
+func parseUnstretch(spec string, bounds image.Rectangle) (image.Point, image.Rectangle) {
+	if width, err := strconv.Atoi(spec); err == nil {
+		return image.Pt(width, bounds.Dy()), image.Rect(bounds.Min.X, bounds.Min.Y, bounds.Min.X+width, bounds.Max.Y)
 	}
-	return bounds.Max.X
+	var w, h, x, y int
+	if _, err := fmt.Sscanf(spec, "%dx%d+%d+%d", &w, &h, &x, &y); err != nil {
+		fail(fmt.Sprintf("--reference-unstretch %q: 需要 N 或 WxH+X+Y", spec))
+	}
+	if w <= 0 || h <= 0 {
+		fail(fmt.Sprintf("--reference-unstretch %q: 尺寸要大於零", spec))
+	}
+	return image.Pt(w, h), image.Rect(bounds.Min.X+x, bounds.Min.Y+y, bounds.Min.X+x+w, bounds.Min.Y+y+h)
 }
 
-// unstretchColumns 還原 oracle 的最近鄰水平放大。Bcan 0.0.8b 的截圖固定 320 欄，
-// 但 UM6618 在 256 模式（video flags bit 8 = 0）只輸出 256 欄，Bcan 是把 256 欄
-// 以 dst = floor(src * 320 / 256) 直接複製欄位填滿孔徑，因此每 5 欄就有一對相同。
-// 還原時取 src = ceil(dst * W / native)，即每組 5 欄中丟掉重複的那一欄；
-// 右側補黑，維持與本專案 320 欄輸出（256 模式右側輸出黑）相同的框架。
-func unstretchColumns(source image.Image, native int) image.Image {
+// unstretchNearest 還原 oracle 的最近鄰放大。Bcan 0.0.8b 的截圖孔徑固定 320×240，
+// 但 UM6618 實際輸出的顯示區更小（256 模式是 256 欄；量到的行數是 224），Bcan 以
+// dst = floor(src * 孔徑 / 原生) 直接複製整欄或整列填滿，因此每 5 欄有一對相同、
+// 每 15 列有一對相同。還原取 src = ceil(dst * 孔徑 / 原生)，即每組丟掉重複的那一份，
+// 再擺到 placement 指定的位置；範圍外補黑。
+func unstretchNearest(source image.Image, native image.Point, placement image.Rectangle) image.Image {
 	bounds := source.Bounds()
-	width := bounds.Dx()
-	if native <= 0 || native >= width {
-		return source
-	}
 	out := image.NewRGBA(bounds)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			out.Set(x, y, color.RGBA{A: 255})
 		}
 	}
-	for target := range native {
-		sourceX := bounds.Min.X + (target*width+native-1)/native
-		if sourceX >= bounds.Max.X {
-			sourceX = bounds.Max.X - 1
-		}
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			r, g, b := channels(source.At(sourceX, y))
-			out.Set(bounds.Min.X+target, y, color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255})
+	for targetY := range native.Y {
+		sourceY := bounds.Min.Y + scaleBack(targetY, bounds.Dy(), native.Y)
+		sourceY = min(sourceY, bounds.Max.Y-1)
+		for targetX := range native.X {
+			sourceX := bounds.Min.X + scaleBack(targetX, bounds.Dx(), native.X)
+			sourceX = min(sourceX, bounds.Max.X-1)
+			destX, destY := placement.Min.X+targetX, placement.Min.Y+targetY
+			if destX < bounds.Min.X || destX >= bounds.Max.X || destY < bounds.Min.Y || destY >= bounds.Max.Y {
+				continue
+			}
+			r, g, b := channels(source.At(sourceX, sourceY))
+			out.Set(destX, destY, color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255})
 		}
 	}
 	return out
+}
+
+// scaleBack 是 dst = floor(src * aperture / native) 的反函數：取 ceil，
+// 也就是每一組重複裡的最後一份。
+func scaleBack(target, aperture, native int) int {
+	return (target*aperture + native - 1) / native
 }
 
 func loadPNG(name string) image.Image {

@@ -113,10 +113,10 @@ framebuffer SHA-256 的值只記在
   開場圖版與 frame 5400 的遊戲中對話都正常。尚未定位是換場中的暫態還是特定 pixel
   mode 的解碼問題；該遊戲會使用 `$F001F0` 的 bit 3，而 MAME 只保存該位元、渲染路徑
   並未讀取。
-- 畫面正確性只到「可辨識、可操作」這一級。像素級對帳見
-  [`docs/bcan-oracle-diff.md`](bcan-oracle-diff.md)：Boom Zoo 標題的版權文字列與
-  Sango Fighter 開場旁白的一整行都已與 Bcan 逐位元組相同，剩下的差異是元素的垂直
-  落點與動畫相位。
+- 像素級對帳見 [`docs/bcan-oracle-diff.md`](bcan-oracle-diff.md)：Boom Zoo 標題的
+  整個顯示區（256×224）與 Bcan 逐像素相同，Sango Fighter 開場旁白的文字帶（320×40）
+  亦然。其餘畫面仍停在「可辨識、可操作」這一級，卡在動畫相位對不上 oracle 的取樣
+  時刻。
 - Super Dragon Force 是雙部分卡帶的 ZIP，音訊那一節取樣時尚未納入，不在音訊表內；
   3600-frame 表已包含它。
 
