@@ -48,6 +48,10 @@ func (u *UI) Fail(text string) { u.errorText = text }
 
 func (u *UI) fail(text string) { u.Fail(text) }
 
+// ErrorText 是目前顯示在錯誤列上的文字，空字串代表沒有錯誤。入口用它把介面上
+// 看得到的失敗同時寫進記錄；沒有這個出口的話，兩邊會各自維護一份「出了什麼事」。
+func (u *UI) ErrorText() string { return u.errorText }
+
 func (u *UI) expireToasts() {
 	kept := u.toasts[:0]
 	for _, t := range u.toasts {

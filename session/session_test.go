@@ -3,6 +3,7 @@ package session
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"image"
 	"os"
 	"path/filepath"
@@ -330,5 +331,65 @@ func TestHotkeyMuteOnlyChangesHostVolume(t *testing.T) {
 	advance(t, s, 1)
 	if got := s.Volume(); got != 0 {
 		t.Fatalf("全速時音量 %d，預期依 MuteOnFastFwd 靜音", got)
+	}
+}
+
+// 離開前景要把卡帶電池記憶體寫出去，並叫出覆蓋選單：行動平台沒有正常結束，
+// 切走的那一刻就是最後一次能寫檔的機會；而回到前景時凍住的畫面要有說明。
+func TestSuspendFlushesAndOpensTheOverlay(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 4)
+	before := s.System.Instructions
+
+	flushed := 0
+	s.Flush = func() error { flushed++; return nil }
+
+	if !s.Handle(ui.Life{Kind: ui.LifeSuspend}) {
+		t.Fatal("LifeSuspend 應該被 session 吃掉")
+	}
+	if flushed != 1 {
+		t.Fatalf("Flush 被呼叫 %d 次，預期 1 次", flushed)
+	}
+	if !s.UI.Visible() {
+		t.Fatal("離開前景應該叫出覆蓋選單")
+	}
+	advance(t, s, 8)
+	if s.System.Instructions != before {
+		t.Fatalf("離開前景之後模擬時間前進了 %d 條指令", s.System.Instructions-before)
+	}
+
+	// 回到前景不自動恢復執行：選單留在畫面上，由使用者按「繼續遊戲」。
+	if !s.Handle(ui.Life{Kind: ui.LifeResume}) {
+		t.Fatal("LifeResume 應該被 session 吃掉")
+	}
+	advance(t, s, 4)
+	if !s.UI.Visible() {
+		t.Fatal("回到前景不該自動關掉選單")
+	}
+	if s.System.Instructions != before {
+		t.Fatal("回到前景不該自動恢復執行")
+	}
+}
+
+// 落地失敗要留在錯誤列上，不能安靜吞掉：使用者的存檔沒寫成功是他必須知道的事。
+func TestSuspendReportsFlushFailure(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 2)
+	s.Flush = func() error { return errors.New("磁碟已滿") }
+	s.Handle(ui.Life{Kind: ui.LifeSuspend})
+	if got := s.UI.ErrorText(); got != "磁碟已滿" {
+		t.Fatalf("錯誤列是 %q，預期落地失敗的原因", got)
+	}
+}
+
+// 返回鍵仍然是介面導覽，不能被生命週期那一層攔走。
+func TestBackIsStillHandledByTheInterface(t *testing.T) {
+	s := newTestSession(t)
+	advance(t, s, 2)
+	if !s.Handle(ui.Life{Kind: ui.LifeBack}) {
+		t.Fatal("LifeBack 應該被吃掉")
+	}
+	if !s.UI.Visible() {
+		t.Fatal("遊戲中按返回鍵應該開啟選單")
 	}
 }

@@ -245,6 +245,8 @@ X11 與 macOS 前端的出廠鍵位。十七個動作都可以在設定 → 熱�
 - [`docs/capture-formats.md`](docs/capture-formats.md)：截圖與錄影在純 Go 下的可行格式
 - [`docs/verify-ui.md`](docs/verify-ui.md)：介面畫面雜湊、headless 覆蓋層驗證與卡帶基準
 - [`docs/macos-frontend.md`](docs/macos-frontend.md)：macOS 的 purego 視窗層與實機 smoke 步驟
+- [`docs/android-frontend.md`](docs/android-frontend.md)：Android 的兩層切法、cgo 量測、
+  表面尺寸政策、生命週期與返回鍵語意、工具鏈需求
 - [`docs/verify-rom-matrix.md`](docs/verify-rom-matrix.md)：八款商業 ROM 的執行與畫面矩陣
 - [`archive/cpp/README.md`](archive/cpp/README.md)：deprecated C++ oracle 的用途與重建方式
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、

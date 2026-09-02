@@ -124,9 +124,15 @@
   架構上 `CGO_ENABLED=0` 建置與 vet 通過，鍵碼表有單元測試。**還沒在真實 macOS 上
   跑過**——交叉編譯只證明組得起來，證明不了 Objective-C 呼叫慣例與事件迴圈的實機
   行為。實機 smoke 步驟見 [`docs/macos-frontend.md`](docs/macos-frontend.md)。
-- [ ] Android 平台層：走 Ebitengine 的 gomobile 路徑（cgo 例外），觸控輸入、虛擬手把、
-  生命週期（暫停／恢復）、存檔落地、螢幕旋轉與返回鍵行為。完成條件同 macOS，
-  另加建置需要 Android NDK 的說明。
+- [~] Android 平台層：`frontend/mobile`（表面尺寸政策與檔案位置）在
+  `GOOS=android CGO_ENABLED=0` 下建置通過並有單元測試；生命週期（離開前景落地＋
+  叫出選單、返回鍵）在 `session` 有測試；`mobile/acan` 的 `ebiten.Game`、觸控與
+  音訊只有 linux＋cgo 的建置與 vet。**缺 Android NDK，`ebitenmobile bind` 沒有跑過，
+  APK 與實機行為全部未驗證。** 契約、量測與實機 smoke 清單見
+  [`docs/android-frontend.md`](docs/android-frontend.md)。
+- [ ] Android 工具鏈 image（JDK 17＋cmdline-tools＋platform 34＋build-tools＋NDK，
+  約 5–6 GB）。這台機器同時放著其他專案的 image，而清理映像不是本專案能自行決定
+  的事，所以要先取得同意。有了它才能跑 `ebitenmobile bind` 與實機 smoke。
 - [ ] 三個平台的可重現發行包與第三方授權清單；只含程式，不含 ROM／BIOS／遊戲畫面。
 - [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
   Android 不受此檢查；模擬核心則在五個目標上都要通過。

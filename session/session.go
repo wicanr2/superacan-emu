@@ -30,6 +30,10 @@ type Session struct {
 	Stamp func(os.FileInfo) string
 	// Screenshot 收到截圖要求時被呼叫，由前端決定寫到哪裡。
 	Screenshot func(frame *image.RGBA) error
+	// Flush 由入口提供：把必須落地的狀態寫出去（目前是卡帶電池記憶體）。
+	// 行動平台離開前景時會呼叫它，因為那是最後一次能寫檔的機會。
+	Flush func() error
+
 	// OnQuit 在使用者要求離開時被呼叫。
 	OnQuit func()
 	// Loader 由入口提供：換卡帶要重建 machine.System，session 不做媒體載入，
@@ -166,8 +170,14 @@ func (s *Session) SetPad(player int, activeLow uint16) {
 	s.pads[player] = activeLow
 }
 
-// Handle 把一個介面事件交給 UI，回傳是否被吃掉。
-func (s *Session) Handle(event ui.Event) bool { return s.UI.Handle(event) }
+// Handle 把一個介面事件交給 UI，回傳是否被吃掉。生命週期事件先在這一層處理：
+// 離開前景要把東西寫到檔案，而 ui 不碰檔案。
+func (s *Session) Handle(event ui.Event) bool {
+	if life, ok := event.(ui.Life); ok && s.handleLifecycle(life) {
+		return true
+	}
+	return s.UI.Handle(event)
+}
 
 // Advance 推進一個 frame，並執行這一輪累積的 Intent。覆蓋層開著時不推進時間，
 // 但 Intent 照樣執行——存檔與讀檔本來就發生在 frame 邊界。

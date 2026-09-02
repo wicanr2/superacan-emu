@@ -660,3 +660,51 @@
 - 未證實：全螢幕；macOS 實機 smoke；Android 平台層未開始；音訊仍靠外部播放程序。
 - 下一個最小行動：Android 平台層（gomobile，cgo 例外）。
 - Docker 清理：本輪全部 `docker run --rm`，`docker ps` 沒有殘留本專案容器。
+
+## 2026-09-02（續）：Android 平台層——能驗證的部分
+
+- **cgo 例外是量出來的不是選出來的。** `GOOS=android CGO_ENABLED=0` 之下
+  `gomobile/internal/mobileinit` 與 `ebiten/internal/vibrate` 整批檔案被 build
+  constraint 排除；開了 cgo 但沒有 NDK，則會拿主機 gcc 去編 arm64 組語而失敗。
+  兩段錯誤訊息抄進 `docs/android-frontend.md`。
+- **`ebiten/v2/mobile` 在 linux＋cgo 下可以建置**，所以 `mobile/acan` 的型別檢查與
+  vet 在這台機器上跑得動。這只證明組得起來。
+- 依「會被實機打臉的」與「現在就能釘住的」把 Android 前端切成兩層：
+  - `frontend/mobile`（純 Go，`GOOS=android CGO_ENABLED=0` 建置通過並有單元測試）：
+    表面尺寸政策與檔案位置。Scale 取顯示密度，因為介面的最小觸控目標是 44 設計
+    單位，Scale＝密度時那 44 單位剛好是 44 dp；低密度小螢幕上照密度取值會讓設計
+    單位不夠放控制項，這時降 Scale——按鍵小一點還能按，控制項疊在一起就不能用。
+  - `mobile/acan`（需要 NDK）：`ebiten.Game`、觸控、音訊與 gomobile 匯出的四個
+    Java 入口。
+- 生命週期補在 `session` 而不是 `ui`：要落地的東西屬於主機端，`ui` 不碰檔案。
+  `LifeSuspend`／`LifeResume`／`LifeFocusLost`／`LifeFocusGained` 四個事件本來就
+  定義在 `ui.LifeKind` 裡，但**沒有任何地方處理**——只有 `LifeBack` 有。
+- 離開前景寫回卡帶電池記憶體，然後叫出覆蓋選單；回到前景不自動恢復執行。
+  叫選單不是只設暫停旗標，是因為凍住的畫面配上沒有說明的介面看起來像當掉，
+  而且要有一個明顯的「繼續遊戲」。設定與金手指在每次變更時就寫過，所以離開前景
+  只需要處理隨時在變的電池記憶體。桌面前端不送這些事件：視窗失去焦點就跳出選單
+  在桌面上是干擾，而桌面有正常的結束流程可以寫檔。
+- 返回鍵沿用 `ui.handleBack`（一律吃掉），所以**返回鍵不會關掉應用程式**：
+  遊戲中開選單、選單中退一層、退到根畫面停住，要離開用選單的「離開模擬器」。
+  這與桌面 Esc 目前不一致，WORKLIST A1 還沒拍板。
+
+### 沒做的與為什麼
+
+- `ebitenmobile bind` 沒有跑過，APK 與實機行為全部未驗證。缺 Android NDK，而
+  補上工具鏈是一個約 5–6 GB 的 image（JDK 17＋cmdline-tools＋platform 34＋
+  build-tools＋NDK）。**這台機器同時放著其他專案的 image，清理映像不是本專案能
+  自行決定的事**，所以先報數字再問，不自己開下去。列成 WORKLIST 自己的一項。
+- 沒有提交跑不起來的 Gradle 專案。Activity 的四個呼叫與 manifest 需求寫進
+  `docs/android-frontend.md`，工具鏈就位時照著做即可。
+
+### 本輪收尾
+
+- HEAD：`8ff5cc8`（另一個工作階段的 FRC／window 1 修正）之後。
+- 驗證：`docker/go.sh test ./...` 全綠；`vet ./...` 無輸出；`frontend/mobile`、`ui`、
+  `session` 在 `GOOS=android CGO_ENABLED=0` 下建置通過；`mobile/acan` 在 linux＋cgo
+  下建置與 vet 通過；darwin 兩個架構的 `CGO_ENABLED=0` 建置通過。九款卡帶
+  1200-frame 重跑與基準相同——本輪沒有動到 `machine`／`cpu`／`chip` 任何一個檔。
+- 未證實：Android 實機一切；macOS 實機 smoke；全螢幕；音訊仍靠外部播放程序（桌面）。
+- 下一個最小行動：等 Android 工具鏈的決定；在那之前可做的是三平台發行包與第三方
+  授權清單。
+- Docker 清理：本輪全部 `docker run --rm`，`docker ps` 沒有殘留本專案容器。
