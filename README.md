@@ -220,6 +220,18 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 預期：通過 UMC6650 交握與授權比對後進入卡帶，vblank IRQ 驅動遊戲主迴圈，
 畫面經 SDL2 顯示（Boom Zoo 可見標題「爆爆動物園」）。
 
+## 下載
+
+| 平台 | 檔案 |
+|---|---|
+| Linux x86_64 | [`SuperACan-x86_64.AppImage`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/SuperACan-x86_64.AppImage) |
+| macOS 12+（arm64 ＋ x86_64） | [`SuperACan-macOS-universal.app.zip`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/SuperACan-macOS-universal.app.zip) |
+| 雜湊 | [`SHA256SUMS.txt`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/SHA256SUMS.txt) |
+
+macOS 版未簽章，第一次開啟要「右鍵 → 打開」。**發行包不含 ROM 與 BIOS**，
+執行需要使用者自備。完整清單見
+[Releases](https://github.com/wicanr2/superacan-emu/releases)。
+
 ## 發行包（Linux）
 
 Linux 的發行形式是 AppImage：單一檔案、不需要安裝、不依賴發行版的套件庫，裡面是

@@ -12,6 +12,15 @@
   版權聲明檔，bitmapfont 的 README 也只標作者與授權名稱，只能照上游標示轉載。
 - 兩個包都重建並確認帶到新的授權檔（387 行、含 OFL 原文）；AppImage 的 300-frame
   smoke 與基準相同（`instructions=4364786`、`122922cb…c71198`）。
+- 公開 Release `v0.1.0-preview`（prerelease）：AppImage、macOS universal `.app.zip`
+  與 `SHA256SUMS.txt`。**上傳前逐項確認過包內沒有韌體或卡帶**——列了 AppImage 的
+  squashfs 內容（只有執行檔、圖示、`.desktop` 與兩份授權）與 `.app` 的 zip 清單。
+- **本機完整版** `build/full/SuperACan-full/`（另有 `.tar.gz`，共 57 MB／50 MB）：
+  三個平台的執行檔＋四份韌體＋九款卡帶＋`run.sh`。`run.sh` 把韌體、卡帶、存檔、
+  截圖與設定全指到包內的相對路徑，不碰 `$HOME` 的 XDG 目錄，整包搬走也能跑；
+  1200-frame 實跑結果與 C10 基準相同。包內附「請先讀我.txt」寫明不可對外散布，
+  並指向只含執行檔的公開 Release。`build/` 已在 `.gitignore` 內，`git check-ignore`
+  對韌體、卡帶與 tarball 逐一確認過。
 
 ## 2026-09-02（續）：推廣影片重錄並進版控
 
