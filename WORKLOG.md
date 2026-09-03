@@ -1086,3 +1086,29 @@
 - 下一個最小行動：CI 守住三個平台的建置與 `CGO_ENABLED=0`。
 - Docker 清理：本輪全部 `docker run --rm`（`docker/go.sh`、一次 `gofmt`、
   android／package 兩個 image 各數次），`docker ps` 沒有殘留本專案容器。
+
+## 2026-09-03（續）：README 補上 Bcan 與 BillyJr 的來歷
+
+「專案起源」原本只寫「手邊能用的模擬器是 Bcan 0.0.8b 與 MAME 的 driver」，
+沒有交代 Bcan 是誰做的，也沒寫這個 repo 為什麼在 2026-08-31 開第一個 commit。
+本輪把這條線補完，並新增「致謝」一節。
+
+### 來源與時間軸
+
+- Bcan 的作者是 BillyJr（T客邦報導寫作 Billy Jr）。2004 年第一版模擬器，
+  2010 年併進 MESS，2026-08-30 釋出 0.0.8b。
+- T客邦〈31年之後，聯電傳奇主機 Super A'Can 模擬器終於完美達成，重溫 1995 年
+  國產 16 位元巔峰榮光〉，李文恩，2026-08-31 15:30，
+  <https://www.techbang.com/posts/132758-super-acan-emulator>。
+- 本 repo 第一個 commit 是 2026-08-31，與報導同日，時間軸相符。
+- 上述年份與釋出日期都只有這一篇報導佐證，屬二手資料，README 內已標明。
+  BillyJr 的 Facebook 粉絲團原文與 Mega 載點尚未查證。
+
+### 本輪收尾
+
+- HEAD：`ff08d90` 之後再加這一次；改動只有 `README.md`（+25／−3）與本檔。
+- 驗證：無程式碼改動，未跑測試。README 兩處改動已逐段複讀；報導連結以 WebFetch 實抓，標題與日期取自該次回應。
+- 未證實：BillyJr 的年份、MESS 併入時間與 0.0.8b 釋出日期均引自單一報導，
+  未取得一手來源。
+- 下一個最小行動：CI 守住三個平台的建置與 `CGO_ENABLED=0`（沿用上一輪）。
+- Docker 清理：本輪未起容器。

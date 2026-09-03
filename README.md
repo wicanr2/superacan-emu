@@ -22,10 +22,17 @@ Super A'Can 是台灣自製的 16 位元家用主機，敦煌科技開發，晶�
 編者的話自述，以往的遊樂器雜誌幾乎都是轉載翻譯日本雜誌，這一冊則是
 「配合國人自行開發的主機 A'can 所編輯而成的刊物」（掃描 p.106／印刷 p.104）。
 
-三十年後，要跑這台主機的遊戲，手邊能用的模擬器是 Bcan 0.0.8b 與 MAME 的 driver。
-Bcan 閉源、只有 Windows 版、沒有公開移植。我想在 Linux 與 Android 上也能玩，
-這個專案就是從這裡開始的。1995 年這冊雜誌在意的是玩家不必再看日文、查字典；
-三十年後的問題變成不必開 Windows 才能玩。
+三十年後，要跑這台主機的遊戲，手邊能用的只有兩套：MAME 的 `supracan` driver，
+以及 BillyJr（報導寫作 Billy Jr）的 Bcan。UMC 那幾顆客製晶片沒有公開規格書，
+BillyJr 從 2004 年的第一版做起，2010 年把 Super A'Can 支援併進 MESS（後併入
+MAME），一路做到 2026 年 8 月 30 日釋出的 0.0.8b。這台主機能被逆向到今天這個
+程度，起點是他的工作；本專案的硬體行為對照也是拿 Bcan 0.0.8b 當 oracle。
+
+我是看到 T客邦 2026 年 8 月 31 日的
+[報導](https://www.techbang.com/posts/132758-super-acan-emulator)才知道 0.0.8b
+釋出。Bcan 閉源、只有 Windows 版、沒有公開移植，而我想在自己的 Linux 桌機上
+直接玩，這個專案就是從這裡開始的。1995 年這冊雜誌在意的是玩家不必再看日文、
+查字典；三十年後的問題變成不必開 Windows 才能玩。
 
 做法是依據唯讀知識庫 [superacan](https://github.com/wicanr2/superacan) 的
 Bcan／BIOS 逆向證據，以及 MAME driver（BSD-3-Clause）的硬體行為參考，把整台主機
@@ -362,6 +369,21 @@ X11 與 macOS 前端的出廠鍵位。十七個動作都可以在設定 → 熱�
 - [`docs/verify-ipl.md`](docs/verify-ipl.md)、[`docs/verify-video.md`](docs/verify-video.md)、
   [`docs/verify-audio-input.md`](docs/verify-audio-input.md)、[`docs/verify-misc.md`](docs/verify-misc.md)：
   各里程碑的可重現證據與限制
+
+## 致謝
+
+Bcan 的作者 BillyJr（報導寫作 Billy Jr）：Super A'Can 用的是 UMC 客製晶片，
+沒有公開規格書可查，他從 2004 年的第一版模擬器做到 2026 年 8 月的 0.0.8b，
+2010 年也把這台主機的支援併進 MESS（後併入 MAME）。本專案的畫面與音訊行為
+大量拿 Bcan 0.0.8b 當對照 oracle，沒有這份成果就沒有這個 repo。
+
+T客邦〈31年之後，聯電傳奇主機 Super A'Can 模擬器終於完美達成，重溫 1995 年
+國產 16 位元巔峰榮光〉（李文恩，2026-08-31）：本專案的起心動念來自這篇報導，
+上述 BillyJr 的年份與 0.0.8b 釋出日期也引自該文，屬二手資料。
+
+MAME `supracan.cpp`／`umc6619_sound.cpp` 的作者（Angelo Salese、Ryan Holtz、
+superctr 等）：UM6618 繪圖與 UM6619 音訊的第二份行為參考，授權與引用方式見
+「Deprecated C++ oracle 的第三方元件」。
 
 ## Deprecated C++ oracle 的第三方元件（固定）
 
