@@ -120,3 +120,42 @@ func (u *UI) drawFPS(c *canvas, snap Snapshot) {
 	c.textCenter(x, y+(m.RowHeight-c.font.Height(m.SmallSize))/2, width, m.SmallSize,
 		u.theme.Text, label)
 }
+
+// menuHintDuration 是「按什麼開選單」提示的顯示時間。夠久到看得完一行字，
+// 短到不會烙在錄影或截圖上。
+const menuHintDuration = 6 * time.Second
+
+// drawMenuHint 在遊戲執行中、選單還沒被打開過時，於左下角提示開選單的鍵。
+//
+// 為什麼需要它：覆蓋選單裡每一頁都有頁尾提示，唯獨最外層那一層沒有——
+// 第一次執行的人看到的是一個完全沒有操作線索的遊戲畫面。Bcan 是 Windows
+// 選單列，入口本身就看得見；自繪覆蓋層沒有那個好處，得自己補。
+//
+// 顯示的是**目前實際綁定**的鍵而不是寫死的 F1：鍵位可以重新指定，寫死的提示
+// 在改過鍵位之後會變成假訊息。觸控版面不畫，那邊螢幕上就有 ☰ 鍵。
+func (u *UI) drawMenuHint(c *canvas, snap Snapshot) {
+	if snap == nil || u.Visible() || u.menuOpened || u.mode != ModeGame {
+		return
+	}
+	if u.surface.Profile == ProfileTouch {
+		return
+	}
+	binding := u.hotkeyBinding("menu")
+	if binding.Empty() {
+		return
+	}
+	if !u.menuHintStarted {
+		u.menuHintSince, u.menuHintStarted = u.now, true
+	}
+	if u.now-u.menuHintSince >= menuHintDuration {
+		return
+	}
+	m := u.metrics
+	label := fmt.Sprintf(u.s.MenuHint, bindingText(u.s, binding))
+	width := c.font.Measure(label, m.SmallSize) + m.RowPadX*2
+	x, y := m.Grid, c.height()-m.RowHeight-m.Grid
+	c.rect(x, y, width, m.RowHeight, u.theme.PanelAlt)
+	c.border(x, y, width, m.RowHeight, u.theme.Border)
+	c.textCenter(x, y+(m.RowHeight-c.font.Height(m.SmallSize))/2, width, m.SmallSize,
+		u.theme.Text, label)
+}

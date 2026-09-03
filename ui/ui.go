@@ -50,6 +50,14 @@ type UI struct {
 	// mutedVolume 是靜音前的音量。設定檔存的是實際生效的音量，
 	// 所以「靜音前是多少」只活在這一輪。
 	mutedVolume int
+	// menuOpened 記這一輪有沒有開過選單。開過就不再提示——提示是給還不知道
+	// 選單在哪的人看的，知道之後它只是雜訊。
+	menuOpened bool
+	// menuHintSince 是提示第一次畫出來的時刻，用來讓它自己消失。要另外用
+	// menuHintStarted 記「有沒有開始」，不能拿零值當哨兵：now 是單調時間，
+	// 第一幀本來就可能是 0，那樣計時會每一幀重新歸零，提示永遠不消失。
+	menuHintSince   time.Duration
+	menuHintStarted bool
 }
 
 // Mode 決定介面的常駐畫面。
@@ -214,6 +222,7 @@ func (u *UI) Open() {
 	if u.mode != ModeGame || u.Visible() {
 		return
 	}
+	u.menuOpened = true
 	u.stack = []screen{&overlayScreen{}}
 	u.paused = true
 	u.emit(SetPaused{Paused: true})
@@ -347,6 +356,7 @@ func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
 	// 不論選單開不開，畫面上都必須看得出來。
 	u.drawCheatMarker(c)
 	u.drawFPS(c, snap)
+	u.drawMenuHint(c, snap)
 	u.drawErrorBar(c)
 	u.drawToasts(c)
 }

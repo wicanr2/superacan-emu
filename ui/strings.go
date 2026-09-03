@@ -184,6 +184,7 @@ type Strings struct {
 	CheatEvidenceWarning string
 	CheatActive          string
 	CheatMarker          string
+	MenuHint             string
 	CaptureStart         string
 	CaptureStop          string
 	CaptureHK            string

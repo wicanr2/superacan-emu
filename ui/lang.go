@@ -218,6 +218,7 @@ var translations = []translation{
 	{"CheatEvidenceWarning", [5]string{"Instruction counts and frame hashes from this session cannot be used as hardware evidence.", "Le nombre d'instructions et les hachages d'image de cette session ne valent pas comme preuve matérielle.", "El conteo de instrucciones y los hashes de esta sesión no sirven como evidencia de hardware.", "啟用期間的指令數與畫面雜湊不可作為硬體證據。", "启用期间的指令数与画面杂凑不可作为硬体证据。"}},
 	{"CheatActive", [5]string{"※ memory writing enabled", "※ écriture mémoire activée", "※ escritura de memoria activada", "※ 已啟用記憶體寫入", "※ 已启用记忆体写入"}},
 	{"CheatMarker", [5]string{"CHEAT", "CHEAT", "CHEAT", "CHEAT", "CHEAT"}},
+	{"MenuHint", [5]string{"%s  Menu", "%s  Menu", "%s  Menú", "%s  選單", "%s  菜单"}},
 	{"CaptureStart", [5]string{"Start recording", "Démarrer l'enregistrement", "Iniciar grabación", "開始錄影", "开始录影"}},
 	{"CaptureStop", [5]string{"Stop recording", "Arrêter l'enregistrement", "Detener grabación", "停止錄影", "停止录影"}},
 	{"CaptureHK", [5]string{"F9", "F9", "F9", "F9", "F9"}},
