@@ -18,23 +18,17 @@ Super A'Can 是台灣自製的 16 位元家用主機，敦煌科技開發，晶�
 > 高科技電玩產品，我的名字叫『A'can』，是剛誕生的國產 16 位元遊戲主機，
 > 請……多多指教。」（掃描 p.14／印刷 p.12）
 
-同一頁的側欄寫「終於……終於可以脫離看日文、查字典來玩遊戲的惡夢了」。這冊雜誌把
-主機的賣點放在中文化，不放在規格：「A'can 在初期的戰略指向必定是鎖定國內玩家
-最最渴望的中文化作為目標，以期拉近與玩家間的距離」（掃描 p.21／印刷 p.19）。
-編者的話自述，以往的遊樂器雜誌幾乎都是轉載翻譯日本雜誌，這一冊則是
-「配合國人自行開發的主機 A'can 所編輯而成的刊物」（掃描 p.106／印刷 p.104）。
-
 三十年後，要跑這台主機的遊戲，手邊能用的只有兩套：MAME 的 `supracan` driver，
 以及 BillyJr（報導寫作 Billy Jr）的 Bcan。
 
 在沒有晶片公開規格書，BillyJr 從 2004 年的第一版做起，2010 年把 Super A'Can 支援併進 MESS（後併入
 MAME），一路做到 2026 年 8 月 30 日釋出的 0.0.8b。這台主機能被逆向到今天這個
-程度，起點是他的工作；本專案的硬體行為對照也是拿 Bcan 0.0.8b 當 oracle。
+程度；本專案的硬體行為對照也是拿 Bcan 0.0.8b 當原版主機對照。
 
 而我想在自己的 Linux 桌機上直接玩，這個專案就是從這裡開始的。
 
-做法是依據唯讀知識庫 [superacan](https://github.com/wicanr2/superacan) 的
-Bcan／BIOS 逆向證據，以及 MAME driver（BSD-3-Clause）的硬體行為參考，把整台主機
+專案做法是先建立知識庫 [superacan](https://github.com/wicanr2/superacan) 的
+Bcan／BIOS 逆向證據，以及參考 MAME driver（BSD-3-Clause）的硬體行為參考，把整台主機
 用純 Go 重新實作、不用 cgo；同一份核心編成 Linux AppImage、macOS `.app` 與
 Android APK（見「下載」）。
 
