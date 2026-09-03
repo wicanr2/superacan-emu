@@ -6,12 +6,38 @@ production 主線正改以純 Go 重寫 68000／65C02、UMC6650、UM6618、UM661
 輸入與整機時間線，Ebitengine 將負責跨平台前端；遊戲只用來驗證晶片行為，這不是
 遊戲 remake。
 
-Bcan 0.0.8b 是閉源 Windows 模擬器且沒有公開移植。本專案依據唯讀知識庫
-[superacan](https://github.com/wicanr2/superacan) 的 Bcan／BIOS 逆向證據，以及 MAME
-driver（BSD-3-Clause）的硬體行為參考，建立獨立、可攜的純 Go 實作。
+## 專案起源
 
-長期目標：以可追溯、可重現的晶片模型在 Linux 執行 Super A'Can 軟體，並在核心
-收斂後提供 macOS 版本。模擬器原始碼同時是硬體文件；相容性不能取代硬體證據。
+Super A'Can 是台灣自製的 16 位元家用主機，敦煌科技開發，晶片由聯華電子供應，
+1995 年上市。上市同一個月，尖端出版印了一冊《A'can 特輯》（電玩玩味叢書 016，
+1995 年 10 月初版），硬體解析那一頁讓主機自己開口：
+
+> 「我是『台灣敦煌科技有限公司』所有高級工程師，花了將近 3 年嘔心瀝血催生的
+> 高科技電玩產品，我的名字叫『A'can』，是剛誕生的國產 16 位元遊戲主機，
+> 請……多多指教。」（掃描 p.14／印刷 p.12）
+
+同一頁的側欄寫「終於……終於可以脫離看日文、查字典來玩遊戲的惡夢了」。這冊雜誌把
+主機的賣點放在中文化，不放在規格：「A'can 在初期的戰略指向必定是鎖定國內玩家
+最最渴望的中文化作為目標，以期拉近與玩家間的距離」（掃描 p.21／印刷 p.19）。
+編者的話自述，以往的遊樂器雜誌幾乎都是轉載翻譯日本雜誌，這一冊則是
+「配合國人自行開發的主機 A'can 所編輯而成的刊物」（掃描 p.106／印刷 p.104）。
+
+三十年後，要跑這台主機的遊戲，手邊能用的模擬器是 Bcan 0.0.8b 與 MAME 的 driver。
+Bcan 閉源、只有 Windows 版、沒有公開移植。我想在 Linux 與 Android 上也能玩，
+這個專案就是從這裡開始的。1995 年這冊雜誌在意的是玩家不必再看日文、查字典；
+三十年後的問題變成不必開 Windows 才能玩。
+
+做法是依據唯讀知識庫 [superacan](https://github.com/wicanr2/superacan) 的
+Bcan／BIOS 逆向證據，以及 MAME driver（BSD-3-Clause）的硬體行為參考，把整台主機
+用純 Go 重新實作、不用 cgo；同一份核心編成 Linux AppImage、macOS `.app` 與
+Android APK（見「下載」）。目標是以可追溯、可重現的晶片模型在 Linux、macOS 與
+Android 執行 Super A'Can 軟體。模擬器原始碼同時是硬體文件；相容性不能取代硬體證據。
+
+《A'can 特輯》的版權頁印「本書圖文皆轉載於敦煌科技及各軟體廠商」，它記的是開發
+公司當時對外的說法，不是獨立量測；與實測衝突時以實測為準。上面的頁碼是私有專藏
+《電視遊樂雜誌》的掃描頁序，本 repo 不收錄雜誌掃描與全文。史料整理與逐條對照見
+知識庫的 [`docs/history/`](https://github.com/wicanr2/superacan/blob/master/docs/history/README.md)
+與 [`docs/console-history.md`](https://github.com/wicanr2/superacan/blob/master/docs/console-history.md)。
 
 ## 目前進度（純 Go 轉向）
 
@@ -364,6 +390,8 @@ PCM 合成模型（通道/period/音量/key/DMA/timer 暫存器語意與混音�
 - `docs/screenshots/bcan/` 是 Bcan 0.0.8b 的介面截圖，版權屬其作者，
   僅作介面對照；截圖時未載入卡帶，不含遊戲畫面。
 - 硬體規格結論引自知識庫 `acan/docs/`（對 Bcan 0.0.8b 的逆向分析）。
+- 「專案起源」引用的《A'can 特輯》（尖端出版，1995）為短引並附頁碼，著作權屬
+  尖端出版與敦煌科技；雜誌掃描與 OCR 全文不收錄，也不會放上公開站台。
 
 ## 授權
 
