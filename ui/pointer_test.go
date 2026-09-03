@@ -16,6 +16,16 @@ func desktopUI(t *testing.T) (*UI, Surface) {
 	return u, surface
 }
 
+// firstHitBelowTitle 跳過標題列上的「返回」，回傳內容區的第一塊命中區。
+func firstHitBelowTitle(u *UI) image.Point {
+	for _, hit := range u.hits {
+		if hit.rect.Min.Y >= u.metrics.TitleBar {
+			return image.Pt((hit.rect.Min.X+hit.rect.Max.X)/2, (hit.rect.Min.Y+hit.rect.Max.Y)/2)
+		}
+	}
+	return image.Point{}
+}
+
 func rowCenter(u *UI, index int) image.Point {
 	rect := u.hits[index].rect
 	return image.Pt((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2)
@@ -105,11 +115,10 @@ func TestPointerLoadsACartridgeFromTheBrowser(t *testing.T) {
 	renderImage(u, surface)
 
 	var loaded string
-	before := len(u.hits)
-	if before == 0 {
+	if len(u.hits) == 0 {
 		t.Fatal("瀏覽器沒有登記可點區域")
 	}
-	click(u, rowCenter(u, 0))
+	click(u, firstHitBelowTitle(u))
 	for _, intent := range u.TakeIntents() {
 		if load, ok := intent.(LoadCartridge); ok {
 			loaded = load.Path
@@ -117,5 +126,59 @@ func TestPointerLoadsACartridgeFromTheBrowser(t *testing.T) {
 	}
 	if loaded == "" {
 		t.Fatal("點清單第一列沒有送出載入卡帶的 Intent")
+	}
+}
+
+// 每個有清單或選項的畫面都要吃指標。這條掃過所有畫面，任何一個沒有登記
+// 命中區就會被抓出來——新畫面忘了接指標時，這裡會先紅。
+func TestEveryListScreenAcceptsPointer(t *testing.T) {
+	surface := Surface{W: 960, H: 720, Scale: 1, Profile: ProfileCompact}
+	for _, tc := range []struct {
+		name   string
+		screen screen
+	}{
+		{"S1 卡帶瀏覽器", &browserScreen{}},
+		{"S4 存檔槽", &slotsScreen{}},
+		{"S5 設定", &settingsScreen{}},
+		{"S5.1 輸入綁定", &bindingScreen{}},
+		{"S5.2 熱鍵", &hotkeyScreen{}},
+		{"S5.3 影像", &videoScreen{}},
+		{"S5.4 音訊", &audioScreen{}},
+		{"S5.6 觸控版面", &touchScreen{}},
+		{"S6.1 金手指搜尋", &cheatSearchScreen{width: 1}},
+		{"S6.2 金手指清單", &cheatListScreen{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u := New(Options{Surface: surface, Config: DefaultConfig(), Slots: fixedSlots{},
+				Library: fixedLibrary{}, Firmware: fixedFirmware{complete: true}, About: fixedAbout})
+			u.Update(0)
+			u.push(tc.screen)
+			renderImage(u, surface)
+			content := 0
+			for _, hit := range u.hits {
+				if hit.rect.Min.Y >= u.metrics.TitleBar {
+					content++
+				}
+			}
+			if content == 0 {
+				t.Fatalf("%s 沒有在內容區登記任何命中區", tc.name)
+			}
+		})
+	}
+}
+
+// 走 page 的畫面共用同一個標題列，返回因此一次都能點。
+func TestPointerBackFromSharedTitleBar(t *testing.T) {
+	surface := Surface{W: 960, H: 720, Scale: 1, Profile: ProfileCompact}
+	u := New(Options{Surface: surface, Config: DefaultConfig(), Slots: fixedSlots{},
+		Library: fixedLibrary{}, Firmware: fixedFirmware{complete: true}})
+	u.Update(0)
+	u.Open()
+	u.push(&browserScreen{})
+	renderImage(u, surface)
+	depth := len(u.stack)
+	click(u, image.Pt(u.metrics.PanelPad+4, u.metrics.TitleBar/2))
+	if len(u.stack) >= depth {
+		t.Fatalf("點標題列的返回沒有退堆疊：%d → %d", depth, len(u.stack))
 	}
 }

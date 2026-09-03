@@ -112,10 +112,10 @@
 - [x] 設定檔：JSON，路徑依 XDG（macOS 走 Application Support），未知欄位保留。
 - [x] 介面語言：英／法／西／繁中／簡中，切換不需重啟（畫面每一幀都從字串表取字）。
 
-- [ ] **把命中區補到其餘畫面**：存檔槽（S4）、熱鍵清單（S5.2）、金手指清單（S6.2）
-  與設定裡的選項列目前只吃鍵盤。單欄選單、確認對話與卡帶瀏覽器已經可以用指標點，
-  機制見 [`docs/ui-design.md`](docs/ui-design.md) §9.1.1，補其餘畫面是照著加
-  `addHit` 並把確認邏輯抽成 `activate`。
+- [x] 命中區已補到覆蓋層的每一個畫面（含存檔槽的頁籤、金手指搜尋的按鈕與候選、
+  共用標題列的返回）。`TestEveryListScreenAcceptsPointer` 掃過所有畫面，
+  新畫面忘了接指標會先紅。機制見
+  [`docs/ui-design.md`](docs/ui-design.md) §9.1.1。
 - [ ] **macOS 前端的滑鼠事件**。X11 已經接上，Cocoa 這邊卡在
   `NSEvent.locationInWindow` 回傳的是 `NSPoint`（兩個 CGFloat 的結構），
   purego 的 `objc.ID.Send` 只取得到整數回傳值，在 arm64 上結構是走浮點暫存器的，

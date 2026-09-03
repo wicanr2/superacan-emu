@@ -23,15 +23,19 @@ func (t *touchScreen) rows(u *UI) []optionRow {
 }
 
 func (t *touchScreen) handle(u *UI, ev Event) bool {
-	return handleOptions(u, ev, &t.focus, t.rows(u), func() {
+	return handleOptions(u, ev, &t.focus, t.rows(u), t.apply(u))
+}
+
+func (t *touchScreen) apply(u *UI) func() {
+	return func() {
 		// 版面參數一改就要重算，否則要等到轉向才生效。
 		u.touch.layout = TouchLayout{}
 		u.emit(ApplyConfig{Config: u.config})
-	})
+	}
 }
 
 func (t *touchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	top, _ := page{title: u.s.TouchTitle, back: true, status: u.s.TouchNote}.draw(u, c)
-	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, t.rows(u), t.focus)
+	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, t.rows(u), &t.focus, t.apply(u))
 }

@@ -15,6 +15,8 @@ func (p page) draw(u *UI, c *canvas) (int, int) {
 	u.fillPage(c)
 	if p.back {
 		c.rowTextFit(m.PanelPad, 0, m.TitleBar, m.BodySize, c.width()/4, u.theme.TextDim, u.s.Back)
+		// 返回登記在共用的標題列上，所有走 page 的畫面因此一次都能點。
+		u.addHit(0, 0, m.PanelPad+c.width()/4, m.TitleBar, nil, func(u *UI) { u.handleBack() })
 	}
 	c.textCenter(0, (m.TitleBar-c.font.Height(m.TitleSize))/2, c.width(), m.TitleSize, u.theme.Text, p.title)
 	if p.right != "" {

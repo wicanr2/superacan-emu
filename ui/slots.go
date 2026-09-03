@@ -135,6 +135,7 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 
 	// 標題列
 	c.rowText(m.PanelPad, 0, m.TitleBar, m.BodySize, theme.TextDim, u.s.Back)
+	u.addHit(0, 0, m.PanelPad+c.width()/4, m.TitleBar, nil, func(u *UI) { u.handleBack() })
 	title := u.s.SlotsTitle
 	if snap != nil {
 		if name, _, _ := snap.Cartridge(); name != "" {
@@ -142,7 +143,7 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 		}
 	}
 	c.textCenter(0, (m.TitleBar-c.font.Height(m.TitleSize))/2, c.width(), m.TitleSize, theme.Text, title)
-	u.drawModeTabs(c, m.TitleBar, s.mode)
+	u.drawModeTabs(c, m.TitleBar, s.mode, func(mode slotMode) { s.mode = mode })
 	c.rect(0, m.TitleBar, c.width(), 1, theme.Border)
 
 	// 縮圖格線：payload 內的 framebuffer 是 320×240，等比縮到 160×120 是整數 1/2。
@@ -181,6 +182,9 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 		case info.Present:
 			mark, markColor = " ✔", theme.OK
 		}
+		cell := slot
+		u.addHit(x-4, y-4, thumbW+8, cellH, func(*UI) { s.focus = cell },
+			func(u *UI) { s.focus = cell; s.activate(u) })
 		c.rowText(x, y+thumbH, m.RowHeight, m.BodySize, theme.Text, label)
 		if mark != "" {
 			c.rowText(x+c.font.Measure(label, m.BodySize), y+thumbH, m.RowHeight, m.BodySize, markColor, mark)
@@ -204,7 +208,8 @@ func (s *slotsScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	c.rowText(m.PanelPad, footerY+m.FooterBar, m.FooterBar, m.BodySize, theme.TextDim, u.s.SlotKeys)
 }
 
-func (u *UI) drawModeTabs(c *canvas, barHeight int, mode slotMode) {
+// drawModeTabs 畫「存檔／讀檔」兩個頁籤。setMode 非 nil 時兩個頁籤可以點。
+func (u *UI) drawModeTabs(c *canvas, barHeight int, mode slotMode, setMode func(slotMode)) {
 	m := u.metrics
 	labels := [2]string{u.s.ModeSave, u.s.ModeLoad}
 	width := 0
@@ -221,5 +226,9 @@ func (u *UI) drawModeTabs(c *canvas, barHeight int, mode slotMode) {
 			text = u.theme.FocusText
 		}
 		c.textCenter(x+i*width, y+(m.RowHeight-c.font.Height(m.BodySize))/2, width, m.BodySize, text, label)
+		if setMode != nil {
+			target := slotMode(i)
+			u.addHit(x+i*width, y, width, m.RowHeight, nil, func(*UI) { setMode(target) })
+		}
 	}
 }

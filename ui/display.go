@@ -53,18 +53,23 @@ func (v *videoScreen) rows(u *UI) []optionRow {
 
 func (v *videoScreen) handle(u *UI, ev Event) bool {
 	rows := v.rows(u)
-	return handleOptions(u, ev, &v.focus, rows, func() {
+	return handleOptions(u, ev, &v.focus, rows, v.apply(u))
+}
+
+// apply 是這個畫面改完值之後要做的事，handle 與 draw 共用同一份。
+func (v *videoScreen) apply(u *UI) func() {
+	return func() {
 		u.config.Video.Aspect = aspectValues[v.aspect]
 		u.config.Video.Filter = filterValues[v.filter]
 		u.emit(ApplyConfig{Config: u.config})
-	})
+	}
 }
 
 func (v *videoScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	v.sync(u)
 	top, _ := page{title: u.s.VideoTitle, back: true, status: u.s.VideoApertureNote}.draw(u, c)
-	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, v.rows(u), v.focus)
+	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, v.rows(u), &v.focus, v.apply(u))
 }
 
 // audioScreen 是 S5.4 音訊設定。
@@ -102,16 +107,20 @@ func (a *audioScreen) rows(u *UI) []optionRow {
 }
 
 func (a *audioScreen) handle(u *UI, ev Event) bool {
-	return handleOptions(u, ev, &a.focus, a.rows(u), func() {
+	return handleOptions(u, ev, &a.focus, a.rows(u), a.apply(u))
+}
+
+func (a *audioScreen) apply(u *UI) func() {
+	return func() {
 		u.emit(SetVolume{Percent: u.config.Audio.MasterVolume})
 		u.emit(ApplyConfig{Config: u.config})
-	})
+	}
 }
 
 func (a *audioScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	top, _ := page{title: u.s.AudioTitle, back: true, status: u.s.AudioNote}.draw(u, c)
-	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, a.rows(u), a.focus)
+	drawOptionRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, a.rows(u), &a.focus, a.apply(u))
 }
 
 // AudioStats 是主機播放端的狀態。這些數字只描述播放，不描述 UM6619。

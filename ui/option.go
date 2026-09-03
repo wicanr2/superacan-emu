@@ -165,16 +165,7 @@ func handleOptions(u *UI, ev Event, focus *int, rows []optionRow, changed func()
 	case Action:
 		switch e.Kind {
 		case ActConfirm:
-			if *focus < len(rows) {
-				row := rows[*focus]
-				if row.disabled {
-					u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
-					return true
-				}
-				if row.adjust(1) && changed != nil {
-					changed()
-				}
-			}
+			activateOption(u, rows, *focus, changed)
 			return true
 		case ActCancel:
 			u.pop()
@@ -184,23 +175,51 @@ func handleOptions(u *UI, ev Event, focus *int, rows []optionRow, changed func()
 	return false
 }
 
-// drawOptionRows 畫一欄設定。
-func drawOptionRows(u *UI, c *canvas, x, y, width int, rows []optionRow, focus int) int {
+// activateOption 是「確認一列設定」的唯一實作，鍵盤與指標共用。
+// 確認等同往右一格：選項循環到下一個、開關切換、數值加一階。
+func activateOption(u *UI, rows []optionRow, index int, changed func()) {
+	if index < 0 || index >= len(rows) {
+		return
+	}
+	row := rows[index]
+	if row.disabled {
+		u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
+		return
+	}
+	if row.adjust(1) && changed != nil {
+		changed()
+	}
+}
+
+// drawOptionRows 畫一欄設定。focus 收指標並帶上 changed，是為了讓指標也能改值；
+// 點一下等同按右鍵，與鍵盤的確認鍵一致。
+func drawOptionRows(u *UI, c *canvas, x, y, width int, rows []optionRow, focus *int, changed func()) int {
+	return drawOptionRowsWith(u, c, x, y, width, rows, focus,
+		func(u *UI, index int) { activateOption(u, rows, index, changed) })
+}
+
+// drawOptionRowsWith 讓確認行為由呼叫端決定。金手指搜尋畫面的某些列按確認不是
+// 改值而是開啟數值輸入，那個畫面因此不能用預設行為。
+func drawOptionRowsWith(u *UI, c *canvas, x, y, width int, rows []optionRow, focus *int, onActivate func(*UI, int)) int {
 	m := u.metrics
 	for index, row := range rows {
-		colour := u.focusRow(c, x, y, width, index == focus)
-		if row.disabled && index != focus {
+		colour := u.focusRow(c, x, y, width, index == *focus)
+		if row.disabled && index != *focus {
 			colour = u.theme.TextOff
 		}
 		c.rowTextFit(x+m.RowPadX, y, m.RowHeight, m.BodySize, width/3-m.RowPadX*2, colour, row.label)
 		c.rowTextFit(x+width/3, y, m.RowHeight, m.BodySize, width/3-m.Grid, colour, row.display(u.s))
 		if row.note != "" {
 			note := u.theme.TextDim
-			if index == focus {
+			if index == *focus {
 				note = u.theme.FocusText
 			}
 			c.rowTextFit(x+width*2/3, y, m.RowHeight, m.SmallSize, width/3-m.RowPadX, note, row.note)
 		}
+		target := index
+		u.addHit(x, y, width, m.RowHeight,
+			func(*UI) { *focus = target },
+			func(u *UI) { *focus = target; onActivate(u, target) })
 		y += m.RowHeight
 	}
 	return y

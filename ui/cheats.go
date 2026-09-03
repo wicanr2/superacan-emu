@@ -175,16 +175,7 @@ func (s *cheatSearchScreen) handle(u *UI, ev Event) bool {
 	case Action:
 		switch e.Kind {
 		case ActConfirm:
-			switch {
-			case s.focus == 3:
-				s.editing = true
-			case s.focus == len(rows):
-				s.command(u, CheatNewSearch)
-			case s.focus == len(rows)+1:
-				s.command(u, CheatRefine)
-			case s.focus == len(rows)+2:
-				s.command(u, CheatClearSearch)
-			}
+			s.activate(u, len(rows))
 			return true
 		case ActSecondary:
 			// 對目前選到的候選加入清單並鎖定。
@@ -216,6 +207,25 @@ func (s *cheatSearchScreen) handle(u *UI, ev Event) bool {
 	return false
 }
 
+// activate 是「確認目前這一項」的唯一實作，鍵盤與指標共用。
+// 這個畫面的確認不是統一的改值：第 3 列開啟數值輸入，最後三項是按鈕。
+func (s *cheatSearchScreen) activate(u *UI, rowCount int) {
+	switch {
+	case s.focus == 3:
+		s.editing = true
+	case s.focus == rowCount:
+		s.command(u, CheatNewSearch)
+	case s.focus == rowCount+1:
+		s.command(u, CheatRefine)
+	case s.focus == rowCount+2:
+		s.command(u, CheatClearSearch)
+	default:
+		if s.focus < rowCount {
+			s.rows(u)[s.focus].adjust(1)
+		}
+	}
+}
+
 func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	state := u.cheats()
@@ -226,7 +236,8 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	x := m.PanelPad
 	width := c.width() - m.PanelPad*2
 	rows := s.rows(u)
-	y := drawOptionRows(u, c, x, top, width, rows, s.focus)
+	y := drawOptionRowsWith(u, c, x, top, width, rows, &s.focus,
+		func(u *UI, _ int) { s.activate(u, len(rows)) })
 	y += m.Grid
 
 	buttons := []string{u.s.CheatNewSearch, u.s.CheatRefine, u.s.CheatClear}
@@ -234,6 +245,10 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	for index, label := range buttons {
 		u.drawButton(c, x+index*(buttonW+m.Grid), y, buttonW, m.RowHeight, label,
 			s.focus == len(rows)+index)
+		target := len(rows) + index
+		u.addHit(x+index*(buttonW+m.Grid), y, buttonW, m.RowHeight,
+			func(*UI) { s.focus = target },
+			func(u *UI) { s.focus = target; s.activate(u, len(rows)) })
 	}
 	y += m.RowHeight + m.SectionGap
 
@@ -254,6 +269,8 @@ func (s *cheatSearchScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		c.rowText(x+width/4, y, m.RowHeight, m.SmallSize, colour, fmt.Sprintf("%d", candidate.Value))
 		c.rowText(x+width/2, y, m.RowHeight, m.SmallSize, colour,
 			fmt.Sprintf(u.s.CheatPrevious, candidate.Previous))
+		pick := index
+		u.addHit(x, y, width, m.RowHeight, func(*UI) { s.list = pick }, nil)
 		y += m.RowHeight
 	}
 }
@@ -277,10 +294,7 @@ func (s *cheatListScreen) handle(u *UI, ev Event) bool {
 	case Action:
 		switch e.Kind {
 		case ActConfirm:
-			if s.focus < len(state.Entries) {
-				u.emit(Cheat{Command: CheatToggleLock, Index: s.focus})
-				u.toast(u.s.CheatEvidenceWarning, SeverityWarn)
-			}
+			s.toggleLock(u)
 			return true
 		case ActDelete:
 			if s.focus < len(state.Entries) {
@@ -302,6 +316,15 @@ func (s *cheatListScreen) handle(u *UI, ev Event) bool {
 	return false
 }
 
+// toggleLock 是「鎖定／解鎖目前這一筆」的唯一實作，鍵盤與指標共用。
+func (s *cheatListScreen) toggleLock(u *UI) {
+	if s.focus >= len(u.cheats().Entries) {
+		return
+	}
+	u.emit(Cheat{Command: CheatToggleLock, Index: s.focus})
+	u.toast(u.s.CheatEvidenceWarning, SeverityWarn)
+}
+
 func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	state := u.cheats()
@@ -315,6 +338,9 @@ func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	}
 	c.rowText(x, top, m.RowHeight, m.BodySize, u.theme.Text, enabled)
 	c.rowText(x+width/3, top, m.RowHeight, m.SmallSize, u.theme.TextDim, u.s.CheatEnableHint)
+	// 總開關那一列可以點；它在鍵盤上是 Secondary，不在清單的焦點序列裡。
+	u.addHit(x, top, width/3, m.RowHeight, nil,
+		func(u *UI) { u.emit(Cheat{Command: CheatSetEnabled, Flag: !u.cheats().Enabled}) })
 	y := top + m.RowHeight + m.Grid
 	c.rect(x, y, width, 1, u.theme.Border)
 	y += 1 + m.Grid
@@ -351,6 +377,10 @@ func (s *cheatListScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		c.rowText(x+width*5/8, y, m.RowHeight, m.SmallSize, colour, fmt.Sprintf("%d", entry.Width))
 		c.rowText(x+width*3/4, y, m.RowHeight, m.SmallSize, colour, fmt.Sprintf("%d", entry.Value))
 		c.rowText(x+width*7/8, y, m.RowHeight, m.SmallSize, colour, entry.Format)
+		target := index
+		u.addHit(x, y, width, m.RowHeight,
+			func(*UI) { s.focus = target },
+			func(u *UI) { s.focus = target; s.toggleLock(u) })
 		y += m.RowHeight
 	}
 	u.listScrollHint(c, x, listTop, width, y-listTop, first, last, len(state.Entries))

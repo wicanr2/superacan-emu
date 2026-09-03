@@ -241,6 +241,12 @@ func (b *bindingScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		if note != "" {
 			c.rowText(columnNote, y, m.RowHeight, m.SmallSize, u.theme.Warn, "※ "+note)
 		}
+		if !b.waiting {
+			target := index
+			u.addHit(x, y, width, m.RowHeight,
+				func(*UI) { b.focus = target },
+				func(*UI) { b.focus, b.waiting = target, true })
+		}
 		y += m.RowHeight
 	}
 	u.listScrollHint(c, x, listTop, width, y-listTop, first, last, len(rows))
@@ -347,6 +353,13 @@ func (h *hotkeyScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		c.rowText(columnKeyboard, y, m.RowHeight, m.SmallSize, colour, text)
 		if note := conflicts[index]; note != "" {
 			c.rowText(columnNote, y, m.RowHeight, m.SmallSize, u.theme.Warn, "※ "+note)
+		}
+		// 等待指定綁定時不登記：那個狀態在等鍵盤，這時點下去只會多送一次進入等待。
+		if !h.waiting {
+			target := index
+			u.addHit(x, y, width, m.RowHeight,
+				func(*UI) { h.focus = target },
+				func(*UI) { h.focus, h.waiting = target, true })
 		}
 		y += m.RowHeight
 	}
