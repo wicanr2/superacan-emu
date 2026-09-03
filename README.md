@@ -95,6 +95,26 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 
 ![觸控版面](docs/screenshots/ui-touch-monopoly.png)
 
+### 與 Bcan 的入口差異
+
+Bcan 0.0.8b 是 Windows 程式，功能掛在視窗頂端的選單列上；本專案的介面全部自繪，
+同一批功能改由覆蓋選單進入。
+
+| Bcan 0.0.8b 的選單列（未載入卡帶） | 本專案的覆蓋選單 |
+|---|---|
+| ![Bcan 的顯示選單](docs/screenshots/bcan/bcan-menu-view.png) | ![覆蓋選單](docs/screenshots/ui-menu-boomzoo.png) |
+
+差別不只是外觀。選單列的入口本身看得見，覆蓋層沒有那個好處，所以載入卡帶後會在
+左下角提示一次開選單的鍵（六秒後消失，開過選單就不再出現）。反過來，覆蓋選單在
+三個平台是同一份版面，Android 也用得上；選單列在觸控裝置上沒有對應物。
+
+功能逐項的對照——同等、改做法、延後、不做——見
+[`docs/ui-design.md`](docs/ui-design.md) §4，Bcan 端的盤點見
+[`docs/bcan-ui-inventory.md`](docs/bcan-ui-inventory.md)。
+
+> Bcan 0.0.8b 的畫面版權屬其作者，此處僅作介面對照；截圖時未載入卡帶，
+> 不含任何遊戲畫面。
+
 ## 遊戲截圖
 
 > 截圖為各遊戲之版權畫面，僅供模擬器開發驗證，不作其他用途。
@@ -339,6 +359,8 @@ PCM 合成模型（通道/period/音量/key/DMA/timer 暫存器語意與混音�
   `*.bin`/`*.zip`/`ROMS/`/`bios/`。
 - `docs/screenshots/` 內的截圖與 Release 附件的展示影片為遊戲執行畫面
   （遊戲內容仍屬原廠商版權），**僅供開發驗證與功能展示用途**，請勿另作散布。
+- `docs/screenshots/bcan/` 是 Bcan 0.0.8b 的介面截圖，版權屬其作者，
+  僅作介面對照；截圖時未載入卡帶，不含遊戲畫面。
 - 硬體規格結論引自知識庫 `acan/docs/`（對 Bcan 0.0.8b 的逆向分析）。
 
 ## 授權
