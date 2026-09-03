@@ -226,11 +226,13 @@ ROM 與 BIOS 為受版權保護檔案，**不包含**在本 repo；請自備 Bca
 |---|---|
 | Linux x86_64 | [`SuperACan-x86_64.AppImage`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/SuperACan-x86_64.AppImage) |
 | macOS 12+（arm64 ＋ x86_64） | [`SuperACan-macOS-universal.app.zip`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/SuperACan-macOS-universal.app.zip) |
+| Android 5.0+（arm64／armv7／x86_64） | [`superacan-emu.apk`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/superacan-emu.apk) |
 | 雜湊 | [`SHA256SUMS.txt`](https://github.com/wicanr2/superacan-emu/releases/download/v0.1.0-preview/SHA256SUMS.txt) |
 
-macOS 版未簽章，第一次開啟要「右鍵 → 打開」。**發行包不含 ROM 與 BIOS**，
-執行需要使用者自備。完整清單見
-[Releases](https://github.com/wicanr2/superacan-emu/releases)。
+macOS 版未簽章，第一次開啟要「右鍵 → 打開」。APK 由發行金鑰簽章，憑證指紋列在
+[Release 說明](https://github.com/wicanr2/superacan-emu/releases/tag/v0.1.0-preview)，
+可用 `apksigner verify --print-certs` 核對。**發行包不含 ROM 與 BIOS**，
+執行需要使用者自備。
 
 ## 發行包（Linux）
 

@@ -171,6 +171,31 @@ manifest 與一張圖示，用 build-tools 自己的 `aapt2`／`d8`／`zipalign`
   編得過但可能用到 Android 上不存在的 API。
 - 字串資源裡的撇號要跳脫（`Super A\'Can`），否則 `aapt2` 判成未結束的引號。
 
+### 簽章：除錯金鑰與發行金鑰
+
+`packaging/android-apk.sh` 預設用除錯金鑰（沒有就現做一把），產出
+`superacan-emu-debug.apk`，只夠側載。要對外散布就給發行金鑰：
+
+```sh
+ACAN_ANDROID_KEYSTORE=<.jks 路徑> \
+ACAN_ANDROID_KEY_ALIAS=<別名> \
+ACAN_ANDROID_KEYSTORE_PASS_FILE=<只含密碼的檔案> \
+    packaging/android-apk.sh build/android      # 產出 superacan-emu.apk
+```
+
+密碼走**檔案**而不是環境變數：環境變數會出現在 `ps` 與 `docker inspect` 的輸出裡。
+容器內金鑰目錄唯讀掛載即可。
+
+發行金鑰的處置有三條不能省：
+
+- **不進版控、不進發行包。** `.gitignore` 沒有涵蓋 repo 以外的路徑，所以金鑰放
+  repo 之外；也不要放 `build/`，那裡會被建置腳本清掉。
+- **弄丟就換不回來。** Android 用簽章憑證認定「同一個應用程式」；換了金鑰，
+  已安裝的使用者只能先解除安裝才裝得上新版，Play Store 上更是直接擋掉。
+  金鑰與密碼要另外備份到這台機器以外的地方。
+- **憑證指紋要記下來**，之後每次建置都可以用
+  `apksigner verify --print-certs` 比對，確認發出去的是同一把金鑰簽的。
+
 ### 靜態驗收
 
 2026-09-02 的結果：

@@ -15,6 +15,18 @@
 - 公開 Release `v0.1.0-preview`（prerelease）：AppImage、macOS universal `.app.zip`
   與 `SHA256SUMS.txt`。**上傳前逐項確認過包內沒有韌體或卡帶**——列了 AppImage 的
   squashfs 內容（只有執行檔、圖示、`.desktop` 與兩份授權）與 `.app` 的 zip 清單。
+- **Android 改用發行金鑰**。除錯金鑰是公開的固定金鑰，不適合對外散布。
+  `packaging/android-apk.sh` 改成吃 `ACAN_ANDROID_KEYSTORE`／`_KEY_ALIAS`／
+  `_KEYSTORE_PASS_FILE`，有給就產 `superacan-emu.apk`，沒給維持除錯金鑰。
+  **密碼走檔案不走環境變數**：環境變數會出現在 `ps` 與 `docker inspect` 裡。
+- 踩到一個坑：`apksigner` 的 `file:` 是「一行一次密碼」，而 `--ks-pass` 與
+  `--key-pass` 共用同一個讀取器，指到同一個單行檔案時第二次讀會撞 EOF
+  （`Failed to read Key ... end of file reached`）。腳本改成產一份兩行的暫存檔，
+  簽完 `trap` 刪掉；事後確認 `build/` 內沒有殘留。
+- 金鑰放 `~/.local/share/superacan-emu-keys/`（0700，檔案 0600），RSA 4096、
+  10000 天。**不在 repo 內也不在 `build/` 內**——前者會進版控，後者會被建置腳本清掉。
+  憑證 SHA-256 `df0a3988…96ba5a`，與 APK 上的簽章者指紋一致；v1／v2／v3 都通過。
+  這把金鑰弄丟就無法再發同一個應用程式的更新，要另外備份到這台機器以外。
 - **本機完整版** `build/full/SuperACan-full/`（另有 `.tar.gz`，共 57 MB／50 MB）：
   三個平台的執行檔＋四份韌體＋九款卡帶＋`run.sh`。`run.sh` 把韌體、卡帶、存檔、
   截圖與設定全指到包內的相對路徑，不碰 `$HOME` 的 XDG 目錄，整包搬走也能跑；

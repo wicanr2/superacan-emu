@@ -57,17 +57,45 @@ cp base.apk unsigned.apk
 
 "$TOOLS/zipalign" -f -p 4 unsigned.apk aligned.apk
 
-# 除錯金鑰：沒有的話現做一把。APK 一定要簽才裝得上去。
-KEYSTORE="$OUT/debug.keystore"
-[ -f "$KEYSTORE" ] || keytool -genkeypair -keystore "$KEYSTORE" -storepass android \
-    -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-    -dname "CN=Super A'Can Debug, OU=, O=, L=, S=, C=TW" >/dev/null 2>&1
+# 簽章。預設用除錯金鑰（沒有就現做一把），只夠側載；要對外散布就給發行金鑰：
+#
+#   ACAN_ANDROID_KEYSTORE=<.jks 路徑>
+#   ACAN_ANDROID_KEY_ALIAS=<別名>
+#   ACAN_ANDROID_KEYSTORE_PASS_FILE=<只含密碼一行的檔案>
+#
+# 密碼走檔案而不是環境變數：環境變數會出現在 `ps` 與容器的 inspect 輸出裡。
+# 發行金鑰**不進版控也不進發行包**；弄丟就無法再發同一個應用程式的更新。
+if [ -n "${ACAN_ANDROID_KEYSTORE:-}" ]; then
+    KEYSTORE="$ACAN_ANDROID_KEYSTORE"
+    ALIAS="${ACAN_ANDROID_KEY_ALIAS:?發行金鑰要一併給 ACAN_ANDROID_KEY_ALIAS}"
+    PASSFILE="${ACAN_ANDROID_KEYSTORE_PASS_FILE:?發行金鑰要一併給 ACAN_ANDROID_KEYSTORE_PASS_FILE}"
+    [ -f "$KEYSTORE" ] || { echo "android-apk.sh: 找不到 $KEYSTORE" >&2; exit 1; }
+    APK="$OUT/superacan-emu.apk"
+    # apksigner 的 file: 讀法是「一行一次密碼」，而且 --ks-pass 與 --key-pass
+    # 共用同一個讀取器：指到同一個單行檔案時，第二次讀會撞到 EOF
+    # （`Failed to read Key ... password ... end of file reached`）。
+    # 所以把密碼寫成兩行的暫存檔，簽完就刪。
+    PASSTMP="$WORK/.kspass"
+    KSPASS=$(head -n1 "$PASSFILE")
+    ( umask 077; printf '%s\n%s\n' "$KSPASS" "$KSPASS" > "$PASSTMP" )
+    unset KSPASS
+    trap 'rm -f "$PASSTMP"' EXIT INT TERM
+    PASSARG="file:$PASSTMP"
+else
+    KEYSTORE="$OUT/debug.keystore"
+    ALIAS=androiddebugkey
+    APK="$OUT/superacan-emu-debug.apk"
+    PASSARG="pass:android"
+    [ -f "$KEYSTORE" ] || keytool -genkeypair -keystore "$KEYSTORE" -storepass android \
+        -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+        -dname "CN=Super A'Can Debug, OU=, O=, L=, S=, C=TW" >/dev/null 2>&1
+fi
 
-"$TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:android \
-    --key-pass pass:android --ks-key-alias androiddebugkey \
-    --out "$OUT/superacan-emu-debug.apk" aligned.apk
-"$TOOLS/apksigner" verify --print-certs "$OUT/superacan-emu-debug.apk" | head -3
+"$TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-pass "$PASSARG" \
+    --key-pass "$PASSARG" --ks-key-alias "$ALIAS" \
+    --out "$APK" aligned.apk
+"$TOOLS/apksigner" verify --verbose --print-certs "$APK" | head -12
 
-ls -l "$OUT/superacan-emu-debug.apk"
+ls -l "$APK"
 echo "=== APK 內的原生程式庫 ==="
-unzip -l "$OUT/superacan-emu-debug.apk" | awk '{print $4}' | grep -E '\.so$|\.dex$' | sort
+unzip -l "$APK" | awk '{print $4}' | grep -E '\.so$|\.dex$' | sort
