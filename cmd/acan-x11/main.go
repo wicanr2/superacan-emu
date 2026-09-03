@@ -317,6 +317,15 @@ func main() {
 		if *maxTicks != 0 && tick > *maxTicks {
 			break
 		}
+		// 滑鼠只在覆蓋層開著時有意義，介面自己會判斷；這裡無條件轉送，
+		// 沒開時 ui 會回報沒有處理。指定綁定時不送，那個畫面在等鍵盤。
+		if !overlay.UI.WantsRawInput() {
+			for _, event := range window.Pointers() {
+				overlay.Handle(ui.Pointer{X: event.X, Y: event.Y, Phase: pointerPhase(event.Kind)})
+			}
+		} else {
+			window.Pointers()
+		}
 		// 等待指定綁定時只送原始按鍵：否則 Enter 會同時被當成確認與被指定。
 		if overlay.UI.WantsRawInput() {
 			for _, keysym := range window.TakeKeyPresses() {
@@ -420,6 +429,18 @@ func main() {
 		if err := hostio.WriteScreenshot(*screenshot, overlay.System.Bus.Video().Framebuffer()); err != nil {
 			fail(err.Error())
 		}
+	}
+}
+
+// pointerPhase 把視窗層的滑鼠事件種類翻成介面的階段。
+func pointerPhase(kind x11.PointerKind) ui.PointerPhase {
+	switch kind {
+	case x11.PointerDown:
+		return ui.PhaseDown
+	case x11.PointerUp:
+		return ui.PhaseUp
+	default:
+		return ui.PhaseMove
 	}
 }
 

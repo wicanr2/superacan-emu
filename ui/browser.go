@@ -42,23 +42,28 @@ func (b *browserScreen) handle(u *UI, ev Event) bool {
 			u.pop()
 			return true
 		case ActConfirm:
-			if b.focus >= len(entries) {
-				return true
-			}
-			entry := entries[b.focus]
-			if entry.Missing {
-				u.fail(u.s.MissingFile)
-				return true
-			}
-			if !u.firmwareReady() {
-				u.toast(fmt.Sprintf(u.s.NotYet, u.s.FirmwareIncompl), SeverityWarn)
-				return true
-			}
-			u.emit(LoadCartridge{Path: entry.Path})
+			b.activate(u, entries)
 			return true
 		}
 	}
 	return false
+}
+
+// activate 是「載入目前這一片」的唯一實作，鍵盤與指標共用。
+func (b *browserScreen) activate(u *UI, entries []CartridgeEntry) {
+	if b.focus >= len(entries) {
+		return
+	}
+	entry := entries[b.focus]
+	if entry.Missing {
+		u.fail(u.s.MissingFile)
+		return
+	}
+	if !u.firmwareReady() {
+		u.toast(fmt.Sprintf(u.s.NotYet, u.s.FirmwareIncompl), SeverityWarn)
+		return
+	}
+	u.emit(LoadCartridge{Path: entry.Path})
 }
 
 func (b *browserScreen) draw(u *UI, c *canvas, _ Snapshot) {
@@ -99,6 +104,10 @@ func (b *browserScreen) draw(u *UI, c *canvas, _ Snapshot) {
 			colour = u.theme.TextOff
 		}
 		c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, colour, entry.Name)
+		row := index
+		u.addHit(x, y, listWidth, m.RowHeight,
+			func(*UI) { b.focus = row },
+			func(u *UI) { b.focus = row; b.activate(u, entries) })
 		y += m.RowHeight
 		for _, part := range entry.Parts {
 			c.rowText(x+m.RowPadX+m.SectionGap, y, m.RowHeight, m.SmallSize, u.theme.TextDim,

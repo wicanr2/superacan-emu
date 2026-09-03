@@ -25,6 +25,7 @@ type Window struct {
 	pressed    map[xproto.Keycode]bool
 	keysyms    map[xproto.Keycode]uint32
 	presses    []uint32
+	pointers   []PointerEvent
 	closed     bool
 	maxRequest int
 }
@@ -52,6 +53,8 @@ func New(title string, sourceW, sourceH, scale int) (*Window, error) {
 		0, 0, width, height, 0, xproto.WindowClassInputOutput, screen.RootVisual,
 		xproto.CwBackPixel|xproto.CwEventMask,
 		[]uint32{screen.BlackPixel, xproto.EventMaskKeyPress | xproto.EventMaskKeyRelease |
+			xproto.EventMaskButtonPress | xproto.EventMaskButtonRelease |
+			xproto.EventMaskPointerMotion |
 			xproto.EventMaskExposure | xproto.EventMaskStructureNotify}).Check()
 	if err != nil {
 		conn.Close()
@@ -247,6 +250,18 @@ func (w *Window) Poll() bool {
 			}
 		case xproto.KeyReleaseEvent:
 			delete(w.pressed, typed.Detail)
+		case xproto.ButtonPressEvent:
+			// 只收主鍵。滾輪在 X11 是第 4／5 號按鈕的按下事件，收進來會變成
+			// 「在滾輪位置點了一下」。
+			if typed.Detail == 1 {
+				w.queuePointer(PointerEvent{X: int(typed.EventX), Y: int(typed.EventY), Kind: PointerDown})
+			}
+		case xproto.ButtonReleaseEvent:
+			if typed.Detail == 1 {
+				w.queuePointer(PointerEvent{X: int(typed.EventX), Y: int(typed.EventY), Kind: PointerUp})
+			}
+		case xproto.MotionNotifyEvent:
+			w.queuePointer(PointerEvent{X: int(typed.EventX), Y: int(typed.EventY), Kind: PointerMove})
 		case xproto.ClientMessageEvent:
 			w.closed = true
 		case xproto.DestroyNotifyEvent:
@@ -254,6 +269,45 @@ func (w *Window) Poll() bool {
 		}
 	}
 	return !w.closed
+}
+
+// PointerKind 是指標事件的種類。
+type PointerKind uint8
+
+const (
+	PointerDown PointerKind = iota
+	PointerUp
+	PointerMove
+)
+
+// PointerEvent 是一次滑鼠事件，座標是視窗內的像素。
+type PointerEvent struct {
+	X, Y int
+	Kind PointerKind
+}
+
+// queuePointer 把事件排進佇列。移動事件會被合併成最後一筆：X11 的移動事件
+// 是連續的，一幀內收到幾十筆很正常，全部往上送只是讓介面重複算同一件事。
+func (w *Window) queuePointer(event PointerEvent) {
+	if event.Kind == PointerMove && len(w.pointers) > 0 {
+		if last := len(w.pointers) - 1; w.pointers[last].Kind == PointerMove {
+			w.pointers[last] = event
+			return
+		}
+	}
+	if len(w.pointers) < 64 {
+		w.pointers = append(w.pointers, event)
+	}
+}
+
+// Pointers 取走這一輪累積的滑鼠事件。
+func (w *Window) Pointers() []PointerEvent {
+	if len(w.pointers) == 0 {
+		return nil
+	}
+	out := w.pointers
+	w.pointers = nil
+	return out
 }
 
 // KeysymPressed 回報某個 X11 keysym 目前是否按著。

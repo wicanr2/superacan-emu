@@ -59,7 +59,7 @@ func (h *haltScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	}
 	cursor += m.Grid
 	c.rect(x, cursor, width, 1, theme.Border)
-	drawMenuRows(u, c, x, cursor+1, width, rows, h.focus)
+	drawMenuRows(u, c, x, cursor+1, width, rows, &h.focus)
 }
 
 type haltFact struct{ label, value string }

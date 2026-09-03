@@ -58,6 +58,12 @@ type UI struct {
 	// 第一幀本來就可能是 0，那樣計時會每一幀重新歸零，提示永遠不消失。
 	menuHintSince   time.Duration
 	menuHintStarted bool
+
+	// hits 是這一幀登記的可點區域，每次 Draw 重建。
+	hits []hitRegion
+	// pointerDown 與 pointerPress 記住按下的位置：放開時要落在同一塊才算數。
+	pointerDown  bool
+	pointerPress image.Point
 }
 
 // Mode 決定介面的常駐畫面。
@@ -290,8 +296,11 @@ func (u *UI) Handle(ev Event) bool {
 	if life, ok := ev.(Life); ok && life.Kind == LifeBack {
 		return u.handleBack()
 	}
-	if pointer, ok := ev.(Pointer); ok && u.handleTouch(pointer) {
-		return true
+	if pointer, ok := ev.(Pointer); ok {
+		if u.handleTouch(pointer) {
+			return true
+		}
+		return u.handlePointer(pointer)
 	}
 	if !u.Visible() {
 		if action, ok := ev.(Action); ok && action.Kind == ActMenu {
@@ -343,6 +352,7 @@ func (u *UI) Update(now time.Duration) {
 func (u *UI) Draw(dst *image.RGBA, snap Snapshot) {
 	c := &canvas{dst: dst, scale: u.surface.Scale, metrics: u.metrics, font: u.font, theme: u.theme}
 	defer func() { u.textRightEdge = c.textRightEdge }()
+	u.hits = u.hits[:0]
 	u.drawVirtualPad(c)
 	if u.Visible() {
 		// 只畫最上層。每一層都自己負責畫滿需要的底，堆疊在視覺上不疊加；

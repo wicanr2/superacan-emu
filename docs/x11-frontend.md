@@ -15,6 +15,10 @@ Linux／BSD 桌面目標需要 cgo：`internal/glfw` 在 darwin 與 windows 走 
 
 - `frontend/x11` 只做三件事：把 UM6618 的 ARGB framebuffer 以整數倍放大後 `PutImage`
   到視窗、讀取鍵盤狀態、回報視窗關閉。它不持有任何模擬器狀態，也不回饋給核心。
+- 滑鼠只在覆蓋層開著時有意義：視窗訂閱 `ButtonPress`／`ButtonRelease`／
+  `PointerMotion`，只收第 1 號按鈕（第 4／5 號是滾輪，收進來會變成「在滾輪位置
+  點了一下」），移動事件在一幀內合併成最後一筆，然後翻成 `ui.Pointer` 交給介面。
+  介面沒開選單時會回報沒有處理。
 - 鍵位與 Ebitengine 前端相同：方向鍵、Z=A、X=B、A=X、S=Y、Q=L、W=R、Enter=Start、
   右 Shift=Select；Esc 離開。keysym 直接取自 `GetKeyboardMapping`，不寫死 keycode。
 - 主機以 60 Hz 請求下一個硬體 frame（`--pace`，預設開啟）。硬體 frame 邊界仍由 cycle

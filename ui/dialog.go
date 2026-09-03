@@ -21,11 +21,7 @@ func (d *confirm) handle(u *UI, ev Event) bool {
 	case Action:
 		switch e.Kind {
 		case ActConfirm:
-			yes := d.focused == 1
-			u.modal = nil
-			if yes && d.onYes != nil {
-				d.onYes(u)
-			}
+			d.activate(u)
 			return true
 		case ActCancel, ActMenu:
 			u.modal = nil
@@ -39,6 +35,15 @@ func (d *confirm) handle(u *UI, ev Event) bool {
 	}
 	// modal 吃掉所有事件，底下的畫面不會收到；這就是 modal 的定義。
 	return true
+}
+
+// activate 是「確認目前這一個按鈕」的唯一實作，鍵盤與指標共用。
+func (d *confirm) activate(u *UI) {
+	yes := d.focused == 1
+	u.modal = nil
+	if yes && d.onYes != nil {
+		d.onYes(u)
+	}
 }
 
 func (d *confirm) draw(u *UI, c *canvas) {
@@ -86,6 +91,14 @@ func (d *confirm) draw(u *UI, c *canvas) {
 	right := x + width - m.PanelPad
 	u.drawButton(c, right-buttonW, buttonY, buttonW, m.RowHeight, d.accept, d.focused == 1)
 	u.drawButton(c, right-buttonW*2-m.Grid, buttonY, buttonW, m.RowHeight, u.s.Cancel, d.focused == 0)
+
+	// modal 的兩個按鈕最後登記，才會蓋過底下畫面的可點區域。
+	u.addHit(right-buttonW, buttonY, buttonW, m.RowHeight,
+		func(*UI) { d.focused = 1 },
+		func(u *UI) { d.focused = 1; d.activate(u) })
+	u.addHit(right-buttonW*2-m.Grid, buttonY, buttonW, m.RowHeight,
+		func(*UI) { d.focused = 0 },
+		func(u *UI) { d.focused = 0; d.activate(u) })
 }
 
 func (u *UI) drawButton(c *canvas, x, y, w, h int, label string, focused bool) {

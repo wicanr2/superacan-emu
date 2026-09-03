@@ -93,7 +93,7 @@ func (s *overlayScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	}
 	c.rect(x, y+titleH, width, 1, u.theme.Border)
 
-	end := drawMenuRows(u, c, x, y+titleH+1, width, rows, s.focus)
+	end := drawMenuRows(u, c, x, y+titleH+1, width, rows, &s.focus)
 	c.rect(x, end, width, 1, u.theme.Border)
 	c.rowText(x+m.RowPadX, end+1, footerH, m.SmallSize, u.theme.TextDim, statusLine(snap))
 }
@@ -177,5 +177,5 @@ func (s *resetScreen) draw(u *UI, c *canvas, snap Snapshot) {
 	c.border(x, y, width, height, u.theme.Border)
 	c.rowText(x+m.RowPadX, y, m.RowHeight, m.BodySize, u.theme.Text, u.s.ResetMachine)
 	c.rect(x, y+m.RowHeight, width, 1, u.theme.Border)
-	drawMenuRows(u, c, x, y+m.RowHeight+1, width, rows, s.focus)
+	drawMenuRows(u, c, x, y+m.RowHeight+1, width, rows, &s.focus)
 }

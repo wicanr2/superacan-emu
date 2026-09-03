@@ -52,18 +52,27 @@ func handleMenu(u *UI, ev Event, focus *int, rows []menuRow) bool {
 		return true
 	case Action:
 		if e.Kind == ActConfirm && *focus < len(rows) {
-			row := rows[*focus]
-			if row.disabled {
-				u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
-				return true
-			}
-			if row.action != nil {
-				row.action(u)
-			}
+			activateMenuRow(u, rows, *focus)
 			return true
 		}
 	}
 	return false
+}
+
+// activateMenuRow 是「確認一列」的唯一實作，鍵盤與指標共用。
+// 停用的列不是沒反應，而是說明原因：看起來沒反應的話使用者無從得知條件。
+func activateMenuRow(u *UI, rows []menuRow, index int) {
+	if index < 0 || index >= len(rows) {
+		return
+	}
+	row := rows[index]
+	if row.disabled {
+		u.toast(fmt.Sprintf(u.s.NotYet, row.reason), SeverityWarn)
+		return
+	}
+	if row.action != nil {
+		row.action(u)
+	}
 }
 
 // menuHeight 是一欄選單佔的高度，含分隔線。面板高度要用它算，
@@ -79,7 +88,17 @@ func menuHeight(m Metrics, rows []menuRow) int {
 }
 
 // drawMenuRows 畫一欄選單，回傳畫完後的 y。
-func drawMenuRows(u *UI, c *canvas, x, y, width int, rows []menuRow, focus int) int {
+//
+// focus 收指標而不是值，是為了讓指標輸入能把焦點移到被點的那一列：版面只有在
+// 畫的當下才算得出來，可點區域因此在這裡登記，順便帶上改焦點的方法。
+// focusOffset 是這一段在整個焦點序列裡的起點，供分段畫的畫面（S0）使用。
+func drawMenuRows(u *UI, c *canvas, x, y, width int, rows []menuRow, focus *int) int {
+	return drawMenuRowsFrom(u, c, x, y, width, rows, focus, 0, rows)
+}
+
+// drawMenuRowsFrom 畫 rows 這一段，但焦點與確認針對的是 all 這整串；
+// segment 的第 i 列在整串裡的索引是 offset+i。
+func drawMenuRowsFrom(u *UI, c *canvas, x, y, width int, rows []menuRow, focus *int, offset int, all []menuRow) int {
 	m := u.metrics
 	for i, row := range rows {
 		if row.gapBefore {
@@ -90,7 +109,8 @@ func drawMenuRows(u *UI, c *canvas, x, y, width int, rows []menuRow, focus int) 
 		if row.disabled {
 			label, value = u.theme.TextOff, u.theme.TextOff
 		}
-		if i == focus {
+		index := offset + i
+		if index == *focus {
 			c.rect(x, y, width, m.RowHeight, u.theme.Focus)
 			c.rect(x, y, 4, m.RowHeight, u.theme.FocusText)
 			label, value = u.theme.FocusText, u.theme.FocusText
@@ -107,6 +127,9 @@ func drawMenuRows(u *UI, c *canvas, x, y, width int, rows []menuRow, focus int) 
 		case row.hotkey != "":
 			c.rowText(right-c.font.Measure(row.hotkey, m.SmallSize), y, m.RowHeight, m.SmallSize, value, row.hotkey)
 		}
+		u.addHit(x, y, width, m.RowHeight,
+			func(u *UI) { *focus = index },
+			func(u *UI) { *focus = index; activateMenuRow(u, all, index) })
 		y += m.RowHeight
 	}
 	return y

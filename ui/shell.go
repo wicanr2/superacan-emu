@@ -76,14 +76,14 @@ func (s *startScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	rows := s.rows(u)
 	recent := u.recentEntries()
 	y += m.Grid
-	y = drawMenuRows(u, c, x, y, width, rows[:1], s.focus)
+	y = drawMenuRowsFrom(u, c, x, y, width, rows[:1], &s.focus, 0, rows)
 
 	y += m.SectionGap
 	y = u.sectionTitle(c, x, y, fmt.Sprintf("%s（%d）", u.s.SectionRecent, len(recent)))
-	y = drawMenuRows(u, c, x, y, width, rows[1:1+len(recent)], s.focus-1)
+	y = drawMenuRowsFrom(u, c, x, y, width, rows[1:1+len(recent)], &s.focus, 1, rows)
 
 	y += m.SectionGap
-	drawMenuRows(u, c, x, y, width, rows[1+len(recent):], s.focus-1-len(recent))
+	drawMenuRowsFrom(u, c, x, y, width, rows[1+len(recent):], &s.focus, 1+len(recent), rows)
 }
 
 // firmwareScreen 是 S0.1。

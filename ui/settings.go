@@ -37,7 +37,7 @@ func (s *settingsScreen) handle(u *UI, ev Event) bool {
 func (s *settingsScreen) draw(u *UI, c *canvas, _ Snapshot) {
 	m := u.metrics
 	top, _ := page{title: u.s.SettingsTitle, back: true}.draw(u, c)
-	drawMenuRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, s.rows(u), s.focus)
+	drawMenuRows(u, c, m.PanelPad, top, c.width()-m.PanelPad*2, s.rows(u), &s.focus)
 }
 
 // bindingRow 是綁定畫面上的一列。

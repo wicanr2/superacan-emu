@@ -112,6 +112,17 @@
 - [x] 設定檔：JSON，路徑依 XDG（macOS 走 Application Support），未知欄位保留。
 - [x] 介面語言：英／法／西／繁中／簡中，切換不需重啟（畫面每一幀都從字串表取字）。
 
+- [ ] **把命中區補到其餘畫面**：存檔槽（S4）、熱鍵清單（S5.2）、金手指清單（S6.2）
+  與設定裡的選項列目前只吃鍵盤。單欄選單、確認對話與卡帶瀏覽器已經可以用指標點，
+  機制見 [`docs/ui-design.md`](docs/ui-design.md) §9.1.1，補其餘畫面是照著加
+  `addHit` 並把確認邏輯抽成 `activate`。
+- [ ] **macOS 前端的滑鼠事件**。X11 已經接上，Cocoa 這邊卡在
+  `NSEvent.locationInWindow` 回傳的是 `NSPoint`（兩個 CGFloat 的結構），
+  purego 的 `objc.ID.Send` 只取得到整數回傳值，在 arm64 上結構是走浮點暫存器的，
+  直接讀會拿到垃圾。要嘛用 `purego.RegisterLibFunc` 宣告結構回傳，要嘛繞道
+  `NSWindow.mouseLocationOutsideOfEventStream`。**這一項必須在實體 Mac 上驗過
+  才算完成**：FFI 寫錯的症狀是回傳值看起來合理但其實是垃圾，靜態檢查抓不到。
+
 ## C. 平台層與發行
 
 - [x] Linux 桌面：純 Go X11 前端 `cmd/acan-x11`，`CGO_ENABLED=0` 可建置，九款卡帶與
