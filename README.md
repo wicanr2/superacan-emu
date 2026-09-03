@@ -9,7 +9,9 @@ production 主線正改以純 Go 重寫 68000／65C02、UMC6650、UM6618、UM661
 ## 專案起源
 
 Super A'Can 是台灣自製的 16 位元家用主機，敦煌科技開發，晶片由聯華電子供應，
-1995 年上市。上市同一個月，尖端出版印了一冊《A'can 特輯》（電玩玩味叢書 016，
+1995 年上市。
+
+上市同一個月，尖端出版印了一冊《A'can 特輯》（電玩玩味叢書 016，
 1995 年 10 月初版），硬體解析那一頁讓主機自己開口：
 
 > 「我是『台灣敦煌科技有限公司』所有高級工程師，花了將近 3 年嘔心瀝血催生的
@@ -23,22 +25,20 @@ Super A'Can 是台灣自製的 16 位元家用主機，敦煌科技開發，晶�
 「配合國人自行開發的主機 A'can 所編輯而成的刊物」（掃描 p.106／印刷 p.104）。
 
 三十年後，要跑這台主機的遊戲，手邊能用的只有兩套：MAME 的 `supracan` driver，
-以及 BillyJr（報導寫作 Billy Jr）的 Bcan。UMC 那幾顆客製晶片沒有公開規格書，
-BillyJr 從 2004 年的第一版做起，2010 年把 Super A'Can 支援併進 MESS（後併入
+以及 BillyJr（報導寫作 Billy Jr）的 Bcan。
+
+在沒有晶片公開規格書，BillyJr 從 2004 年的第一版做起，2010 年把 Super A'Can 支援併進 MESS（後併入
 MAME），一路做到 2026 年 8 月 30 日釋出的 0.0.8b。這台主機能被逆向到今天這個
 程度，起點是他的工作；本專案的硬體行為對照也是拿 Bcan 0.0.8b 當 oracle。
 
-我是看到 T客邦 2026 年 8 月 31 日的
-[報導](https://www.techbang.com/posts/132758-super-acan-emulator)才知道 0.0.8b
-釋出。Bcan 閉源、只有 Windows 版、沒有公開移植，而我想在自己的 Linux 桌機上
-直接玩，這個專案就是從這裡開始的。1995 年這冊雜誌在意的是玩家不必再看日文、
-查字典；三十年後的問題變成不必開 Windows 才能玩。
+而我想在自己的 Linux 桌機上直接玩，這個專案就是從這裡開始的。
 
 做法是依據唯讀知識庫 [superacan](https://github.com/wicanr2/superacan) 的
 Bcan／BIOS 逆向證據，以及 MAME driver（BSD-3-Clause）的硬體行為參考，把整台主機
 用純 Go 重新實作、不用 cgo；同一份核心編成 Linux AppImage、macOS `.app` 與
-Android APK（見「下載」）。目標是以可追溯、可重現的晶片模型在 Linux、macOS 與
-Android 執行 Super A'Can 軟體。模擬器原始碼同時是硬體文件；相容性不能取代硬體證據。
+Android APK（見「下載」）。
+
+目標是以可追溯、可重現的晶片模型在 Linux、macOS 與 Android 執行 Super A'Can 軟體。
 
 《A'can 特輯》的版權頁印「本書圖文皆轉載於敦煌科技及各軟體廠商」，它記的是開發
 公司當時對外的說法，不是獨立量測；與實測衝突時以實測為準。上面的頁碼是私有專藏
