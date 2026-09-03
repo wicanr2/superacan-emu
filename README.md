@@ -1,6 +1,7 @@
 # superacan-emu
 
-Super A'Can（敦煌科技 Funtech，1995，台灣自製 16 位元遊戲機）的開源硬體模擬器。
+Super A'Can（敦煌科技 Funtech，1995，台灣自製 16 位元遊戲機）的硬體模擬器，
+原始碼公開（source-available，非商業免費，見「授權」）。
 production 主線正改以純 Go 重寫 68000／65C02、UMC6650、UM6618、UM6619、DMA、
 輸入與整機時間線，Ebitengine 將負責跨平台前端；遊戲只用來驗證晶片行為，這不是
 遊戲 remake。
@@ -365,5 +366,19 @@ PCM 合成模型（通道/period/音量/key/DMA/timer 暫存器語意與混音�
 
 ## 授權
 
-本專案自有程式碼以 MIT 授權釋出（見 `LICENSE`）。第三方元件依其各自授權
-（Moira、CLK 皆為 MIT）。
+本專案自有程式碼以 **RRSAL-1.0**（復古重製 source-available 授權條款 1.0，
+SPDX `LicenseRef-RRSAL-1.0`）釋出，全文見 [`LICENSE`](LICENSE)。重點：
+
+- **非商業用途免費**：個人、教育、研究、保存、評論都可以自由使用、修改與再散布，
+  只要標示出處、保留授權全文，並且不對取得本作品本身收費。
+- **實況、錄影、直播、教學、論文引用不算商業使用**，平台廣告分潤與觀眾贊助
+  同樣不受限（第 4 條明列）。
+- **商業使用需要事先書面授權**，請寄 wicanr2@gmail.com 洽談。
+- **不得散布 ROM／BIOS，也不得把它們和本作品打包在一起**（第 5 條 (e)）。
+
+這不是 OSI 定義的開源授權（有非商業限制），對外請寫 source-available。
+第三方元件依其各自授權，發行包內的 `THIRD-PARTY-LICENSES` 列出完整清單；
+`archive/cpp/` 的 Moira 與 CLK 為 MIT，SDL2 為 zlib。
+
+`v0.1.0-preview` 發行包附的是 MIT，該授權對已散布的那些副本持續有效；
+RRSAL-1.0 適用於此後散布的副本。

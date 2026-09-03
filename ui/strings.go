@@ -65,6 +65,7 @@ type Strings struct {
 	About                string
 	AboutTitle           string
 	AboutName            string
+	AboutLicense         string
 	AboutDisclaimer      string
 	AboutThirdParty      string
 	AboutMAME            string

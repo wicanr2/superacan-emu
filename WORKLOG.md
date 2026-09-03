@@ -991,3 +991,58 @@
 - 下一個最小行動：補 OFL-1.1 原文；之後是 CI 守住三個平台的建置。
 - Docker 清理：本輪自建 `superacan-android:v1`（5.69 GB），其餘全部
   `docker run --rm`；`docker ps` 沒有殘留本專案容器。
+
+## 2026-09-03：發行、指標輸入與授權改為 RRSAL-1.0
+
+### 發行
+
+- OFL-1.1 原文補進 `packaging/THIRD-PARTY-LICENSES` 之後，公開散布的最後一個
+  阻礙解除。`v0.1.0-preview` 發出 AppImage、macOS universal `.app.zip`、APK 與
+  `SHA256SUMS`；展示影片另掛在固定 tag `promo` 的附件。
+- **`gh release upload file#name` 設的是 label，不是下載檔名**，要換檔名得先改
+  本機檔名。**`releases/latest/download/…` 對 prerelease 回 404**（`latest` 會跳過
+  prerelease），README 的連結因此指向固定 tag。
+- APK 改用發行金鑰簽章。`apksigner` 的 `--ks-pass` 與 `--key-pass` **共用同一個
+  讀取器，一行讀一個密碼**：只寫一行時第二次讀取撞到檔尾，錯誤訊息卻是
+  `Failed to read Key … password`，看起來像別名錯了。
+- 本機另留一份含 BIOS 與九款卡帶的完整包，不進版控也不對外。
+
+### 指標輸入
+
+- 覆蓋層改成 immediate-mode 命中區：每次 `Draw` 重建，由後往前掃描讓對話框先拿到
+  事件，按下與放開要落在同一區才算數。頁面共用的返回鍵在標題列註冊，所以每個
+  page-based 畫面都自動有返回。X11 前端補上 `ButtonPress`／`ButtonRelease`／
+  `PointerMotion`，只接受 button 1。
+- 執行中畫面補了一個會自動消失的開選單提示，按鍵名從綁定表取，不寫死 F1。
+  **計時器不能拿「時間為 0」當「還沒開始」的哨符**——單調時鐘在第一幀就是 0，
+  提示因此永遠不會過期；改用一個明確的布林旗標。
+- 選單列維持不做。理由與 Bcan 選單列的對照截圖寫在 `docs/ui-design.md` §4.0 與
+  README。
+
+### 授權改為 RRSAL-1.0
+
+- 自有程式碼由 MIT 改為 RRSAL-1.0（SPDX `LicenseRef-RRSAL-1.0`）：非商業免費含
+  修改與再散布，商業使用需事先書面授權，實況／錄影／教學／論文引用明列為非商業。
+- 這個儲存庫不是遊戲 remake，所以條款裡的「原版素材」對應到 ROM、BIOS 與遊戲
+  內容；第 2 條 (c) 的灰色地帶列的是 `docs/screenshots/` 的執行畫面截圖、
+  `docs/screenshots/bcan/` 的 Bcan 介面截圖，以及量測所得的暫存器與調色盤數值表。
+  條款本文只換占位符，未改動任何條件。
+- 授權要跟著包走，四個位置：儲存庫的 `LICENSE`、README 的授權段、AppImage 的
+  根目錄與 `usr/share/doc/superacan-emu/`、`.app` 的 `Contents/Resources/`。
+  **APK 是例外**——使用者翻不到包裡的檔案，所以改在 S8 關於畫面顯示授權名稱、
+  非商業條件與取得全文的位置（五種語言）。S8 的畫面雜湊因此改變，`verify-ui.md`
+  的 C10 表同步更新。
+- 對外文件一律寫 source-available，不寫開源：非商業限制不符合 OSI 的定義，寫成
+  開源會讓人以為可以商用。README 第一段的「開源硬體模擬器」因此改掉。
+
+### 本輪收尾
+
+- HEAD：`72e4f34` 之後再加這一次。
+- 驗證：`test ./...`、`vet ./...` 全綠；S8 的畫面雜湊由
+  `fb18139c…f39b81` 變為 `f99ad055…0f1842`，是本輪唯一改變的畫面。
+- 未證實：**已發行的 `v0.1.0-preview` 附件仍帶 MIT 版的 `LICENSE`**，重新打包會
+  改動已公布的 SHA256SUMS，要不要重切一版還沒決定。macOS 與 Android 兩個包仍未
+  在實機上跑過。
+- 下一個最小行動：決定要不要重切 `v0.1.0-preview`；之後是 CI 守住三個平台的建置。
+- Docker 清理：本輪只用 `docker run --rm`（`docker/go.sh` 與一次 `gofmt`），
+  `docker ps` 沒有殘留本專案容器。

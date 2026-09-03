@@ -45,6 +45,13 @@ func (a *aboutScreen) draw(u *UI, c *canvas, _ Snapshot) {
 		info.Version, info.BuildDate, info.GoVersion, info.Platform, cgo))
 	y += m.RowHeight + m.Grid
 
+	// APK 沒有讓人翻得到的 LICENSE 檔，授權條件只能在這裡讓使用者看見。
+	for _, line := range wrapText(c.font, u.s.AboutLicense, m.BodySize, width) {
+		c.rowText(x, y, m.RowHeight, m.BodySize, u.theme.Text, line)
+		y += m.RowHeight
+	}
+	y += m.Grid
+
 	for _, line := range wrapText(c.font, u.s.AboutDisclaimer, m.BodySize, width) {
 		c.rowText(x, y, m.RowHeight, m.BodySize, u.theme.Text, line)
 		y += m.RowHeight

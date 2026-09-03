@@ -29,6 +29,12 @@ cp "$REPO/packaging/superacan-emu.png" "$BUILD/AppDir/superacan-emu.png"
 cp "$REPO/packaging/superacan-emu.png" "$BUILD/AppDir/.DirIcon"
 cp "$REPO/LICENSE" "$BUILD/AppDir/LICENSE"
 cp "$REPO/packaging/THIRD-PARTY-LICENSES" "$BUILD/AppDir/THIRD-PARTY-LICENSES"
+# 掛載後的 AppDir 根目錄不在使用者的檢視路徑上，桌面環境與封裝檢查工具找的是
+# usr/share/doc/<name>/；授權要在兩個位置都有。
+mkdir -p "$BUILD/AppDir/usr/share/doc/superacan-emu"
+cp "$REPO/LICENSE" "$BUILD/AppDir/usr/share/doc/superacan-emu/LICENSE"
+cp "$REPO/packaging/THIRD-PARTY-LICENSES" \
+    "$BUILD/AppDir/usr/share/doc/superacan-emu/THIRD-PARTY-LICENSES"
 
 # gzip 而不是 zstd：舊的 runtime 不一定支援 zstd，而這個包不大，
 # 壓縮率換相容性划算。

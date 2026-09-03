@@ -123,7 +123,7 @@ var wantHashes = map[string]string{
 	"S0.1/960x720/compact":         "90adda11beebb2cb6fb7529b7177f8522a8b42b372ba37ca0fc94cc1deef90bf",
 	"S1/960x720/compact":           "82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca",
 	"S1/1280x720/touch":            "64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9",
-	"S8/960x720/compact":           "fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81",
+	"S8/960x720/compact":           "f99ad0556789730fcba65ee315ab430dbe93c152f7a120d75d8246cc570f1842",
 	"S5/960x720/compact":           "eeb6cbf576e00d37f94e5ba8f1b18f6e6da28cbdfb577be0f30cdfd06c687e0e",
 	"S5.1/960x720/compact":         "1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62",
 	"S5.2/960x720/compact":         "2cccd2b67daf8a5e36be3d14722c3037ab6ed2b87a55384c36350d8e1964d4f8",

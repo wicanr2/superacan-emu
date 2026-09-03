@@ -1,6 +1,6 @@
 # Super A'Can 模擬器工作清單
 
-更新日期：2026-09-02。狀態只反映目前程式與最近證據；歷程見 `WORKLOG.md`。
+更新日期：2026-09-03。狀態只反映目前程式與最近證據；歷程見 `WORKLOG.md`。
 
 ## 目前位置
 
@@ -153,9 +153,14 @@
   原文、bitmapfont 的 Apache-2.0 原文，以及 OFL-1.1 原文與四份 OFL 來源的版權聲明
   （原文取自 Ark Pixel 與 Galmuri 兩份上游並逐字比對一致）。唯一剩下的缺口是阿拉伯
   字符那一份：上游沒有可引用的版權聲明檔，目前依 bitmapfont README 的標示轉載。
-  macOS 出 universal `.app`（arm64＋x86_64，未簽），Android 出 AAR 與除錯金鑰簽的
-  APK。見
+  macOS 出 universal `.app`（arm64＋x86_64，未簽），Android 出 AAR 與發行金鑰簽的
+  APK（金鑰只在本機，不進版控）。自有程式碼的 `LICENSE`（RRSAL-1.0）在 AppImage
+  的根目錄與 `usr/share/doc/superacan-emu/`、`.app` 的 `Contents/Resources/`
+  各一份；APK 沒有使用者翻得到的檔案，改由 S8 關於畫面顯示。見
   [`docs/release-packaging.md`](docs/release-packaging.md)。
+- [ ] **已發行的 `v0.1.0-preview` 附件仍是 MIT 版的 `LICENSE`。** 授權自 2026-09-03
+  改為 RRSAL-1.0，重新打包會改動已公布的 SHA256SUMS，要不要重切一版待決定。
+  已散布的副本依當時的 MIT 授權，這一點不受影響。
 - [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
   Android 不受此檢查；模擬核心則在五個目標上都要通過。
 

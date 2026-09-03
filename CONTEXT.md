@@ -1,6 +1,6 @@
 # Super A'Can 模擬器目前脈絡
 
-更新日期：2026-09-02
+更新日期：2026-09-03
 
 ## 專案定位
 
@@ -13,6 +13,9 @@ Ebitengine v2.9.9 只有 Linux／BSD 桌面目標需要 cgo，`js/wasm` 與 `win
 oracle 與歷史紀錄。可執行遊戲是驗證硬體模型的方法，不代表可以用遊戲專屬特判
 取代晶片契約。`../acan/` 是唯讀的硬體／Bcan 逆向知識庫，目前由另一工作階段
 review；本專案只引用固定證據，不回寫。
+
+授權自 2026-09-03 起是 RRSAL-1.0（SPDX `LicenseRef-RRSAL-1.0`）：非商業免費含修改
+與再散布，商業使用需事先書面授權。對外一律寫 source-available，不寫開源。
 
 CPU 路線也已定案：Go Motorola 68000 是獨立實作，Moira 固定版只作 sample 與差分
 oracle，不直接移植。CPU 對外一次 `Step` 一條指令，但內部按 fetch、prefetch、bus

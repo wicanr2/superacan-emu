@@ -34,7 +34,7 @@
 | S0.1 主機韌體 | 960×720 `compact` | `90adda11beebb2cb6fb7529b7177f8522a8b42b372ba37ca0fc94cc1deef90bf` |
 | S1 卡帶瀏覽器 | 960×720 `compact` | `82cae5f1eceefee32895587a3972ea42c1e5b03a3d4ba14a5cb39fbda23bddca` |
 | S1 卡帶瀏覽器 | 1280×720 `touch` | `64274509659f2a7e7a637d197f9b264efba212fedc72d26eed4816902e41d1f9` |
-| S8 關於 | 960×720 `compact` | `fb18139c4ac701d5187e9110dd0e9b9e485382eba23a78775b03e2725ff39b81` |
+| S8 關於 | 960×720 `compact` | `f99ad0556789730fcba65ee315ab430dbe93c152f7a120d75d8246cc570f1842` |
 | S9 停機 | 960×720 `compact` | `c06f549d0b21a9caba9422a89cef873cc66bb867a0eef0dc3899991d2533e1bf` |
 | S5 設定 | 960×720 `compact` | `c48bf197a895e9b46313a21d23dae7e98577ebcd7231e6afb7799228d16056cc` |
 | S5.1 輸入綁定 | 960×720 `compact` | `1ef20869b7fb4a4442f58beb90bd1b1f7717e0aec4555344c66ef5e5258fdb62` |

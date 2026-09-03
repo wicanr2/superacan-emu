@@ -1,6 +1,6 @@
 # 發行包與展示影片
 
-更新日期：2026-09-02。
+更新日期：2026-09-03。
 
 Linux 的發行形式是 AppImage：單一檔案、不需要安裝、不依賴發行版的套件庫。裡面裝
 的是 `cmd/acan-x11`，那是 `CGO_ENABLED=0` 的純 Go 執行檔，所以這個包沒有任何動態
@@ -8,6 +8,21 @@ Linux 的發行形式是 AppImage：單一檔案、不需要安裝、不依賴�
 
 ROM、BIOS 與遊戲畫面都不進發行包。韌體與卡帶由使用者自己放到
 `~/.local/share/superacan-emu/` 底下，程式不隨附也不代為下載。
+
+## 授權要跟著包走
+
+自有程式碼是 RRSAL-1.0（SPDX `LicenseRef-RRSAL-1.0`）。授權條件只在儲存庫裡放一份
+不夠——拿到發行包的人多半不會回到儲存庫。每一種發行形式都要能就地讀到全文：
+
+| 發行形式 | LICENSE 位置 |
+|---|---|
+| AppImage | `AppDir/LICENSE` 與 `AppDir/usr/share/doc/superacan-emu/LICENSE` |
+| macOS `.app` | `Contents/Resources/LICENSE` |
+| 本機完整包 | 解開後的根目錄 |
+| APK | 沒有使用者翻得到的檔案，改在 S8 關於畫面顯示授權名稱與取得全文的位置 |
+
+`packaging/THIRD-PARTY-LICENSES` 與 `LICENSE` 一起放，兩份是分開的東西：前者是別人
+的授權，後者是本專案的。
 
 ## AppImage
 
