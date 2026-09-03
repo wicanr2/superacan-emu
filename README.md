@@ -64,9 +64,10 @@ deprecated C++ oracle 的舊里程碑，不是 Go 版完成度：
 ## 展示影片
 
 [下載展示影片](https://github.com/wicanr2/superacan-emu/releases/download/promo/superacan-emu-promo.mp4)
-（70 秒、960×720、含聲音，約 5 MB）——多款卡帶輪播、介面巡覽與實際遊玩。影片是用
-發行的 AppImage 錄的，不是開發中的執行檔：輸入是腳本，同一份腳本在同一份 AppImage
-上會錄出同一段影片。
+（113 秒、960×720、含聲音）——關於畫面、卡帶瀏覽器、Boom Zoo 實際遊玩，接著把覆蓋
+選單底下的每個畫面走一遍：存檔槽的存與讀、金手指、設定的六個子畫面（輸入、熱鍵、
+影像、音訊、語言、觸控）、診斷，最後換第二片卡帶。影片是用發行的 AppImage 錄的，
+不是開發中的執行檔：輸入是腳本，同一份腳本在同一份 AppImage 上會錄出同一段影片。
 
 影片放在 GitHub Release（tag `promo`）的附件而不是版控裡：二進位檔不做差分，
 每重錄一次就會在 git 歷程多留一份完整副本。重錄時覆蓋同一個 tag，上面的網址不變。

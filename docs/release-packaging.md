@@ -251,6 +251,34 @@ ACAN_ANDROID_KEYSTORE_PASS_FILE=<只含密碼的檔案> \
 **後面的聲音整體提前**，不是「那一段沒聲音」。所以每錄一幀就把音訊補到
 `48000/60 × 4` 位元組的整數倍，缺的部分寫靜音。
 
+### 介面要走完整套
+
+影片同時是介面的展示，所以覆蓋層底下的每個畫面都走一遍：存檔槽的存與讀兩種模式、
+金手指、設定的六個子畫面（輸入、熱鍵、影像、音訊、語言、觸控）、診斷，再加上啟動
+畫面的「關於」。每個畫面停約 200 tick（3.3 秒）。
+
+腳本裡的每個 `down` 數量都是從「上一次焦點停在哪」算出來的：`cancel` 回上一層時
+焦點會停在原來那一列，不會重設。改動任何一段都要重算後面所有段落——這是這條腳本
+最容易錯的地方，也是為什麼調完要逐格抽驗而不是看總長度。
+
+### 遊戲的確認鍵是 A，而且要按住
+
+`--press` 的預設按住長度是十幀。Boom Zoo 與 Monopoly 的標題選單在十幀下沒有反應，
+`START` 則是完全沒有作用——這兩個遊戲的確認鍵是 **A，按住約三十幀**。
+還有一個時機限制：**載入卡帶或讀檔之後不能馬上按**，畫面還在淡入時的按鍵會被吃掉，
+實測要隔約 400 tick。
+
+這兩件事是抽格量出來的，不是從按鍵名稱推的。量法是錄一小段（`ACAN_PROMO_NO_ENCODE=1`
+只錄不編），把每個候選按鍵排在不同 tick 上，再抽幀看哪一格之後畫面變了。
+
+### 存檔存在遊玩中，不是標題畫面
+
+從標題按到可操作畫面要按兩次 A 再等轉場，加起來一千多 tick。那段等待沒有必要出現在
+影片裡，所以預建存檔時就把它跑完再存——正式錄影讀檔就直接落在遊玩畫面上。
+
+影片長度定在 6800 tick（113 秒）：Monopoly 的標題約在 6850 tick 開始自己淡出進
+attract mode，再往後錄會以一片純色收尾。
+
 ### 為什麼用讀檔而不是從頭跑
 
 這些遊戲從開機跑到標題畫面要數千幀：Boom Zoo 約 6000 幀、Monopoly 約 3600 幀。
@@ -284,10 +312,10 @@ docker run --rm --network none --memory 6g --cpus 4 --pids-limit 256 \
     superacan-package:v1 sh -c 'packaging/promo.sh /build/promo'
 ```
 
-產物三個：`promo.avi`（MJPEG＋PCM，純 Go 錄出來的原始錄影，約 330 MB）、
-`superacan-emu-promo.mp4`（H.264 crf 20＋AAC 128k，約 12 MB）與
-`superacan-emu-promo-repo.mp4`（H.264 crf 26 `-tune animation`＋AAC 96k，約 5 MB）。
-**影片含遊戲執行畫面，版權仍屬原廠商**，與 `docs/screenshots/` 同一個限制。
+產物兩個：`promo.avi`（MJPEG＋PCM，純 Go 錄出來的原始錄影）與
+`superacan-emu-promo.mp4`（H.264 crf 26 `-tune animation`＋AAC 96k）。
+`ACAN_PROMO_NO_ENCODE=1` 只錄不編，供調腳本時快速看畫面；`ACAN_PROMO_TICKS`
+改長度。**影片含遊戲執行畫面，版權仍屬原廠商**，與 `docs/screenshots/` 同一個限制。
 
 ### 影片走 Release 附件，不進版控
 

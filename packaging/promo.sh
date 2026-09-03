@@ -29,72 +29,104 @@ run() { "$APP" $BIOS --rom-dir /media --state-root "$STATES" --config none \
 # 預先做存檔。走的是與正式錄影同一條「啟動畫面 → 瀏覽器 → 載入」的路，
 # 存檔目錄才會落在同一個地方；直接用 --rom 開的話 StateDir 是另一個值。
 #
-# 每款遊戲存兩個槽：槽 0 是標題畫面，槽 1 是按下 Start 之後的可操作畫面。
-# 按 Start 到畫面真的換過去要六百多幀，直接錄會變成十秒的過場；分兩個槽之後
-# 影片裡兩個畫面都看得到，而且順便演到「切換存檔槽」。
-# 存檔已經在的話就跳過預建：那一段要跑一萬多個 tick，重錄影片時不必再做一次。
-if [ -n "$(find "$STATES" -name 'slot0.acanstate' 2>/dev/null)" ]; then
-  echo "=== 已有存檔，跳過預建"
-else
-# 每款只用槽 0。存檔槽索引是設定檔裡的值，換卡帶不會重設，所以腳本一旦動過
-# 「下一個槽」，後面每一片卡帶都會跟著偏——偏到不存在的槽就會跳出錯誤列，
-# 而錯誤列會吃掉下一個確認鍵，整條腳本從那裡開始失準。不動它就沒有這個問題。
+# 存檔存在**遊玩中**而不是標題畫面。這些遊戲從開機到標題要數千幀，標題到可操作
+# 又要按兩次確認鍵並等轉場——影片沒有那個預算。預建時把這一段跑完再存，正式錄影
+# 讀檔就直接落在有東西看的畫面上。
 #
-# 存檔的 frame 取自 docs/screenshots 已驗證過的畫面：Boom Zoo 6000、
-# Monopoly 3600、Speedy Dragon 1200。載入卡帶的 tick 要加回去。
-echo "=== 預建存檔：Boom Zoo（標題 frame 6000）"
-run --max-ticks 6200 \
-    --ui-script "60:down,90:confirm,120:confirm,6121:hksave_state" >/dev/null
-echo "=== 預建存檔：Monopoly（標題 frame 3600）"
-run --max-ticks 3900 \
-    --ui-script "60:down,90:confirm,120:down,150:down,180:down,210:confirm,3811:hksave_state" >/dev/null
-echo "=== 預建存檔：Speedy Dragon（開場風景 frame 1200）"
-run --max-ticks 1550 \
-    --ui-script "60:down,90:confirm,120:down,150:down,180:down,210:down,240:down,270:confirm,1471:hksave_state" >/dev/null
+# 確認鍵是 **A，而且要按住**（`a*30`）：預設的十幀在這些遊戲的標題選單上不夠長，
+# START 完全沒有作用。這是量出來的，不是從按鍵名稱推的。
+# 另一個坑是**讀檔／載入之後不能馬上按**：載入當下畫面還在淡入，那時的按鍵會被
+# 吃掉。實測要隔約 400 tick。
+#
+# 每款各自檢查，不是「有任何一個存檔就整段跳過」——只重建其中一款時會需要。
+have_state() { [ -f "$STATES/$1/slot0.acanstate" ]; }
+
+# Boom Zoo：標題在 6000 幀，A 選單、A 選角色，1-1 開場之後就是可操作畫面。
+if have_state "Boom Zoo (Taiwan).bin"; then
+  echo "=== 已有 Boom Zoo 存檔"
+else
+  echo "=== 預建存檔：Boom Zoo（遊玩中）"
+  run --max-ticks 8100 \
+      --ui-script "60:down,90:confirm,120:confirm,8001:hksave_state" \
+      --press "6600:a*30,7000:a*30" >/dev/null
 fi
+
+# Monopoly：只當影片結尾的第二片卡帶，停在標題畫面就夠，不必進到遊戲。
+if have_state "Monopoly - Adventure in Africa (Taiwan).bin"; then
+  echo "=== 已有 Monopoly 存檔"
+else
+  echo "=== 預建存檔：Monopoly（標題 frame 3600）"
+  run --max-ticks 3900 \
+      --ui-script "60:down,90:confirm,120:down,150:down,180:down,210:confirm,3811:hksave_state" >/dev/null
+fi
+
 find "$STATES" -name 'slot*.acanstate' | sort
 
 # 正式錄影。腳本事件與按鍵注入用的都是主機迴圈次數，所以兩條時間線對得上。
 # 讀檔之後按 Start，再留六百多個 tick 讓遊戲把畫面換過去——那是遊戲自己的節奏，
 # 不是模擬器慢。
-UI_SCRIPT="220:down,280:confirm,\
-340:down,400:down,460:down,520:up,550:up,580:up,\
-620:confirm,\
-1000:hkload_state,\
-1540:menu,1580:down,1610:down,1640:confirm,\
-1890:cancel,1930:down,1960:down,1990:down,2020:down,2050:confirm,\
-2330:cancel,2360:down,2390:down,2420:down,2450:confirm,\
-2510:down,2570:confirm,2610:down,2640:down,2670:down,2720:confirm,\
-2790:hkload_state,\
-3340:menu,3370:down,3400:down,3430:down,3460:down,3490:down,3520:down,3550:down,3580:down,3610:down,3640:confirm,\
-3700:down,3760:confirm,3800:down,3830:down,3860:down,3890:down,3920:down,3960:confirm,\
-4030:hkload_state"
+#
+# 影片的重點之一是介面，所以覆蓋層的每一個畫面都走一遍：存檔槽（存與讀兩種模式）、
+# 金手指、設定底下六個子畫面、診斷，再加上啟動畫面的「關於」。每個畫面停約
+# 200 tick（3.3 秒）——比讀完一頁需要的時間短，但足夠看清楚版面。
+#
+# 焦點是有狀態的：cancel 回上一層之後焦點停在原來那一列，所以下面每個 down 的
+# 數量都是從「上一次停在哪」算出來的，不是從 0 重數。改動任何一段都要重算後面。
+#
+# S0 啟動畫面（--config none 沒有最近清單）：0 韌體、1 選擇卡帶、2 關於、3 離開
+# S3 覆蓋選單：0 繼續、1 存檔、2 讀檔、3 重置、4 金手指、5 設定、6 診斷、
+#              7 截圖、8 錄影、9 退出卡帶、10 結束
+# S5 設定：0 輸入、1 熱鍵、2 畫面、3 音訊、4 語言、5 觸控
+UI_SCRIPT="\
+180:down,210:down,260:confirm,\
+620:cancel,680:up,730:confirm,\
+800:down,850:down,900:down,950:up,1000:up,1050:up,\
+1120:confirm,\
+1500:hkload_state,\
+2100:menu,2160:down,2200:confirm,\
+2450:cancel,2500:down,2540:confirm,\
+2790:cancel,2840:down,2880:down,2920:confirm,\
+3170:cancel,3220:down,3260:confirm,\
+3320:confirm,3570:cancel,\
+3620:down,3660:confirm,3890:cancel,\
+3940:down,3980:confirm,4210:cancel,\
+4260:down,4300:confirm,4530:cancel,\
+4580:down,4620:confirm,4850:cancel,\
+4900:down,4940:confirm,5170:cancel,\
+5220:cancel,5270:down,5310:confirm,\
+5560:cancel,5610:down,5650:down,5690:down,5740:confirm,\
+5800:down,5850:confirm,\
+5910:down,5950:down,5990:down,6050:confirm,\
+6350:hkload_state"
 
-PRESS="1060:start,1200:right*25,1260:left*25,1320:down*20,\
-2850:start,3000:down*20,3060:up*20,\
-4100:right*40,4160:left*40"
+# 開選單提示只在「載入卡帶之後、還沒開過選單」時出現，所以 1120 載入到 2100 開選單
+# 之間那一段本來就會演到它，不必另外安排。
+PRESS="1560:right*30,1640:a*15,1690:left*40,1790:down*30,\
+1870:a*15,1920:up*40,2010:right*25"
 
-echo "=== 錄製 4200 tick（約 70 秒）"
-run --max-ticks 4200 --audio-sink "cat > /dev/null" \
+# 6800 而不是整數 7000：Monopoly 的標題畫面約在 6850 tick 開始自己淡出進 attract
+# mode，再往後錄就會以一片純色收尾。
+TICKS=${ACAN_PROMO_TICKS:-6800}
+echo "=== 錄製 $TICKS tick（約 $((TICKS / 60)) 秒）"
+run --max-ticks "$TICKS" --audio-sink "cat > /dev/null" \
     --ui-script "$UI_SCRIPT" --press "$PRESS" \
     --record "$OUT/promo.avi" >/dev/null
 
 ls -l "$OUT/promo.avi"
-echo "=== 轉成 H.264 MP4"
-ffmpeg -loglevel error -y -i "$OUT/promo.avi" \
-    -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \
-    -c:a aac -b:a 128k -movflags +faststart \
-    "$OUT/superacan-emu-promo.mp4"
-ls -l "$OUT/superacan-emu-promo.mp4"
 
-# 進版控的那一份另外壓一次。二進位檔每重錄一次就在 git 歷程留一份完整副本，
-# 所以進 repo 的版本要小；`-tune animation` 對這種大面積平色的畫面有效，
-# crf 26 下介面文字與 crf 20 肉眼無異，體積約少一半。
-echo "=== 轉成進版控用的 MP4"
+# 只編一份。兩份的分工來自「一份進版控、一份留全畫質」，影片改掛 Release 附件
+# 之後就沒有進版控的那一份了；而下載端要的是小檔，所以留 crf 26。
+# -tune animation 對這種大面積平色的畫面有效，介面文字與 crf 20 肉眼無異。
+if [ -n "${ACAN_PROMO_NO_ENCODE:-}" ]; then
+    echo "=== ACAN_PROMO_NO_ENCODE 有設，跳過編碼"
+    exit 0
+fi
+
+echo "=== 轉成 H.264 MP4"
 ffmpeg -loglevel error -y -i "$OUT/promo.avi" \
     -c:v libx264 -preset veryslow -tune animation -crf 26 -pix_fmt yuv420p \
     -c:a aac -b:a 96k -movflags +faststart \
-    "$OUT/superacan-emu-promo-repo.mp4"
-ls -l "$OUT/superacan-emu-promo-repo.mp4"
+    "$OUT/superacan-emu-promo.mp4"
+ls -l "$OUT/superacan-emu-promo.mp4"
 ffprobe -loglevel error -show_entries format=duration:stream=codec_name,width,height,r_frame_rate \
     -of default=noprint_wrappers=1 "$OUT/superacan-emu-promo.mp4"
