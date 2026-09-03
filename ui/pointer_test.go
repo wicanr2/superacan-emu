@@ -17,11 +17,20 @@ func desktopUI(t *testing.T) (*UI, Surface) {
 }
 
 // firstHitBelowTitle 跳過標題列上的「返回」，回傳內容區的第一塊命中區。
-func firstHitBelowTitle(u *UI) image.Point {
+func firstHitBelowTitle(u *UI) image.Point { return contentHit(u, 0) }
+
+// contentHit 回傳內容區第 n 塊命中區的中心。走 page 的畫面會先登記標題列上的
+// 「返回」，所以命中區的索引比列的索引多一，這裡把它跳掉。
+func contentHit(u *UI, n int) image.Point {
+	seen := 0
 	for _, hit := range u.hits {
-		if hit.rect.Min.Y >= u.metrics.TitleBar {
+		if hit.rect.Min.Y < u.metrics.TitleBar {
+			continue
+		}
+		if seen == n {
 			return image.Pt((hit.rect.Min.X+hit.rect.Max.X)/2, (hit.rect.Min.Y+hit.rect.Max.Y)/2)
 		}
+		seen++
 	}
 	return image.Point{}
 }
@@ -181,4 +190,65 @@ func TestPointerBackFromSharedTitleBar(t *testing.T) {
 	if len(u.stack) >= depth {
 		t.Fatalf("點標題列的返回沒有退堆疊：%d → %d", depth, len(u.stack))
 	}
+}
+
+// 走一條完整的路：覆蓋選單 →「設定」→「影像」→ 點一列選項，確認值真的變了。
+// 這條測的是「點下去有沒有做事」，不只是「有沒有登記命中區」。
+func TestPointerWalksIntoSettingsAndChangesAValue(t *testing.T) {
+	surface := Surface{W: 960, H: 720, Scale: 1, Profile: ProfileCompact}
+	u := New(Options{Surface: surface, Config: DefaultConfig(), Slots: fixedSlots{},
+		Library: fixedLibrary{}, Firmware: fixedFirmware{complete: true}, About: fixedAbout})
+	u.Update(0)
+	u.Open()
+
+	clickRowLabelled(t, u, surface, u.s.Settings)
+	if id := u.stack[len(u.stack)-1].id(); id != "S5" {
+		t.Fatalf("點「設定」之後在 %s，預期 S5", id)
+	}
+	clickRowLabelled(t, u, surface, u.s.VideoTitle)
+	if id := u.stack[len(u.stack)-1].id(); id != "S5.3" {
+		t.Fatalf("點「影像」之後在 %s，預期 S5.3", id)
+	}
+
+	// 影像設定的第一列是縮放倍率，點一下等同按右鍵，值加一階。
+	before := u.config.Video.Scale
+	renderImage(u, surface)
+	click(u, firstHitBelowTitle(u))
+	if u.config.Video.Scale != before+1 {
+		t.Fatalf("點第一列選項之後縮放是 %d，預期 %d", u.config.Video.Scale, before+1)
+	}
+}
+
+// clickRowLabelled 畫一次、找到寫著 label 的那一列、點它。用畫面上的文字定位，
+// 測試就不必寫死列的索引，選單增減一列也不會假紅。
+func clickRowLabelled(t *testing.T, u *UI, surface Surface, label string) {
+	t.Helper()
+	renderImage(u, surface)
+	rows := rowsOnScreen(u)
+	for index, row := range rows {
+		if row == label {
+			click(u, contentHit(u, index))
+			return
+		}
+	}
+	t.Fatalf("畫面上找不到「%s」這一列", label)
+}
+
+// rowsOnScreen 取目前最上層畫面的列標題，順序與命中區相同。
+func rowsOnScreen(u *UI) []string {
+	switch top := u.stack[len(u.stack)-1].(type) {
+	case *overlayScreen:
+		return labelsOf(top.rows(u))
+	case *settingsScreen:
+		return labelsOf(top.rows(u))
+	}
+	return nil
+}
+
+func labelsOf(rows []menuRow) []string {
+	out := make([]string, len(rows))
+	for i, row := range rows {
+		out[i] = row.label
+	}
+	return out
 }
