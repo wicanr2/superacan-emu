@@ -1,5 +1,18 @@
 # 工作歷程
 
+## 2026-09-03：補齊 OFL-1.1，發行 AppImage 與 macOS，另做本機完整版
+
+- **公開散布的阻擋條件解除**。`packaging/THIRD-PARTY-LICENSES` 原本自己寫著
+  「補上 OFL-1.1 原文之前這個包不可對外散布」。bitmapfont v4.1.0 模組內只有
+  Apache-2.0 的 `LICENSE`，四份 OFL 來源只列在 README，所以原文要從各字型專案的
+  上游取：Ark Pixel 的 `LICENSE-OFL`、Cubic 11 的 `OFL.txt`、Galmuri 的 `ofl.md`。
+- 四份的授權原文相同，包裡只收一份。**用兩份獨立上游（Ark Pixel 與 Galmuri）
+  正規化後逐字比對確認一致**才收，不是抄一份就算。版權聲明四份各自列出。
+- 留著一個缺口並寫明：阿拉伯字符（Eternal Dream Arabization）上游沒有可引用的
+  版權聲明檔，bitmapfont 的 README 也只標作者與授權名稱，只能照上游標示轉載。
+- 兩個包都重建並確認帶到新的授權檔（387 行、含 OFL 原文）；AppImage 的 300-frame
+  smoke 與基準相同（`instructions=4364786`、`122922cb…c71198`）。
+
 ## 2026-09-02（續）：推廣影片重錄並進版控
 
 - 用發行的 AppImage（`29350d20…f16aae`）重錄一次，70 秒、960×720、60 fps、含聲音；

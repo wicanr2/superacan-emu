@@ -139,10 +139,11 @@
   跑出來的指令數與 framebuffer 雜湊與 headless 基準相同；預設路徑走 XDG，缺韌體
   改由啟動畫面說明而不是啟動失敗。第三方授權清單已進包
   （`packaging/THIRD-PARTY-LICENSES`），含 Baekmuk 授權原文與商標標示、M+ 授權
-  原文、bitmapfont 的 Apache-2.0 原文。**還缺**：OFL-1.1 的原文不在 bitmapfont
-  模組內，四份 OFL 來源因此尚未符合散布條件——**補上之前這個包不可對外散布**；
+  原文、bitmapfont 的 Apache-2.0 原文，以及 OFL-1.1 原文與四份 OFL 來源的版權聲明
+  （原文取自 Ark Pixel 與 Galmuri 兩份上游並逐字比對一致）。唯一剩下的缺口是阿拉伯
+  字符那一份：上游沒有可引用的版權聲明檔，目前依 bitmapfont README 的標示轉載。
   macOS 出 universal `.app`（arm64＋x86_64，未簽），Android 出 AAR 與除錯金鑰簽的
-  APK。三個平台的包都缺 OFL-1.1 原文。見
+  APK。見
   [`docs/release-packaging.md`](docs/release-packaging.md)。
 - [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
   Android 不受此檢查；模擬核心則在五個目標上都要通過。

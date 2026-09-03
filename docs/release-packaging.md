@@ -81,12 +81,16 @@ DISPLAY=:99 ./SuperACan-x86_64.AppImage --ipl … --key … --sound-bios1 … --
 ### 第三方授權
 
 `packaging/THIRD-PARTY-LICENSES` 隨包散布，內容是 bitmapfont/v4 的 Apache-2.0
-原文、Baekmuk 授權原文與它要求的商標標示、M+ Bitmap Fonts 授權原文，以及六份
-字型來源的出處與授權名稱。
+原文、Baekmuk 授權原文與它要求的商標標示、M+ Bitmap Fonts 授權原文，以及 OFL-1.1
+原文與六份字型來源的出處、授權名稱與版權聲明。
 
-**目前不符合散布條件**：其中四份來源採用 OFL-1.1，而該授權要求原文隨字型散布；
-OFL-1.1 的原文不在 bitmapfont 模組內，本專案也還沒把它取進來。在補上之前，
-這個 AppImage 只能自用與內部驗證，不可對外散布。
+OFL-1.1 的原文不在 bitmapfont 模組內（模組只有 Apache-2.0 的 `LICENSE`，OFL 來源
+只列在 README），所以是從各字型專案的上游取回來的：Ark Pixel 的 `LICENSE-OFL`、
+Cubic 11 的 `OFL.txt`、Galmuri 的 `ofl.md`。四份的授權原文相同，包裡只收一份，
+並用 Ark Pixel 與 Galmuri 兩份獨立來源正規化後逐字比對確認一致。
+
+一個缺口留著：阿拉伯字符那一份（Eternal Dream Arabization）上游沒有可引用的版權
+聲明檔，bitmapfont 的 README 也只標作者與授權名稱，包裡因此只能照上游的標示轉載。
 
 ## macOS
 
