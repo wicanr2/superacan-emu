@@ -158,9 +158,6 @@
   的根目錄與 `usr/share/doc/superacan-emu/`、`.app` 的 `Contents/Resources/`
   各一份；APK 沒有使用者翻得到的檔案，改由 S8 關於畫面顯示。見
   [`docs/release-packaging.md`](docs/release-packaging.md)。
-- [ ] **已發行的 `v0.1.0-preview` 附件仍是 MIT 版的 `LICENSE`。** 授權自 2026-09-03
-  改為 RRSAL-1.0，重新打包會改動已公布的 SHA256SUMS，要不要重切一版待決定。
-  已散布的副本依當時的 MIT 授權，這一點不受影響。
 - [ ] CI 守住「Linux 與 macOS 的發行 binary `CGO_ENABLED=0` 可建置」，不靠人記得。
   Android 不受此檢查；模擬核心則在五個目標上都要通過。
 

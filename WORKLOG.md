@@ -1035,14 +1035,32 @@
 - 對外文件一律寫 source-available，不寫開源：非商業限制不符合 OSI 的定義，寫成
   開源會讓人以為可以商用。README 第一段的「開源硬體模擬器」因此改掉。
 
+### 作者身分改寫與重新發行
+
+- 131 個 commit 裡有 58 個掛公司信箱 `cy.wang@coretronic.com`，全部改寫成
+  `Chun-Yu Wang <wicanr2@gmail.com>`（`git filter-branch --env-filter`，author 與
+  committer 都改）。改寫後逐一比對：131 個 commit 位置一一對應、每個位置的 tree
+  雜湊相同、訊息與 author／committer 兩個時間戳完全一致，所以只有身分欄改變。
+- **只 force push 分支不夠**：tag 會把舊 commit 釘住不放，GitHub 那邊的舊身分
+  因此還在。`v0.1.0-preview` 與 `promo` 兩個 tag 連同 release 都要刪掉重建。
+- 三個發行包全部重建，帶新的 `LICENSE` 與關於畫面的授權行；`SHA256SUMS.txt`
+  重新產生。APK 用同一把發行金鑰簽（憑證 SHA-256 `df0a3988…ba5a` 不變，所以裝得
+  上去覆蓋舊版）。
+- **AppImage 的執行檔是 `-ldflags "-s -w"` 建的**，文件原本漏寫。少了這兩個旗標
+  執行檔 7.9 MB → 10.2 MB，AppImage 跟著大 2 MB；發現的方式是重建後檔案莫名變大，
+  不是讀文件讀出來的。文件已補。
+- 重建後的 AppImage 跑 300 frame 得到 `instructions=4364786`
+  `framebuffer_sha256=122922cb…c71198`，與 `verify-ui.md` 的 headless 基準相同，
+  所以重建沒有改變行為。
+
 ### 本輪收尾
 
-- HEAD：`72e4f34` 之後再加這一次。
+- HEAD：`72e4f34`（改寫後 `fd586fa`）之後再加這一次。
 - 驗證：`test ./...`、`vet ./...` 全綠；S8 的畫面雜湊由
-  `fb18139c…f39b81` 變為 `f99ad055…0f1842`，是本輪唯一改變的畫面。
-- 未證實：**已發行的 `v0.1.0-preview` 附件仍帶 MIT 版的 `LICENSE`**，重新打包會
-  改動已公布的 SHA256SUMS，要不要重切一版還沒決定。macOS 與 Android 兩個包仍未
-  在實機上跑過。
-- 下一個最小行動：決定要不要重切 `v0.1.0-preview`；之後是 CI 守住三個平台的建置。
-- Docker 清理：本輪只用 `docker run --rm`（`docker/go.sh` 與一次 `gofmt`），
-  `docker ps` 沒有殘留本專案容器。
+  `fb18139c…f39b81` 變為 `f99ad055…0f1842`，是本輪唯一改變的畫面。AppImage
+  300-frame 與 headless 基準逐位元相同。三個包各自確認帶著 RRSAL-1.0 的 `LICENSE`，
+  APK 的 `libgojni.so` 內找得到 `RRSAL-1.0` 字串。
+- 未證實：macOS 與 Android 兩個包仍未在實機上跑過。
+- 下一個最小行動：CI 守住三個平台的建置與 `CGO_ENABLED=0`。
+- Docker 清理：本輪全部 `docker run --rm`（`docker/go.sh`、一次 `gofmt`、
+  android／package 兩個 image 各數次），`docker ps` 沒有殘留本專案容器。

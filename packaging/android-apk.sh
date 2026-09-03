@@ -7,7 +7,8 @@
 # manifest 與一張圖示，用 build-tools 自己的 aapt2／d8／zipalign／apksigner 就組
 # 得完，步驟也因此看得見。
 #
-# 簽的是**除錯金鑰**，只夠側載安裝；要上架或對外散布必須換成自己的發行金鑰。
+# 預設簽除錯金鑰（只夠側載）。給 ACAN_ANDROID_KEYSTORE／_KEY_ALIAS／
+# _KEYSTORE_PASS_FILE 就改簽發行金鑰，產出 superacan-emu.apk；詳見下方簽章那一段。
 set -eu
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)

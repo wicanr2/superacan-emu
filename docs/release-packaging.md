@@ -54,7 +54,7 @@ dd if=某個.AppImage of=runtime bs=$off count=1
 
 ```sh
 # 1. 純 Go 執行檔
-ACAN_CGO=0 docker/go.sh build -o /src/build/acan-x11 ./cmd/acan-x11/
+ACAN_CGO=0 docker/go.sh build -ldflags "-s -w" -o /src/build/acan-x11 ./cmd/acan-x11/
 
 # 2. 圖示（建置產物，可從原始碼重現）
 docker/go.sh run ./packaging/icon /src/packaging/superacan-emu.png
@@ -62,6 +62,9 @@ docker/go.sh run ./packaging/icon /src/packaging/superacan-emu.png
 # 3. 組出 AppImage（在 superacan-package image 內）
 ACAN_APPIMAGE_RUNTIME=<runtime> packaging/appimage.sh build/SuperACan-x86_64.AppImage
 ```
+
+`-s -w` 拿掉符號表與 DWARF：執行檔 10.2 MB → 7.9 MB，AppImage 因此少約 2 MB。
+Go 的 panic backtrace 不靠 DWARF，拿掉不影響堆疊追蹤。
 
 `docker/package.Dockerfile` 是打包與編碼用的工具鏈，從專案的 Go image 延伸，
 只多了 `squashfs-tools`、`ffmpeg`、`xvfb` 與 `file`（多出約 264 MB）。
@@ -263,7 +266,7 @@ ACAN_ANDROID_KEYSTORE_PASS_FILE=<只含密碼的檔案> \
 才會發現（例如音訊長度對不上畫面）。所以錄影的第一步永遠是重建：
 
 ```sh
-ACAN_CGO=0 docker/go.sh build -o /src/build/acan-x11 ./cmd/acan-x11/
+ACAN_CGO=0 docker/go.sh build -ldflags "-s -w" -o /src/build/acan-x11 ./cmd/acan-x11/
 ACAN_APPIMAGE_RUNTIME=<runtime> packaging/appimage.sh build/SuperACan-x86_64.AppImage
 ```
 
